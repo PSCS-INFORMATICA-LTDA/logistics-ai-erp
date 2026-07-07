@@ -3,9 +3,14 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 
+type EntityFormRenderProps = {
+  form: Record<string, unknown>;
+  set: (k: string, v: unknown) => void;
+};
+
 type Props = {
-  children: ReactNode;
-  onSubmit: (data: Record<string, unknown>) => Promise<void>;
+  children: ReactNode | ((ctx: EntityFormRenderProps) => ReactNode);
+  onSubmit: (data: Record<string, unknown>) => Promise<void | string | null>;
   onCancel: () => void;
   saving: boolean;
   initial?: Record<string, unknown>;
@@ -23,9 +28,7 @@ export function EntityForm({ children, onSubmit, onCancel, saving, initial = {} 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {typeof children === "function"
-        ? (children as (ctx: { form: Record<string, unknown>; set: (k: string, v: unknown) => void }) => ReactNode)({ form, set })
-        : children}
+      {typeof children === "function" ? children({ form, set }) : children}
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={saving}>
           {saving ? "Salvando..." : "Salvar"}
