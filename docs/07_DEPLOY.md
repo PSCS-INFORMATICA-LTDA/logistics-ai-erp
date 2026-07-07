@@ -51,7 +51,7 @@ supabase link --project-ref SEU_PROJECT_REF
 supabase db push
 ```
 
-**Via Dashboard:** Supabase → **SQL Editor** → executar cada arquivo de `supabase/migrations/` na ordem numérica (001 → 020), se o ambiente ainda não estiver atualizado.
+**Via Dashboard:** Supabase → **SQL Editor** → executar `supabase/apply_015_to_020.sql` (ou cada arquivo de `supabase/migrations/` na ordem numérica).
 
 > Confirme no Dashboard (**Database → Migrations** ou histórico de queries) que 015–020 foram aplicadas antes de testar OS de frete em produção.
 
@@ -59,11 +59,13 @@ supabase db push
 
 Em **Authentication → URL Configuration**:
 
-| Campo | Valor (exemplo) |
-|-------|-----------------|
-| **Site URL** | `https://seu-dominio.vercel.app` |
-| **Redirect URLs** | `https://seu-dominio.vercel.app/**` |
+| Campo | Valor (produção GRX) |
+|-------|----------------------|
+| **Site URL** | `https://grx-management.vercel.app` |
+| **Redirect URLs** | `https://grx-management.vercel.app/**` |
 | | `http://localhost:3002/**` (desenvolvimento) |
+
+Link direto: [Supabase → Auth → URL Configuration](https://supabase.com/dashboard/project/tqeenmswotxqainkyyct/auth/url-configuration)
 
 O middleware do app redireciona usuários não autenticados para `/login`. Garanta que a URL de produção esteja na lista de redirects permitidos.
 
@@ -126,7 +128,7 @@ Push na branch conectada (ex.: `main`) dispara deploy automático. Migrations no
 
 ## 4. Checklist pós-deploy
 
-Execute na URL de produção:
+Execute na URL de produção: **https://grx-management.vercel.app**
 
 - [ ] `/login` — tela carrega sem erro
 - [ ] Login com usuário de teste — redireciona para `/dashboard`

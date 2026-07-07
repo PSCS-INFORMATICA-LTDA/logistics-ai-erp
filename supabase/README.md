@@ -20,6 +20,10 @@ No **SQL Editor** do Supabase, execute na sequência:
 14. `migrations/014_service_orders_freight.sql` — Frete, rota A→B, piso ANTT e valor fechado
 15. `migrations/015_service_orders_freight_tolls.sql` — quantidade e detalhamento de pedágios
 16. `migrations/016_vehicles_axle_count.sql` — quantidade de eixos no cadastro de caminhão
+17. `migrations/017_service_orders_status_approval.sql` — status "Aguardando aprovação cliente"
+18. `migrations/018_service_orders_per_diem.sql` — despesas de viagem (diárias > 1.000 km)
+19. `migrations/019_service_orders_per_diem_charge.sql` — cobrança diária Cliente vs GRX
+20. `migrations/020_service_orders_transport_km_rate.sql` — tarifa R$/km para van
 
 ## Seed do plano de contas
 
