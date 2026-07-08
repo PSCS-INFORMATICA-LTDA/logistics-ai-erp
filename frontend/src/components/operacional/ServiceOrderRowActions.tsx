@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AssignDriverModal } from "@/components/operacional/AssignDriverModal";
 import { cn } from "@/lib/utils";
-import { isPendingClientProposal } from "@/lib/service-order-display-status";
+import {
+  canAssignDriverToServiceOrder,
+  isPendingClientProposal,
+} from "@/lib/service-order-display-status";
 import {
   registerProposalFollowUp,
   resetProposalClientResponse,
@@ -24,6 +28,7 @@ type Props = {
   row: ServiceOrderListRow;
   onFollowUpRegistered?: (orderId: string, count: number, lastAt: string | null) => void;
   onProposalResponseChanged?: (orderId: string, patch: ProposalResponsePatch) => void;
+  onDriverAssigned?: (orderId: string, driverId: string, driverName: string) => void;
 };
 
 function PhoneIcon({ className }: { className?: string }) {
@@ -101,13 +106,16 @@ export function ServiceOrderRowActions({
   row,
   onFollowUpRegistered,
   onProposalResponseChanged,
+  onDriverAssigned,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
 
   const canPhoneResponse = isPendingClientProposal(row);
+  const canAssignDriver = canAssignDriverToServiceOrder(row);
   const canResetProposal =
     Boolean(row.proposal_sent_at) && (row.proposal_response ?? "pending") !== "pending";
 
@@ -213,8 +221,9 @@ export function ServiceOrderRowActions({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Link
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
         href={`/operacional/ordens-servico/${row.id}/proposta`}
         target="_blank"
         rel="noreferrer"
@@ -224,6 +233,18 @@ export function ServiceOrderRowActions({
       >
         PDF / Proposta
       </Link>
+      {canAssignDriver && (
+        <button
+          type="button"
+          title="Designar motorista disponível"
+          onClick={() => setAssignOpen(true)}
+          className={cn(
+            "inline-flex items-center justify-center rounded-lg border border-brand-400 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-900 transition-colors hover:bg-brand-100"
+          )}
+        >
+          Designar motorista
+        </button>
+      )}
       {canPhoneResponse && (
         <>
           <button
@@ -277,6 +298,17 @@ export function ServiceOrderRowActions({
           Reabrir proposta
         </button>
       )}
-    </div>
+      </div>
+
+      <AssignDriverModal
+        open={assignOpen}
+        order={row}
+        onClose={() => setAssignOpen(false)}
+        onAssigned={(driverId, driverName) => {
+          onDriverAssigned?.(row.id, driverId, driverName);
+          window.alert(`Motorista ${driverName} designado para ${row.code}.`);
+        }}
+      />
+    </>
   );
 }

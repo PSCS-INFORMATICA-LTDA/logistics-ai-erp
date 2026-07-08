@@ -16,11 +16,17 @@ function isProposalRejectedByClient(row: ServiceOrderStatusRow): boolean {
   );
 }
 
-function isProposalAcceptedByClient(row: ServiceOrderStatusRow): boolean {
+export function isProposalAcceptedByClient(row: ServiceOrderStatusRow): boolean {
   return (
     (row.proposal_response ?? "pending") === "accepted" ||
     Boolean(row.proposal_accepted_at)
   );
+}
+
+export function canAssignDriverToServiceOrder(
+  row: ServiceOrderStatusRow & { driver_id?: string | null }
+): boolean {
+  return isProposalAcceptedByClient(row) && !row.driver_id;
 }
 
 /** Status operacional único — evita conflito entre colunas Proposta e Status. */

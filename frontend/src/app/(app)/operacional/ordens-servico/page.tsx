@@ -180,6 +180,18 @@ function OrdensServicoPageContent() {
     []
   );
 
+  const handleDriverAssigned = useCallback(
+    (orderId: string, driverId: string, driverName: string) => {
+      setListRows((rows) =>
+        rows.map((row) =>
+          row.id === orderId ? { ...row, driver_id: driverId, driver_name: driverName } : row
+        )
+      );
+      setListRefreshKey((key) => key + 1);
+    },
+    []
+  );
+
   const visibleCount = useMemo(
     () => listRows.filter(filterItem).length,
     [listRows, filterItem]
@@ -248,6 +260,7 @@ function OrdensServicoPageContent() {
           row={row}
           onFollowUpRegistered={handleFollowUpRegistered}
           onProposalResponseChanged={handleProposalResponseChanged}
+          onDriverAssigned={handleDriverAssigned}
         />
       )}
       columns={[
