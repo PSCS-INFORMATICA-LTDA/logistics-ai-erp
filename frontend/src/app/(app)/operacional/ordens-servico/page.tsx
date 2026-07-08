@@ -22,9 +22,11 @@ import { fetchActiveFleetVehicles, fleetVehicleLabel } from "@/lib/fleet-vehicle
 import { requiresPerDiem } from "@/lib/freight-per-diem";
 import { isTruckCategory } from "@/lib/transport-van-estimate";
 import {
+  canEditServiceOrder,
   isPendingClientProposal,
   matchesServiceOrderStatusFilter,
   resolveServiceOrderDisplayStatus,
+  serviceOrderEditBlockedReason,
   serviceOrderStatusVariant,
 } from "@/lib/service-order-display-status";
 import {
@@ -218,6 +220,8 @@ function OrdensServicoPageContent() {
       softDelete={false}
       transformItems={transformItems}
       filterItem={filterItem}
+      canEditRow={canEditServiceOrder}
+      editBlockedReason={serviceOrderEditBlockedReason}
       toolbar={
         <div className="space-y-4">
           <ServiceOrderListFilters

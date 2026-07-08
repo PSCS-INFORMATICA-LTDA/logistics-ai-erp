@@ -49,6 +49,23 @@ export function isPendingClientProposal(row: ServiceOrderStatusRow): boolean {
   );
 }
 
+/** Bloqueia edição enquanto o cliente já aceitou ou recusou a proposta enviada. */
+export function canEditServiceOrder(row: ServiceOrderStatusRow): boolean {
+  if (!row.proposal_sent_at) return true;
+
+  const response = row.proposal_response ?? "pending";
+  if (response === "pending") return true;
+
+  return false;
+}
+
+export function serviceOrderEditBlockedReason(row: ServiceOrderStatusRow): string | null {
+  if (canEditServiceOrder(row)) return null;
+
+  const label = resolveServiceOrderDisplayStatus(row);
+  return `Edição indisponível com status «${label}». Use «Reabrir proposta» para alterar.`;
+}
+
 export function matchesServiceOrderStatusFilter(
   row: ServiceOrderStatusRow,
   filterStatus: string

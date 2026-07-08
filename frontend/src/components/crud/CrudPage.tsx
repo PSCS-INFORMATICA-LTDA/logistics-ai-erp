@@ -31,6 +31,9 @@ type CrudPageProps<T extends { id: string }> = {
   filterItem?: (item: T) => boolean;
   transformItems?: (items: T[], companyId: string) => Promise<T[]>;
   renderRowActions?: (row: T) => ReactNode;
+  /** When false, the Editar action is disabled for that row. */
+  canEditRow?: (row: T) => boolean;
+  editBlockedReason?: (row: T) => string | null;
   /** Increment to refetch rows after external mutations (e.g. RPC row actions). */
   refreshKey?: number;
 };
@@ -48,6 +51,8 @@ export function CrudPage<T extends { id: string }>({
   filterItem,
   transformItems,
   renderRowActions,
+  canEditRow,
+  editBlockedReason,
   refreshKey = 0,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
@@ -189,7 +194,13 @@ export function CrudPage<T extends { id: string }>({
                 </tr>
               </thead>
               <tbody>
-                {visibleItems.map((row) => (
+                {visibleItems.map((row) => {
+                  const canEdit = canEditRow?.(row) ?? true;
+                  const editTitle = canEdit
+                    ? undefined
+                    : (editBlockedReason?.(row) ?? "Edição indisponível para este registro.");
+
+                  return (
                   <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                     {columns.map((col) => (
                       <td key={String(col.key)} className="px-4 py-3 text-slate-700">
@@ -204,7 +215,13 @@ export function CrudPage<T extends { id: string }>({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => { setEditing(row); setIsNew(false); }}
+                          disabled={!canEdit}
+                          title={editTitle}
+                          onClick={() => {
+                            if (!canEdit) return;
+                            setEditing(row);
+                            setIsNew(false);
+                          }}
                         >
                           Editar
                         </Button>
@@ -218,7 +235,8 @@ export function CrudPage<T extends { id: string }>({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
