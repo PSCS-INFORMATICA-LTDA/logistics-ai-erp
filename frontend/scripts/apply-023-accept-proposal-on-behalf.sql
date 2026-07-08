@@ -1,5 +1,6 @@
--- Aceite e recusa manual da proposta pelo staff (ex.: cliente confirmou por telefone)
--- Cole no Supabase SQL Editor e execute uma vez.
+-- Opcional: RPCs de aceite/recusa manual por order_id (legado).
+-- O app usa respond_to_proposal (mesma função do link e-mail/WhatsApp) via proposal_token.
+-- Execute apenas se quiser manter funções auxiliares no banco.
 
 CREATE OR REPLACE FUNCTION public.accept_proposal_on_behalf_of_client(p_order_id UUID)
 RETURNS JSONB

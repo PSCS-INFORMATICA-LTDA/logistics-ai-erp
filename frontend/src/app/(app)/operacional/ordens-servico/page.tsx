@@ -160,9 +160,23 @@ function OrdensServicoPageContent() {
     []
   );
 
-  const handleProposalResponseChanged = useCallback(() => {
-    setListRefreshKey((key) => key + 1);
-  }, []);
+  const handleProposalResponseChanged = useCallback(
+    (
+      orderId: string,
+      patch: {
+        proposal_response: ServiceOrderListRow["proposal_response"];
+        status: string;
+        proposal_accepted_at?: string | null;
+        proposal_rejected_at?: string | null;
+      }
+    ) => {
+      setListRows((rows) =>
+        rows.map((row) => (row.id === orderId ? { ...row, ...patch } : row))
+      );
+      setListRefreshKey((key) => key + 1);
+    },
+    []
+  );
 
   const visibleCount = useMemo(
     () => listRows.filter(filterItem).length,

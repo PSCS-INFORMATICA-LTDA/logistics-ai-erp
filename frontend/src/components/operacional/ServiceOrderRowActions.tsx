@@ -5,17 +5,25 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { isPendingClientProposal } from "@/lib/service-order-display-status";
 import {
-  acceptProposalOnBehalfOfClient,
   registerProposalFollowUp,
-  rejectProposalOnBehalfOfClient,
+  resetProposalClientResponse,
+  respondToProposal,
 } from "@/lib/service-order-proposal-api";
 import { createClient } from "@/lib/supabase/client";
 import type { ServiceOrderListRow } from "@/lib/service-order-filters";
+import type { ProposalResponse } from "@/types/database";
+
+type ProposalResponsePatch = {
+  proposal_response: ProposalResponse;
+  status: string;
+  proposal_accepted_at?: string | null;
+  proposal_rejected_at?: string | null;
+};
 
 type Props = {
   row: ServiceOrderListRow;
   onFollowUpRegistered?: (orderId: string, count: number, lastAt: string | null) => void;
-  onProposalResponseChanged?: (orderId: string) => void;
+  onProposalResponseChanged?: (orderId: string, patch: ProposalResponsePatch) => void;
 };
 
 function PhoneIcon({ className }: { className?: string }) {
@@ -97,8 +105,24 @@ export function ServiceOrderRowActions({
   const [loading, setLoading] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const canPhoneResponse = isPendingClientProposal(row);
+  const canResetProposal =
+    Boolean(row.proposal_sent_at) && (row.proposal_response ?? "pending") !== "pending";
+
+  const requireProposalToken = (): string | null => {
+    const token = row.proposal_token?.trim();
+    if (!token || token.length < 32) {
+      window.alert("Token da proposta indisponível. Abra PDF / Proposta e registre o envio.");
+      return null;
+    }
+    if (!row.proposal_sent_at) {
+      window.alert("Registre o envio da proposta antes de aceitar ou recusar.");
+      return null;
+    }
+    return token;
+  };
 
   const handleFollowUp = async () => {
     setLoading(true);
@@ -115,50 +139,77 @@ export function ServiceOrderRowActions({
     window.alert(`Follow-up registrado (${count} contato${count === 1 ? "" : "s"}).`);
   };
 
-  const handleAcceptOnBehalf = async () => {
+  const handlePhoneResponse = async (action: "accept" | "reject") => {
+    const token = requireProposalToken();
+    if (!token) return;
+
+    const isAccept = action === "accept";
     if (
       !window.confirm(
-        `Registrar aceite da proposta OS ${row.code} em nome do cliente (confirmação por telefone)?`
+        isAccept
+          ? `Registrar aceite da proposta OS ${row.code} em nome do cliente (confirmação por telefone)?`
+          : `Registrar recusa da proposta OS ${row.code} em nome do cliente (confirmação por telefone)?`
       )
     ) {
       return;
     }
 
-    setAccepting(true);
+    if (isAccept) setAccepting(true);
+    else setRejecting(true);
+
     const supabase = createClient();
-    const { error } = await acceptProposalOnBehalfOfClient(supabase, row.id);
-    setAccepting(false);
+    const { proposalResponse, status, error } = await respondToProposal(supabase, token, action);
+
+    if (isAccept) setAccepting(false);
+    else setRejecting(false);
 
     if (error) {
       window.alert(error);
       return;
     }
 
-    onProposalResponseChanged?.(row.id);
-    window.alert("Aceite registrado. A ordem aparecerá como «Aceita pelo cliente».");
+    const now = new Date().toISOString();
+    onProposalResponseChanged?.(row.id, {
+      proposal_response: proposalResponse ?? (isAccept ? "accepted" : "rejected"),
+      status: status ?? (isAccept ? "Aberto" : "Aguardando aprovação cliente"),
+      proposal_accepted_at: isAccept ? now : null,
+      proposal_rejected_at: isAccept ? null : now,
+    });
+
+    window.alert(
+      isAccept
+        ? "Aceite registrado. A ordem aparecerá como «Aceita pelo cliente»."
+        : "Recusa registrada. A ordem aparecerá como «Recusada pelo cliente»."
+    );
   };
 
-  const handleRejectOnBehalf = async () => {
+  const handleResetProposal = async () => {
     if (
       !window.confirm(
-        `Registrar recusa da proposta OS ${row.code} em nome do cliente (confirmação por telefone)?`
+        `Reabrir a proposta OS ${row.code} para novo aceite ou recusa (cliente ou telefone)?`
       )
     ) {
       return;
     }
 
-    setRejecting(true);
+    setResetting(true);
     const supabase = createClient();
-    const { error } = await rejectProposalOnBehalfOfClient(supabase, row.id);
-    setRejecting(false);
+    const { proposalResponse, status, error } = await resetProposalClientResponse(supabase, row.id);
+    setResetting(false);
 
     if (error) {
       window.alert(error);
       return;
     }
 
-    onProposalResponseChanged?.(row.id);
-    window.alert("Recusa registrada. A ordem aparecerá como «Recusada pelo cliente».");
+    onProposalResponseChanged?.(row.id, {
+      proposal_response: proposalResponse ?? "pending",
+      status: status ?? "Aguardando aprovação cliente",
+      proposal_accepted_at: null,
+      proposal_rejected_at: null,
+    });
+
+    window.alert("Proposta reaberta. Use os botões de telefone ou envie o link ao cliente.");
   };
 
   return (
@@ -177,10 +228,10 @@ export function ServiceOrderRowActions({
         <>
           <button
             type="button"
-            disabled={accepting || rejecting}
+            disabled={accepting || rejecting || resetting}
             title="Registrar aceite (telefone)"
             aria-label={`Registrar aceite por telefone — OS ${row.code}`}
-            onClick={() => void handleAcceptOnBehalf()}
+            onClick={() => void handlePhoneResponse("accept")}
             className={cn(
               "inline-flex items-center justify-center rounded-lg border border-green-300 bg-green-50 px-2.5 py-1.5 text-green-900 transition-colors hover:bg-green-100 disabled:opacity-50"
             )}
@@ -189,10 +240,10 @@ export function ServiceOrderRowActions({
           </button>
           <button
             type="button"
-            disabled={accepting || rejecting}
+            disabled={accepting || rejecting || resetting}
             title="Registrar recusa (telefone)"
             aria-label={`Registrar recusa por telefone — OS ${row.code}`}
-            onClick={() => void handleRejectOnBehalf()}
+            onClick={() => void handlePhoneResponse("reject")}
             className={cn(
               "inline-flex items-center justify-center rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-red-800 transition-colors hover:bg-red-100 disabled:opacity-50"
             )}
@@ -204,13 +255,26 @@ export function ServiceOrderRowActions({
       {canPhoneResponse && (
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || resetting}
           onClick={() => void handleFollowUp()}
           className={cn(
             "inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
           )}
         >
           Registrar follow-up
+        </button>
+      )}
+      {canResetProposal && (
+        <button
+          type="button"
+          disabled={resetting || accepting || rejecting}
+          title="Reabrir proposta para novo aceite ou recusa"
+          onClick={() => void handleResetProposal()}
+          className={cn(
+            "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          )}
+        >
+          Reabrir proposta
         </button>
       )}
     </div>
