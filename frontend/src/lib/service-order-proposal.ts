@@ -618,7 +618,7 @@ export async function openEmailShare(
 
   if (hasRichPaste) {
     window.alert(
-      "Proposta copiada (link de produção, QR Code e logo GRX).\n\nNo Gmail ou Outlook, clique no corpo do e-mail e pressione Ctrl+V para colar tudo. Não use o texto curto do mailto — só o Ctrl+V traz QR e logo."
+      "Proposta copiada (link de produção, QR Code e logo 3D GRX).\n\nNo Gmail ou Outlook, clique no corpo do e-mail e pressione Ctrl+V para colar tudo. Não use o texto curto do mailto — só o Ctrl+V traz QR e logo."
     );
   }
 

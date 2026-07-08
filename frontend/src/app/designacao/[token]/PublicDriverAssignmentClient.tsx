@@ -118,10 +118,16 @@ export function PublicDriverAssignmentClient({ token }: Props) {
               {SERVICE_ORDER_TYPE_LABELS[order.service_type ?? ""] ?? order.service_type ?? "—"}
             </p>
             {(order.freight_origin_address || order.freight_destination_address) && (
-              <p>
-                <span className="text-slate-500">Rota:</span>{" "}
-                {order.freight_origin_address ?? "—"} → {order.freight_destination_address ?? "—"}
-              </p>
+              <div className="space-y-1">
+                <p>
+                  <span className="text-slate-500">Origem (A):</span>{" "}
+                  {order.freight_origin_address ?? "—"}
+                </p>
+                <p>
+                  <span className="text-slate-500">Destino (B):</span>{" "}
+                  {order.freight_destination_address ?? "—"}
+                </p>
+              </div>
             )}
             {amount != null && (
               <p className="text-base font-semibold text-brand-700">

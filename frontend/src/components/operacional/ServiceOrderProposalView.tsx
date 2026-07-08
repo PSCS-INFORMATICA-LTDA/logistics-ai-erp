@@ -227,7 +227,7 @@ export function ServiceOrderProposalView({
       setEmailHint(
         copied
           ? hasQr && hasLogo
-            ? "Copiado: link (produção), QR Code e logo GRX. Use Ctrl+V no corpo do Gmail — não use o texto curto do mailto."
+            ? "Copiado: link (produção), QR Code e logo 3D GRX. Use Ctrl+V no corpo do Gmail — não use o texto curto do mailto."
             : "Copiado parcialmente. Use Ctrl+V no corpo do e-mail. Se faltar QR ou logo, recarregue a página e tente de novo."
           : "Não foi possível copiar automaticamente. Registre o envio, recarregue a página e tente de novo."
       );

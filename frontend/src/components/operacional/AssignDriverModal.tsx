@@ -32,6 +32,7 @@ type OrderSummary = Pick<
   | "service_date"
   | "freight_origin_address"
   | "freight_destination_address"
+  | "freight_distance_km"
   | "freight_agreed_amount"
   | "service_amount"
 >;
@@ -54,6 +55,23 @@ function driverAvailabilityLabel(driver: DriverListRow): string {
   return "Indisponível";
 }
 
+function MailIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn("h-4 w-4 shrink-0", className)}
+      aria-hidden
+    >
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </svg>
+  );
+}
 function PhoneIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -260,16 +278,26 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           </p>
           {order.client_name ? <p className="text-sm text-slate-600">{order.client_name}</p> : null}
           {(order.freight_origin_address || order.freight_destination_address) && (
-            <p className="mt-1 text-sm text-slate-500">
-              {order.freight_origin_address ?? "—"} → {order.freight_destination_address ?? "—"}
-            </p>
+            <div className="mt-1 space-y-0.5 text-sm text-slate-500">
+              <p>
+                <span className="font-medium text-slate-600">A:</span>{" "}
+                {order.freight_origin_address ?? "—"}
+              </p>
+              <p>
+                <span className="font-medium text-slate-600">B:</span>{" "}
+                {order.freight_destination_address ?? "—"}
+              </p>
+              {order.freight_distance_km ? (
+                <p className="text-xs">Distância: {order.freight_distance_km} km</p>
+              ) : null}
+            </div>
           )}
           {amount != null ? (
             <p className="mt-1 text-sm font-medium text-brand-700">{formatCurrency(amount)}</p>
           ) : null}
           <p className="mt-2 text-xs text-slate-500">
             Envie por WhatsApp ou e-mail para o motorista aceitar pelo link público (como a proposta
-            ao cliente). No e-mail, use Ctrl+V no corpo para colar QR Code e logo GRX.
+            ao cliente). No e-mail, use Ctrl+V no corpo para colar QR Code e logo 3D GRX.
           </p>
         </div>
 
@@ -326,18 +354,30 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                           </span>
                         ) : null}
                       </span>
-                      {driver.phone ? (
-                        <a
-                          href={`https://wa.me/${driver.phone.replace(/\D/g, "")}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Abrir WhatsApp do motorista"
-                          className="rounded-lg border border-green-300 bg-green-50 p-2 text-green-800 hover:bg-green-100"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <PhoneIcon />
-                        </a>
-                      ) : null}
+                      <span className="flex shrink-0 items-center gap-1">
+                        {driver.phone ? (
+                          <a
+                            href={`https://wa.me/${driver.phone.replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Abrir WhatsApp do motorista"
+                            className="rounded-lg border border-green-300 bg-green-50 p-2 text-green-800 hover:bg-green-100"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <PhoneIcon />
+                          </a>
+                        ) : null}
+                        {driver.email ? (
+                          <a
+                            href={`mailto:${encodeURIComponent(driver.email.trim())}`}
+                            title="Abrir e-mail do motorista"
+                            className="rounded-lg border border-sky-300 bg-sky-50 p-2 text-sky-800 hover:bg-sky-100"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <MailIcon />
+                          </a>
+                        ) : null}
+                      </span>
                     </label>
                   </li>
                 );
@@ -346,43 +386,47 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           )}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-4">
-          <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={saving || loading || !selectedId}
-            onClick={() => void handleDirectAssign()}
-          >
-            Confirmar sem link
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={saving || loading || !selectedId || !selectedDriver?.email?.trim()}
-            title={
-              selectedDriver?.email?.trim()
-                ? "Enviar designação por e-mail"
-                : "Cadastre e-mail do motorista"
-            }
-            onClick={() => void handleSendEmail()}
-          >
-            Enviar por e-mail
-          </Button>
-          <Button
-            type="button"
-            disabled={saving || loading || !selectedId || !selectedDriver?.phone?.trim()}
-            title={
-              selectedDriver?.phone?.trim()
-                ? "Enviar designação por WhatsApp"
-                : "Cadastre telefone do motorista"
-            }
-            onClick={() => void handleSendWhatsApp()}
-          >
-            {saving ? "Enviando…" : "Enviar WhatsApp"}
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={saving || loading || !selectedId}
+              onClick={() => void handleDirectAssign()}
+            >
+              Confirmar sem link
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={saving || loading || !selectedId || !selectedDriver?.email?.trim()}
+              title={
+                selectedDriver?.email?.trim()
+                  ? "Enviar designação por e-mail"
+                  : "Cadastre e-mail do motorista"
+              }
+              onClick={() => void handleSendEmail()}
+            >
+              {saving ? "Enviando…" : "Enviar por e-mail"}
+            </Button>
+            <Button
+              type="button"
+              disabled={saving || loading || !selectedId || !selectedDriver?.phone?.trim()}
+              title={
+                selectedDriver?.phone?.trim()
+                  ? "Enviar designação por WhatsApp"
+                  : "Cadastre telefone do motorista"
+              }
+              onClick={() => void handleSendWhatsApp()}
+            >
+              Enviar WhatsApp
+            </Button>
+          </div>
         </div>
       </div>
     </div>

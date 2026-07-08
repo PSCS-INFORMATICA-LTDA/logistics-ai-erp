@@ -313,7 +313,7 @@ export function ServiceOrderRowActions({
         onAssignmentSent={(driverId, driverName) => {
           onAssignmentSent?.(row.id, driverId, driverName);
           window.alert(
-            `Designação enviada a ${driverName}. Aguardando confirmação pelo link (WhatsApp).`
+            `Designação enviada a ${driverName}. Aguardando confirmação pelo link (WhatsApp ou e-mail).`
           );
         }}
       />

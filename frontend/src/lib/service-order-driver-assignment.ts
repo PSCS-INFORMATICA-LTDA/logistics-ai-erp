@@ -41,106 +41,125 @@ export function buildPublicDriverAssignmentUrl(token: string): string {
   return `${origin}/designacao/${token}`;
 }
 
+export type DriverAssignmentOrderSummary = Pick<
+  ServiceOrder,
+  | "code"
+  | "service_type"
+  | "service_date"
+  | "plate"
+  | "client_name"
+  | "freight_origin_address"
+  | "freight_destination_address"
+  | "freight_distance_km"
+  | "freight_agreed_amount"
+  | "service_amount"
+>;
+
+const DRIVER_ASSIGNMENT_INTRO =
+  "Segue a designação da ordem de serviço para sua confirmação.";
+const DRIVER_ASSIGNMENT_CLOSING =
+  "Por favor, acesse o link abaixo e confirme se aceita ou recusa esta corrida.";
+const DRIVER_ASSIGNMENT_EMAIL_QR_HINT =
+  "Escaneie o QR Code abaixo para abrir a designação no celular.";
+const DRIVER_ASSIGNMENT_EMAIL_SIGNOFF = [
+  "Fico no aguardo da sua confirmação,",
+  "Obrigado!",
+] as const;
+const DRIVER_GREETING_BREAK = "\n\n\n";
+
+function formatDriverGreetingName(driverName: string): string {
+  const first = driverName.trim().split(/\s+/)[0];
+  return first || driverName;
+}
+
+function buildDriverAssignmentGreeting(driverName: string): string {
+  const firstName = formatDriverGreetingName(driverName);
+  return `Olá, ${firstName},${DRIVER_GREETING_BREAK}Tudo bem?${DRIVER_GREETING_BREAK}${DRIVER_ASSIGNMENT_INTRO}`;
+}
+
+function appendDriverAssignmentOrderDetails(
+  lines: string[],
+  order: DriverAssignmentOrderSummary,
+  options?: { boldRoute?: boolean }
+): void {
+  const amount = resolveProposalAmount(order as ServiceOrder);
+  const routeLabel = options?.boldRoute ? "*Rota*" : "Rota";
+
+  lines.push(
+    "",
+    `OS ${order.code}`,
+    `Cliente: ${order.client_name ?? "—"}`,
+    `Tipo: ${SERVICE_ORDER_TYPE_LABELS[order.service_type] ?? order.service_type}`,
+    `Data: ${formatServiceDate(order.service_date)}`,
+    `Placa: ${order.plate ?? "—"}`
+  );
+
+  if (order.freight_origin_address || order.freight_destination_address) {
+    lines.push(
+      "",
+      routeLabel,
+      `A: ${order.freight_origin_address ?? "—"}`,
+      `B: ${order.freight_destination_address ?? "—"}`
+    );
+    if (order.freight_distance_km) {
+      lines.push(`Distância: ${order.freight_distance_km} km`);
+    }
+  }
+
+  if (amount != null) {
+    lines.push(
+      "",
+      options?.boldRoute ? `*Valor: ${formatCurrency(amount)}*` : `Valor: ${formatCurrency(amount)}`
+    );
+  }
+}
+
+function appendDriverAssignmentClosingWithLink(lines: string[], assignmentUrl: string): void {
+  lines.push("", DRIVER_ASSIGNMENT_CLOSING);
+  const url = assignmentUrl.trim();
+  if (url) lines.push("", url);
+}
+
 export function buildDriverAssignmentWhatsAppText(
-  order: Pick<
-    ServiceOrder,
-    | "code"
-    | "service_type"
-    | "service_date"
-    | "plate"
-    | "client_name"
-    | "freight_origin_address"
-    | "freight_destination_address"
-    | "freight_agreed_amount"
-    | "service_amount"
-  >,
+  order: DriverAssignmentOrderSummary,
   companyName: string,
   driverName: string,
   assignmentUrl: string
 ): string {
-  const amount = resolveProposalAmount(order as ServiceOrder);
   const lines = [
-    `Olá, ${driverName}!`,
-    ``,
-    `*Designação de OS ${order.code}* — ${companyName}`,
-    ``,
-    `Cliente: ${order.client_name ?? "—"}`,
-    `Tipo: ${SERVICE_ORDER_TYPE_LABELS[order.service_type] ?? order.service_type}`,
-    `Data: ${formatServiceDate(order.service_date)}`,
-    `Placa: ${order.plate}`,
+    buildDriverAssignmentGreeting(driverName),
+    "",
+    `*Designação OS ${order.code}* — ${companyName}`,
   ];
 
-  if (order.freight_origin_address || order.freight_destination_address) {
-    lines.push(
-      ``,
-      `*Rota*`,
-      `${order.freight_origin_address ?? "—"} → ${order.freight_destination_address ?? "—"}`
-    );
-  }
-
-  if (amount != null) {
-    lines.push(``, `*Valor: ${formatCurrency(amount)}*`);
-  }
-
-  lines.push(
-    ``,
-    `Por favor, confirme se você aceita esta designação:`,
-    assignmentUrl,
-    ``,
-    `Obrigado!`
-  );
+  appendDriverAssignmentOrderDetails(lines, order, { boldRoute: true });
+  appendDriverAssignmentClosingWithLink(lines, assignmentUrl);
+  lines.push("", "GRX Transportes e Logística");
 
   return lines.join("\n");
 }
 
 export function buildDriverAssignmentEmailBody(
-  order: Pick<
-    ServiceOrder,
-    | "code"
-    | "service_type"
-    | "service_date"
-    | "plate"
-    | "client_name"
-    | "freight_origin_address"
-    | "freight_destination_address"
-    | "freight_agreed_amount"
-    | "service_amount"
-  >,
+  order: DriverAssignmentOrderSummary,
   companyName: string,
   driverName: string,
   assignmentUrl: string
 ): string {
-  const amount = resolveProposalAmount(order as ServiceOrder);
   const lines = [
-    `Olá, ${driverName}!`,
+    buildDriverAssignmentGreeting(driverName),
     "",
-    `Designação de OS ${order.code} — ${companyName}`,
-    "",
-    `Cliente: ${order.client_name ?? "—"}`,
-    `Tipo: ${SERVICE_ORDER_TYPE_LABELS[order.service_type] ?? order.service_type}`,
-    `Data: ${formatServiceDate(order.service_date)}`,
-    `Placa: ${order.plate}`,
+    `Designação OS ${order.code} — ${companyName}`,
   ];
 
-  if (order.freight_origin_address || order.freight_destination_address) {
-    lines.push(
-      "",
-      "Rota",
-      `${order.freight_origin_address ?? "—"} → ${order.freight_destination_address ?? "—"}`
-    );
-  }
-
-  if (amount != null) {
-    lines.push("", `Valor: ${formatCurrency(amount)}`);
-  }
-
+  appendDriverAssignmentOrderDetails(lines, order);
+  appendDriverAssignmentClosingWithLink(lines, assignmentUrl);
   lines.push(
     "",
-    "Por favor, confirme se você aceita esta designação pelo link abaixo:",
-    assignmentUrl,
+    DRIVER_ASSIGNMENT_EMAIL_QR_HINT,
     "",
-    "Fico no aguardo,",
-    "Obrigado pela atenção!"
+    ...DRIVER_ASSIGNMENT_EMAIL_SIGNOFF,
+    "",
+    "GRX Transportes e Logística"
   );
 
   return lines.join("\n");
@@ -148,18 +167,7 @@ export function buildDriverAssignmentEmailBody(
 
 export async function openDriverAssignmentEmailShare(
   driverEmail: string,
-  order: Pick<
-    ServiceOrder,
-    | "code"
-    | "service_type"
-    | "service_date"
-    | "plate"
-    | "client_name"
-    | "freight_origin_address"
-    | "freight_destination_address"
-    | "freight_agreed_amount"
-    | "service_amount"
-  >,
+  order: DriverAssignmentOrderSummary,
   companyName: string,
   driverName: string,
   assignmentUrl: string
