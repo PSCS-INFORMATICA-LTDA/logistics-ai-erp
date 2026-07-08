@@ -63,7 +63,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned }: Props) {
     const [driversRes, activeOrders] = await Promise.all([
       supabase
         .from("drivers")
-        .select("id, code, name, status, active_for_operations, cnh_categories, phone")
+        .select("id, code, name, status, active_for_operations, phone")
         .eq("company_id", companyId)
         .eq("status", "Ativo")
         .is("deleted_at", null)
