@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/Input";
 import {
+  PROPOSAL_RESPONSE_LABELS,
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_TYPES,
@@ -9,7 +10,8 @@ import {
 
 const SERVICE_ORDER_STATUS_FILTER = [
   ...SERVICE_ORDER_STATUS,
-  "Recusada pelo cliente",
+  PROPOSAL_RESPONSE_LABELS.accepted,
+  PROPOSAL_RESPONSE_LABELS.rejected,
 ] as const;
 
 type Props = {

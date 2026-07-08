@@ -1,4 +1,4 @@
-import type { ProposalResponse, ServiceOrder } from "@/types/database";
+import { PROPOSAL_RESPONSE_LABELS, type ServiceOrder } from "@/types/database";
 
 export type ServiceOrderStatusRow = Pick<
   ServiceOrder,
@@ -10,12 +10,12 @@ export function resolveServiceOrderDisplayStatus(row: ServiceOrderStatusRow): st
   const response = row.proposal_response ?? "pending";
 
   if (response === "accepted") {
-    return "Aberto";
+    return PROPOSAL_RESPONSE_LABELS.accepted;
   }
 
   if (row.proposal_sent_at) {
     if (response === "rejected") {
-      return "Recusada pelo cliente";
+      return PROPOSAL_RESPONSE_LABELS.rejected;
     }
     if (response === "pending") {
       return "Aguardando aprovação cliente";
@@ -29,9 +29,9 @@ export function serviceOrderStatusVariant(
   row: ServiceOrderStatusRow
 ): "success" | "warning" | "default" {
   const label = resolveServiceOrderDisplayStatus(row);
-  if (label === "Concluido") return "success";
+  if (label === "Concluido" || label === PROPOSAL_RESPONSE_LABELS.accepted) return "success";
   if (label === "Aberto" || label === "Aguardando aprovação cliente") return "warning";
-  if (label === "Recusada pelo cliente") return "default";
+  if (label === PROPOSAL_RESPONSE_LABELS.rejected) return "default";
   return "default";
 }
 
