@@ -14,6 +14,7 @@ import { assignServiceOrderDriver } from "@/lib/service-order-driver-api";
 import {
   buildDriverAssignmentWhatsAppText,
   buildPublicDriverAssignmentUrl,
+  openDriverAssignmentEmailShare,
   sendDriverAssignment,
   shareDriverAssignmentViaWhatsApp,
 } from "@/lib/service-order-driver-assignment";
@@ -91,7 +92,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     const [driversRes, activeOrders] = await Promise.all([
       supabase
         .from("drivers")
-        .select("id, code, name, status, active_for_operations, phone, address")
+        .select("id, code, name, status, active_for_operations, phone, email, address")
         .eq("company_id", companyId)
         .eq("status", "Ativo")
         .is("deleted_at", null)
@@ -164,7 +165,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
     if (!selectedDriver.phone?.trim()) {
       window.alert(
-        "Cadastre o telefone do motorista em Cadastros → Motoristas antes de enviar a designação."
+        "Cadastre o telefone do motorista em Cadastros → Motoristas antes de enviar por WhatsApp."
       );
       return;
     }
@@ -192,6 +193,45 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     );
 
     await shareDriverAssignmentViaWhatsApp(message, selectedDriver.phone);
+    onAssignmentSent?.(selectedId, selectedDriver.name);
+    onClose();
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedDriver) {
+      window.alert("Selecione um motorista.");
+      return;
+    }
+
+    if (!selectedDriver.email?.trim()) {
+      window.alert(
+        "Cadastre o e-mail do motorista em Cadastros → Motoristas antes de enviar por e-mail."
+      );
+      return;
+    }
+
+    if (!isDriverAvailableForContact(selectedDriver)) {
+      window.alert("Motorista indisponível para esta designação.");
+      return;
+    }
+
+    setSaving(true);
+    const { token, error: sendError } = await sendDriverAssignment(supabase, order.id, selectedId);
+    setSaving(false);
+
+    if (sendError || !token) {
+      window.alert(sendError ?? "Não foi possível registrar a designação.");
+      return;
+    }
+
+    const assignmentUrl = buildPublicDriverAssignmentUrl(token);
+    await openDriverAssignmentEmailShare(
+      selectedDriver.email.trim(),
+      order,
+      companyName,
+      selectedDriver.name,
+      assignmentUrl
+    );
     onAssignmentSent?.(selectedId, selectedDriver.name);
     onClose();
   };
@@ -228,8 +268,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
             <p className="mt-1 text-sm font-medium text-brand-700">{formatCurrency(amount)}</p>
           ) : null}
           <p className="mt-2 text-xs text-slate-500">
-            Envie pelo WhatsApp para o motorista aceitar pelo link público (como a proposta ao
-            cliente).
+            Envie por WhatsApp ou e-mail para o motorista aceitar pelo link público (como a proposta
+            ao cliente). No e-mail, use Ctrl+V no corpo para colar QR Code e logo GRX.
           </p>
         </div>
 
@@ -278,6 +318,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                         >
                           {label}
                           {driver.phone ? ` · ${driver.phone}` : " · sem telefone"}
+                          {driver.email ? ` · ${driver.email}` : ""}
                         </span>
                         {driver.address ? (
                           <span className="mt-0.5 block text-xs text-slate-500">
@@ -319,10 +360,28 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           </Button>
           <Button
             type="button"
-            disabled={saving || loading || !selectedId}
+            variant="secondary"
+            disabled={saving || loading || !selectedId || !selectedDriver?.email?.trim()}
+            title={
+              selectedDriver?.email?.trim()
+                ? "Enviar designação por e-mail"
+                : "Cadastre e-mail do motorista"
+            }
+            onClick={() => void handleSendEmail()}
+          >
+            Enviar por e-mail
+          </Button>
+          <Button
+            type="button"
+            disabled={saving || loading || !selectedId || !selectedDriver?.phone?.trim()}
+            title={
+              selectedDriver?.phone?.trim()
+                ? "Enviar designação por WhatsApp"
+                : "Cadastre telefone do motorista"
+            }
             onClick={() => void handleSendWhatsApp()}
           >
-            {saving ? "Enviando…" : "Enviar designação (WhatsApp)"}
+            {saving ? "Enviando…" : "Enviar WhatsApp"}
           </Button>
         </div>
       </div>

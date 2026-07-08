@@ -61,6 +61,7 @@ export type Driver = {
   driver_type: string;
   status: string;
   phone: string | null;
+  email: string | null;
   address: string | null;
   document: string | null;
   cnh_number: string | null;

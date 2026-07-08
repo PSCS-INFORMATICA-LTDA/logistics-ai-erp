@@ -1,7 +1,8 @@
--- Designação de motorista + endereço no cadastro — cole no Supabase SQL Editor
+-- Designação de motorista + endereço e e-mail no cadastro — cole no Supabase SQL Editor
 
 ALTER TABLE public.drivers
-  ADD COLUMN IF NOT EXISTS address TEXT;
+  ADD COLUMN IF NOT EXISTS address TEXT,
+  ADD COLUMN IF NOT EXISTS email TEXT;
 
 ALTER TABLE public.service_orders
   ADD COLUMN IF NOT EXISTS proposed_driver_id UUID REFERENCES public.drivers(id) ON DELETE SET NULL,

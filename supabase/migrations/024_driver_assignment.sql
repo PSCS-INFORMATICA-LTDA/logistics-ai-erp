@@ -2,9 +2,11 @@
 -- Migration: 024_driver_assignment.sql
 
 ALTER TABLE public.drivers
-  ADD COLUMN IF NOT EXISTS address TEXT;
+  ADD COLUMN IF NOT EXISTS address TEXT,
+  ADD COLUMN IF NOT EXISTS email TEXT;
 
 COMMENT ON COLUMN public.drivers.address IS 'Endereço do motorista para contato e cadastro.';
+COMMENT ON COLUMN public.drivers.email IS 'E-mail do motorista para envio de designação de OS.';
 
 ALTER TABLE public.service_orders
   ADD COLUMN IF NOT EXISTS proposed_driver_id UUID REFERENCES public.drivers(id) ON DELETE SET NULL,

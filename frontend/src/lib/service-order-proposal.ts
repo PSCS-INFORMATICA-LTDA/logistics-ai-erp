@@ -599,7 +599,7 @@ export async function openEmailShare(
   subject: string,
   body: string,
   proposalUrl = "",
-  options?: EmailShareOptions
+  options?: EmailShareOptions & { to?: string | null }
 ): Promise<EmailShareResult> {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
@@ -612,7 +612,9 @@ export async function openEmailShare(
   });
   const hasRichPaste = Boolean(copied && (qrDataUrl || logoDataUrl || safeUrl));
   const mailtoBody = hasRichPaste ? "" : buildMailtoSafeBody(plainBody, safeUrl);
-  const href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
+  const to = options?.to?.trim();
+  const mailtoPrefix = to ? `mailto:${encodeURIComponent(to)}` : "mailto:";
+  const href = `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
 
   if (hasRichPaste) {
     window.alert(

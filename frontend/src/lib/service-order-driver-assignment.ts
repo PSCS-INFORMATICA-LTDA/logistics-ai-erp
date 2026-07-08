@@ -3,10 +3,13 @@ import {
   buildWhatsAppShareLinks,
   copyTextToClipboard,
   formatServiceDate,
+  generateProposalQrDataUrl,
   getPublicAppOrigin,
   isWindowsWhatsAppDesktop,
+  openEmailShare,
   resolveProposalAmount,
 } from "@/lib/service-order-proposal";
+import { fetchBrandLogoDataUrl } from "@/lib/brand-email";
 import { formatCurrency } from "@/lib/utils";
 import { SERVICE_ORDER_TYPE_LABELS, type ServiceOrder } from "@/types/database";
 
@@ -88,6 +91,92 @@ export function buildDriverAssignmentWhatsAppText(
   );
 
   return lines.join("\n");
+}
+
+export function buildDriverAssignmentEmailBody(
+  order: Pick<
+    ServiceOrder,
+    | "code"
+    | "service_type"
+    | "service_date"
+    | "plate"
+    | "client_name"
+    | "freight_origin_address"
+    | "freight_destination_address"
+    | "freight_agreed_amount"
+    | "service_amount"
+  >,
+  companyName: string,
+  driverName: string,
+  assignmentUrl: string
+): string {
+  const amount = resolveProposalAmount(order as ServiceOrder);
+  const lines = [
+    `Olá, ${driverName}!`,
+    "",
+    `Designação de OS ${order.code} — ${companyName}`,
+    "",
+    `Cliente: ${order.client_name ?? "—"}`,
+    `Tipo: ${SERVICE_ORDER_TYPE_LABELS[order.service_type] ?? order.service_type}`,
+    `Data: ${formatServiceDate(order.service_date)}`,
+    `Placa: ${order.plate}`,
+  ];
+
+  if (order.freight_origin_address || order.freight_destination_address) {
+    lines.push(
+      "",
+      "Rota",
+      `${order.freight_origin_address ?? "—"} → ${order.freight_destination_address ?? "—"}`
+    );
+  }
+
+  if (amount != null) {
+    lines.push("", `Valor: ${formatCurrency(amount)}`);
+  }
+
+  lines.push(
+    "",
+    "Por favor, confirme se você aceita esta designação pelo link abaixo:",
+    assignmentUrl,
+    "",
+    "Fico no aguardo,",
+    "Obrigado pela atenção!"
+  );
+
+  return lines.join("\n");
+}
+
+export async function openDriverAssignmentEmailShare(
+  driverEmail: string,
+  order: Pick<
+    ServiceOrder,
+    | "code"
+    | "service_type"
+    | "service_date"
+    | "plate"
+    | "client_name"
+    | "freight_origin_address"
+    | "freight_destination_address"
+    | "freight_agreed_amount"
+    | "service_amount"
+  >,
+  companyName: string,
+  driverName: string,
+  assignmentUrl: string
+): Promise<void> {
+  const body = buildDriverAssignmentEmailBody(order, companyName, driverName, assignmentUrl);
+  const subject = `Designação OS ${order.code} — ${companyName}`;
+  const [qrDataUrl, logoDataUrl] = await Promise.all([
+    generateProposalQrDataUrl(assignmentUrl),
+    fetchBrandLogoDataUrl(),
+  ]);
+
+  await openEmailShare(subject, body, assignmentUrl, {
+    to: driverEmail,
+    qrDataUrl,
+    logoDataUrl,
+    companyName,
+  });
 }
 
 export async function sendDriverAssignment(

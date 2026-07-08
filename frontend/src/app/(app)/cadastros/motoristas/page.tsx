@@ -171,6 +171,7 @@ function MotoristasPageContent() {
         },
       },
       { key: "phone", label: "Telefone" },
+      { key: "email", label: "E-mail" },
       { key: "address", label: "Endereço" },
       {
         key: "cnh_number",
