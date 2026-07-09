@@ -360,21 +360,21 @@ export function launchProposalEmailShareSync(
 ): EmailShareResult {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
-  const logoDataUrl = options.logoDataUrl ?? null;
+  const logoDataUrl = options?.logoDataUrl ?? null;
 
   let richCopied = false;
-  if (!options.skipCopy && logoDataUrl?.startsWith("data:image")) {
+  if (!options?.skipCopy && logoDataUrl?.startsWith("data:image")) {
     const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
       qrDataUrl: null,
       logoDataUrl,
-      companyName: options.companyName,
+      companyName: options?.companyName,
     });
     richCopied = copyRichHtmlToClipboardSync(html, plainBody);
-  } else if (options.skipCopy) {
+  } else if (options?.skipCopy) {
     richCopied = Boolean(options.richCopied);
   }
 
-  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options.to));
+  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to));
 
   return {
     copied: true,
