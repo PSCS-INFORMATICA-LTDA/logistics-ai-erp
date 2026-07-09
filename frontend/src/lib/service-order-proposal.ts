@@ -306,21 +306,39 @@ export function buildProposalEmailMailtoHref(
   return `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
 }
 
-/** Abre o cliente de e-mail com assunto e corpo da proposta (texto puro via mailto). */
+/** Abre o cliente de e-mail com assunto e corpo; copia HTML com logo 2D quando disponível. */
 export function launchProposalEmailShareSync(
   subject: string,
   body: string,
   proposalUrl: string,
-  options?: { to?: string | null }
+  options?: {
+    to?: string | null;
+    logoDataUrl?: string | null;
+    companyName?: string;
+    skipCopy?: boolean;
+  }
 ): EmailShareResult {
+  const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
+  const logoDataUrl = options?.logoDataUrl ?? null;
+
+  let richCopied = false;
+  if (!options?.skipCopy && logoDataUrl?.startsWith("data:image")) {
+    const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
+      qrDataUrl: null,
+      logoDataUrl,
+      companyName: options?.companyName,
+    });
+    richCopied = copyRichHtmlToClipboardSync(html, plainBody);
+  }
+
   openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to));
 
   return {
     copied: true,
-    richCopied: false,
+    richCopied,
     hasQr: false,
-    hasLogo: false,
+    hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
     plainBody,
   };
 }

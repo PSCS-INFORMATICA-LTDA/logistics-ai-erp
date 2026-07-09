@@ -315,6 +315,39 @@ export async function fetchBrandLogoDataUrl(origin?: string): Promise<string | n
   return null;
 }
 
+let cachedBrandLogoFlat2D: string | null = null;
+
+/** Logo 2D plano (grx-logo.png) para colar no corpo do e-mail via HTML. */
+export async function fetchBrandLogoFlat2DDataUrl(origin?: string): Promise<string | null> {
+  if (cachedBrandLogoFlat2D?.startsWith("data:image")) {
+    return cachedBrandLogoFlat2D;
+  }
+
+  try {
+    const image = await loadBrandLogoImage(origin);
+    if (!image) return null;
+
+    const logoWidth = 264;
+    const logoHeight = Math.max(1, Math.round((image.naturalHeight / image.naturalWidth) * logoWidth));
+    const canvas = document.createElement("canvas");
+    canvas.width = logoWidth;
+    canvas.height = logoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(image, 0, 0, logoWidth, logoHeight);
+    const flat = compressCanvasToEmailDataUrl(canvas);
+    if (flat?.startsWith("data:image")) {
+      cachedBrandLogoFlat2D = flat;
+      return flat;
+    }
+  } catch {
+    /* sem logo */
+  }
+
+  return null;
+}
+
 export function buildEmailBrandFooterHtml(
   logoSrc: string | null,
   companyName = DEFAULT_COMPANY_TAGLINE
@@ -334,7 +367,7 @@ export function buildEmailBrandFooterHtml(
   }
 
   const logoBlock = [
-    `<img src="${logoSrc}" alt="${safeCompany}" width="264" style="display:block;max-width:264px;height:auto;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,0.28),0 4px 10px rgba(208,0,31,0.08)" />`,
+    `<img src="${logoSrc}" alt="${safeCompany}" width="220" style="display:block;max-width:220px;height:auto" />`,
   ].join("");
 
   return [
@@ -345,7 +378,7 @@ export function buildEmailBrandFooterHtml(
   ].join("");
 }
 
-/** Apenas placa 3D embutida (data URL) — nunca URL plana de /grx-logo.png. */
+/** Logo embutido como data URL (2D ou 3D). */
 export function resolveEmailBrandLogoSrc(logoDataUrl: string | null): string | null {
   return logoDataUrl?.startsWith("data:image") ? logoDataUrl : null;
 }
