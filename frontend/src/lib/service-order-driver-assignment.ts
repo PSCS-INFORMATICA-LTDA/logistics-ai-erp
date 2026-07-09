@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatServiceDate,
-  generateProposalQrDataUrl,
   getPublicAppOrigin,
   isWindowsWhatsAppDesktop,
   prepareEmailShareBundle,
@@ -10,7 +9,6 @@ import {
   type EmailShareBundle,
   type WhatsAppShareLinks,
 } from "@/lib/service-order-proposal";
-import { fetchBrandLogoDataUrl } from "@/lib/brand-email";
 import { formatCurrency } from "@/lib/utils";
 import { SERVICE_ORDER_TYPE_LABELS, type ServiceOrder } from "@/types/database";
 
@@ -33,6 +31,7 @@ export type PublicDriverAssignmentPayload = {
     | "freight_origin_address"
     | "freight_destination_address"
     | "freight_agreed_amount"
+    | "freight_toll_amount"
     | "service_amount"
   >;
 };
@@ -53,6 +52,7 @@ export type DriverAssignmentOrderSummary = Pick<
   | "freight_destination_address"
   | "freight_distance_km"
   | "freight_agreed_amount"
+  | "freight_toll_amount"
   | "service_amount"
 >;
 
@@ -60,8 +60,6 @@ const DRIVER_ASSIGNMENT_INTRO =
   "Segue a designação da ordem de serviço para sua confirmação.";
 const DRIVER_ASSIGNMENT_CLOSING =
   "Por favor, acesse o link abaixo e confirme se aceita ou recusa esta corrida.";
-const DRIVER_ASSIGNMENT_EMAIL_QR_HINT =
-  "Escaneie o QR Code abaixo para abrir a designação no celular.";
 const DRIVER_ASSIGNMENT_EMAIL_SIGNOFF = [
   "Fico no aguardo da sua confirmação,",
   "Obrigado!",
@@ -105,6 +103,9 @@ function appendDriverAssignmentOrderDetails(
     );
     if (order.freight_distance_km) {
       lines.push(`Distância: ${order.freight_distance_km} km`);
+    }
+    if (order.freight_toll_amount) {
+      lines.push(`Pedágio: ${formatCurrency(order.freight_toll_amount)}`);
     }
   }
 
@@ -172,14 +173,7 @@ export function buildDriverAssignmentEmailBody(
 
   appendDriverAssignmentOrderDetails(lines, order);
   appendDriverAssignmentClosingWithLink(lines, assignmentUrl);
-  lines.push(
-    "",
-    DRIVER_ASSIGNMENT_EMAIL_QR_HINT,
-    "",
-    ...DRIVER_ASSIGNMENT_EMAIL_SIGNOFF,
-    "",
-    "GRX Transportes e Logística"
-  );
+  lines.push("", ...DRIVER_ASSIGNMENT_EMAIL_SIGNOFF, "", "GRX Transportes e Logística");
 
   return lines.join("\n");
 }
@@ -193,15 +187,9 @@ export async function prepareDriverAssignmentEmailBundle(
 ): Promise<EmailShareBundle> {
   const body = buildDriverAssignmentEmailBody(order, companyName, driverName, assignmentUrl);
   const subject = `Designação OS ${order.code} — ${companyName}`;
-  const [qrDataUrl, logoDataUrl] = await Promise.all([
-    generateProposalQrDataUrl(assignmentUrl),
-    fetchBrandLogoDataUrl(getPublicAppOrigin()),
-  ]);
 
   return prepareEmailShareBundle(subject, body, assignmentUrl, {
     to: driverEmail,
-    qrDataUrl,
-    logoDataUrl,
     companyName,
   });
 }

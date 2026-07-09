@@ -49,6 +49,12 @@ export function resolveServiceOrderDisplayStatus(row: ServiceOrderStatusRow): st
 
   if (isProposalAcceptedByClient(row)) {
     const assignment = (row.driver_assignment_response ?? "pending") as DriverAssignmentResponse;
+    if (assignment === "rejected") {
+      return DRIVER_ASSIGNMENT_RESPONSE_LABELS.rejected;
+    }
+    if (assignment === "accepted" && row.driver_id) {
+      return DRIVER_ASSIGNMENT_RESPONSE_LABELS.accepted;
+    }
     if (
       assignment === "pending" &&
       row.proposed_driver_id &&

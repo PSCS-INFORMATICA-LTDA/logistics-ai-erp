@@ -134,6 +134,12 @@ export function PublicDriverAssignmentClient({ token }: Props) {
                 Valor: {formatCurrency(amount)}
               </p>
             )}
+            {order.freight_toll_amount != null && order.freight_toll_amount > 0 && (
+              <p>
+                <span className="text-slate-500">Pedágio:</span>{" "}
+                {formatCurrency(order.freight_toll_amount)}
+              </p>
+            )}
           </div>
 
           {canRespond && (

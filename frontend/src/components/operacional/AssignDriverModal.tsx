@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Badge";
 import { useCompany } from "@/lib/company-context";
@@ -18,16 +19,14 @@ import {
   type DriverAssignmentSharePayload,
 } from "@/lib/service-order-driver-assignment";
 import {
-  copyPreparedEmailHtmlToClipboard,
   copyTextToClipboardSync,
   isWindowsWhatsAppDesktop,
-  launchPreparedEmailShare,
+  openMailtoLink,
   openWhatsAppShareHref,
 } from "@/lib/service-order-proposal";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Driver, ServiceOrder } from "@/types/database";
-
 type OrderSummary = Pick<
   ServiceOrder,
   | "id"
@@ -40,6 +39,7 @@ type OrderSummary = Pick<
   | "freight_destination_address"
   | "freight_distance_km"
   | "freight_agreed_amount"
+  | "freight_toll_amount"
   | "service_amount"
 >;
 
@@ -61,40 +61,6 @@ function driverAvailabilityLabel(driver: DriverListRow): string {
   return "Indisponível";
 }
 
-function MailIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn("h-4 w-4 shrink-0", className)}
-      aria-hidden
-    >
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
-    </svg>
-  );
-}
-function PhoneIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn("h-4 w-4 shrink-0", className)}
-      aria-hidden
-    >
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-    </svg>
-  );
-}
-
 export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignmentSent }: Props) {
   const { companyId, company } = useCompany();
   const supabase = useMemo(() => createClient(), []);
@@ -106,11 +72,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
   const [sharePayload, setSharePayload] = useState<DriverAssignmentSharePayload | null>(null);
   const [shareDriverName, setShareDriverName] = useState("");
-  const emailRichCopiedRef = useRef(false);
 
   const secondaryActionClass =
-    "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50";
-
+    "inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50";
   const companyName = company?.trade_name || company?.name || "GRX Transportes e Logística";
   const amount = order.freight_agreed_amount ?? order.service_amount;
   const selectedDriver = drivers.find((d) => d.id === selectedId);
@@ -255,29 +219,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     );
   };
 
-  const handleEmailShareMouseDown = () => {
-    if (!sharePayload?.emailBundle) return;
-    emailRichCopiedRef.current = copyPreparedEmailHtmlToClipboard(
-      sharePayload.emailBundle.htmlForClipboard,
-      sharePayload.emailBundle.plainBody
-    );
-  };
-
   const handleEmailShareClick = () => {
     if (!sharePayload?.emailBundle) {
       window.alert("E-mail do motorista não cadastrado ou conteúdo ainda não preparado.");
       return;
     }
-
-    launchPreparedEmailShare(sharePayload.emailBundle, {
-      skipCopy: true,
-      richCopied: emailRichCopiedRef.current,
-      copiedAlertMessage: emailRichCopiedRef.current
-        ? "Designação copiada (texto, link, QR Code e logo GRX).\n\n1. O e-mail abrirá com assunto e texto.\n2. Clique no corpo do e-mail e pressione Ctrl+V para colar QR Code e logo."
-        : "O e-mail abrirá com assunto e texto.\n\nPressione Ctrl+V no corpo — se QR/logo não aparecerem, clique em «Abrir e-mail» novamente.",
-    });
+    openMailtoLink(sharePayload.emailBundle.mailtoHref);
   };
-
   if (!open) return null;
 
   return (
@@ -314,16 +262,18 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               {order.freight_distance_km ? (
                 <p className="text-xs">Distância: {order.freight_distance_km} km</p>
               ) : null}
+              {order.freight_toll_amount ? (
+                <p className="text-xs">Pedágio: {formatCurrency(order.freight_toll_amount)}</p>
+              ) : null}
             </div>
           )}
           {amount != null ? (
             <p className="mt-1 text-sm font-medium text-brand-700">{formatCurrency(amount)}</p>
           ) : null}
           <p className="mt-2 text-xs text-slate-500">
-            Envie por WhatsApp ou e-mail para o motorista aceitar pelo link público (como a proposta
-            ao cliente). No e-mail, use Ctrl+V no corpo para colar QR Code e logo 3D GRX.
-          </p>
-        </div>
+            Envie por WhatsApp ou e-mail para o motorista aceitar ou recusar pelo link público (como
+            a proposta ao cliente). Se recusar, você poderá designar outro motorista.
+          </p>        </div>
 
         <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
           {sharePayload ? (
@@ -338,24 +288,30 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                   href={sharePayload.whatsappLinks.primaryHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={cn(secondaryActionClass, "w-full")}
+                  className={cn(
+                    secondaryActionClass,
+                    "w-full border-green-300 bg-green-50 text-green-900 hover:bg-green-100"
+                  )}
                   onMouseDown={handleWhatsAppShareMouseDown}
                   onClick={handleWhatsAppShareClick}
                 >
-                  Abrir WhatsApp do motorista
+                  <WhatsAppIcon className="h-5 w-5" />
+                  Enviar por WhatsApp
                 </a>
               ) : null}
               {sharePayload.emailBundle ? (
                 <button
                   type="button"
-                  className={cn(secondaryActionClass, "w-full")}
-                  onMouseDown={handleEmailShareMouseDown}
+                  className={cn(
+                    secondaryActionClass,
+                    "w-full border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100"
+                  )}
                   onClick={handleEmailShareClick}
                 >
-                  Abrir e-mail do motorista
+                  <MailIcon className="h-5 w-5" />
+                  Enviar por e-mail
                 </button>
-              ) : null}
-            </div>
+              ) : null}            </div>
           ) : loading ? (
             <Loading />
           ) : error ? (
@@ -414,24 +370,25 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                             href={`https://wa.me/${driver.phone.replace(/\D/g, "")}`}
                             target="_blank"
                             rel="noreferrer"
-                            title="Abrir WhatsApp do motorista"
+                            title="WhatsApp do motorista"
+                            aria-label={`WhatsApp de ${driver.name}`}
                             className="rounded-lg border border-green-300 bg-green-50 p-2 text-green-800 hover:bg-green-100"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <PhoneIcon />
+                            <WhatsAppIcon className="h-4 w-4" />
                           </a>
                         ) : null}
                         {driver.email ? (
                           <a
                             href={`mailto:${encodeURIComponent(driver.email.trim())}`}
-                            title="Abrir e-mail do motorista"
+                            title="E-mail do motorista"
+                            aria-label={`E-mail de ${driver.name}`}
                             className="rounded-lg border border-sky-300 bg-sky-50 p-2 text-sky-800 hover:bg-sky-100"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <MailIcon />
+                            <MailIcon className="h-4 w-4" />
                           </a>
-                        ) : null}
-                      </span>
+                        ) : null}                      </span>
                     </label>
                   </li>
                 );
