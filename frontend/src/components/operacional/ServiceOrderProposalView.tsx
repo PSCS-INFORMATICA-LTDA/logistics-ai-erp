@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +20,7 @@ import {
   buildPublicProposalUrl,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
-  copyPreparedEmailHtmlToClipboard,
+  copyPreparedEmailHtmlToClipboardAsync,
   copyTextToClipboardSync,
   formatServiceDate,
   generateProposalQrDataUrl,
@@ -188,10 +188,10 @@ export function ServiceOrderProposalView({
     if (!whatsappShare) return;
     setWhatsappHint(
       whatsappUsesDemoPhone
-        ? "Número demo da OS (11) 98765-4321 — WhatsApp abre sem chat fixo. Cole (Ctrl+V) no seu contato. Para testar com seu número, edite o telefone da OS."
+        ? "Número demo — WhatsApp abre sem chat fixo. Cole (Ctrl+V) no seu contato."
         : isWindowsWhatsAppDesktop()
-          ? `Mensagem copiada. Abrindo WhatsApp desktop${order.phone?.trim() ? ` para ${order.phone.trim()}` : ""}. Se não abrir, use Alt+Tab → WhatsApp → Ctrl+V.`
-          : "Mensagem copiada. Confira o chat do cliente e pressione Enter. Use Ctrl+V se o texto não aparecer."
+          ? `1) O Chrome pergunta «Abrir WhatsApp?» → clique Abrir WhatsApp e marque «Sempre permitir». 2) Mensagem copiada para ${order.phone?.trim() || "o cliente"}.`
+          : "Mensagem copiada. Confira o chat do cliente e pressione Enter."
     );
   };
 
@@ -256,59 +256,60 @@ export function ServiceOrderProposalView({
     });
   };
 
-  const emailRichCopiedRef = useRef(false);
-
-  const handleEmailMouseDown = () => {
-    if (!emailShareBundle) return;
-    emailRichCopiedRef.current = copyPreparedEmailHtmlToClipboard(
-      emailShareBundle.htmlForClipboard,
-      emailShareBundle.plainBody
-    );
-  };
-
   const handleEmailClick = () => {
-    if (!clientShareUrl) {
-      window.alert(
-        "Registre o envio da proposta primeiro.\n\nO link, o QR Code e o e-mail só funcionam após gerar o link público de produção."
-      );
-      return;
-    }
+    void (async () => {
+      if (!clientShareUrl) {
+        window.alert(
+          "Registre o envio da proposta primeiro.\n\nO link, o QR Code e o e-mail só funcionam após gerar o link público de produção."
+        );
+        return;
+      }
 
-    if (!emailShareBundle) {
-      window.alert(
-        emailAssetsLoading
-          ? "Aguarde — QR Code e logo ainda estão sendo preparados. Tente novamente em alguns segundos."
-          : "Não foi possível preparar o e-mail. Recarregue a página (F5) e tente novamente."
-      );
-      return;
-    }
+      if (!emailShareBundle) {
+        window.alert(
+          emailAssetsLoading
+            ? "Aguarde — QR Code e logo ainda estão sendo preparados. Tente novamente em alguns segundos."
+            : "Não foi possível preparar o e-mail. Recarregue a página (F5) e tente novamente."
+        );
+        return;
+      }
 
-    try {
-      const { copied, richCopied, hasQr, hasLogo } = launchPreparedEmailShare(
-        emailShareBundle,
-        {
+      try {
+        const richCopied = await copyPreparedEmailHtmlToClipboardAsync(
+          emailShareBundle.htmlForClipboard,
+          emailShareBundle.plainBody
+        );
+
+        const { copied, hasQr, hasLogo } = launchPreparedEmailShare(emailShareBundle, {
           skipCopy: true,
-          richCopied: emailRichCopiedRef.current,
-          copiedAlertMessage:
-            emailRichCopiedRef.current
-              ? "Proposta copiada (texto, link, QR Code e logo 3D GRX).\n\n1. O e-mail abrirá com assunto e texto.\n2. Clique no corpo do e-mail e pressione Ctrl+V para colar QR Code e logo."
-              : "O e-mail abrirá com assunto e texto.\n\nPressione Ctrl+V no corpo — se QR/logo não aparecerem, recarregue a página e clique em «Enviar por e-mail» novamente.",
-        }
-      );
-      setEmailHint(
-        richCopied
-          ? hasQr && hasLogo
-            ? "Copiado: texto + QR + logo 3D GRX. E-mail abre com assunto/texto; use Ctrl+V no corpo para QR e logo."
-            : "Copiado parcialmente. E-mail abre com assunto/texto; use Ctrl+V no corpo."
-          : copied
-            ? "Texto copiado. E-mail abre com assunto e corpo preenchidos."
-            : "E-mail abrirá com assunto e texto. Se faltar conteúdo, recarregue e tente novamente."
-      );
-    } catch {
-      setActionError(
-        "Não foi possível preparar o e-mail. Recarregue a página (F5) e tente novamente."
-      );
-    }
+          richCopied,
+          copiedAlertMessage: richCopied
+            ? "IMPORTANTE — o Gmail abre só com TEXTO.\n\n" +
+              "Para QR Code e logo 3D GRX:\n" +
+              "1. Clique dentro do corpo do e-mail\n" +
+              "2. Pressione Ctrl+V\n\n" +
+              (emailShareBundle.hasLogo
+                ? "Logo 3D incluído na cópia."
+                : "Aviso: logo não foi gerado — recarregue a página.")
+            : "Não foi possível copiar QR/logo automaticamente.\n\n" +
+              "Recarregue a página (F5), aguarde «Enviar por e-mail» e tente de novo.",
+        });
+
+        setEmailHint(
+          richCopied
+            ? hasQr && hasLogo
+              ? "Copiado com QR + logo 3D. Gmail mostra só texto — use Ctrl+V no corpo do e-mail."
+              : "Copiado parcialmente. Use Ctrl+V no corpo do Gmail."
+            : copied
+              ? "Texto copiado. Use Ctrl+V no corpo se faltar QR ou logo."
+              : "Recarregue a página e tente novamente."
+        );
+      } catch {
+        setActionError(
+          "Não foi possível preparar o e-mail. Recarregue a página (F5) e tente novamente."
+        );
+      }
+    })();
   };
 
   const copyLink = async () => {
@@ -402,9 +403,8 @@ export function ServiceOrderProposalView({
               title={
                 emailAssetsLoading
                   ? "Preparando QR Code e logo para colar no e-mail…"
-                  : "Copia QR + logo no clique; abre o e-mail com assunto e texto"
+                  : "Copia QR + logo 3D; abre Gmail com texto — depois Ctrl+V no corpo"
               }
-              onMouseDown={handleEmailMouseDown}
               onClick={handleEmailClick}
             >
               {emailAssetsLoading ? "Preparando e-mail…" : "Enviar por e-mail"}
@@ -434,6 +434,15 @@ export function ServiceOrderProposalView({
             mensagem com o link) → opcional: anexe o PDF salvo com o clipe no WhatsApp.
           </p>
 
+          {emailShareBundle && !emailAssetsLoading && (
+            <p className="proposal-toolbar mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-950 print:hidden">
+              <strong>E-mail:</strong> o Gmail abre só com texto. Depois de clicar em «Enviar por e-mail»,
+              clique no <strong>corpo</strong> do e-mail e pressione <strong>Ctrl+V</strong> para colar QR
+              Code e logo 3D GRX.
+              {!emailShareBundle.hasLogo && " (Logo ainda não carregou — aguarde ou recarregue F5.)"}
+            </p>
+          )}
+
           {emailHint && (
             <p className="proposal-toolbar mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 print:hidden">
               {emailHint}
@@ -448,6 +457,11 @@ export function ServiceOrderProposalView({
 
           {whatsappShare && (
             <div className="proposal-toolbar mb-4 space-y-2 text-xs text-slate-500 print:hidden">
+              <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-950">
+                <strong>1ª vez no Chrome:</strong> aparece «Abrir WhatsApp?» — clique{" "}
+                <strong>Abrir WhatsApp</strong> e marque <strong>Sempre permitir</strong>. O app desktop
+                abrirá (não o WhatsApp Web).
+              </p>
               {whatsappUsesDemoPhone && (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
                   <strong>Telefone demo:</strong> a OS001 usa <strong>(11) 98765-4321</strong>, que não

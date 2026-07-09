@@ -193,10 +193,51 @@ function buildEmailQrHtmlBlock(qrDataUrl: string): string {
 
 const MAX_CLIPBOARD_HTML_CHARS = 180_000;
 
-/** Windows/Gmail paste works more reliably with HTML fragment markers. */
+function cfHtmlByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
+
+/** Formato CF_HTML exigido pelo Gmail/Outlook no Windows para colar imagens. */
+export function buildCfHtmlDocument(fragmentHtml: string): string {
+  const fragment = `<!--StartFragment-->${fragmentHtml}<!--EndFragment-->`;
+  const htmlDoc =
+    `<html xmlns:o="urn:schemas-microsoft-com:office:office" ` +
+    `xmlns:w="urn:schemas-microsoft-com:office:word">` +
+    `<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>` +
+    `<body>${fragment}</body></html>`;
+
+  const headerFor = (startHtml: number, endHtml: number, startFragment: number, endFragment: number) =>
+    `Version:1.0\r\n` +
+    `StartHTML:${String(startHtml).padStart(10, "0")}\r\n` +
+    `EndHTML:${String(endHtml).padStart(10, "0")}\r\n` +
+    `StartFragment:${String(startFragment).padStart(10, "0")}\r\n` +
+    `EndFragment:${String(endFragment).padStart(10, "0")}\r\n`;
+
+  let startHtml = 0;
+  let endHtml = 0;
+  let startFragment = 0;
+  let endFragment = 0;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const header = headerFor(startHtml, endHtml, startFragment, endFragment);
+    startHtml = cfHtmlByteLength(header);
+    const docStart = startHtml;
+    endHtml = docStart + cfHtmlByteLength(htmlDoc);
+
+    const startMarker = "<!--StartFragment-->";
+    const endMarker = "<!--EndFragment-->";
+    startFragment =
+      docStart + cfHtmlByteLength(htmlDoc.slice(0, htmlDoc.indexOf(startMarker) + startMarker.length));
+    endFragment = docStart + cfHtmlByteLength(htmlDoc.slice(0, htmlDoc.indexOf(endMarker)));
+  }
+
+  return headerFor(startHtml, endHtml, startFragment, endFragment) + htmlDoc;
+}
+
+/** @deprecated Prefer buildCfHtmlDocument for clipboard writes. */
 function wrapHtmlForClipboard(innerHtml: string): string {
   if (innerHtml.includes("StartFragment")) return innerHtml;
-  return `<html><body><!--StartFragment-->${innerHtml}<!--EndFragment--></body></html>`;
+  return buildCfHtmlDocument(innerHtml);
 }
 
 /**
@@ -207,15 +248,19 @@ export function copyRichHtmlToClipboardSync(html: string): boolean {
   if (typeof document === "undefined") return false;
 
   const container = document.createElement("div");
-  container.innerHTML = wrapHtmlForClipboard(html);
+  container.innerHTML = html;
   container.setAttribute("contenteditable", "true");
   container.style.position = "fixed";
-  container.style.left = "-9999px";
+  container.style.left = "0";
   container.style.top = "0";
-  container.style.opacity = "0";
+  container.style.width = "2px";
+  container.style.height = "2px";
+  container.style.overflow = "hidden";
+  container.style.opacity = "0.01";
   container.style.pointerEvents = "none";
   document.body.appendChild(container);
 
+  container.focus();
   const selection = window.getSelection();
   const range = document.createRange();
   range.selectNodeContents(container);
@@ -235,26 +280,35 @@ export function copyRichHtmlToClipboardSync(html: string): boolean {
 }
 
 async function copyRichHtmlViaClipboardApi(html: string, plainText: string): Promise<boolean> {
-  if (
-    typeof navigator === "undefined" ||
-    !navigator.clipboard?.write ||
-    typeof ClipboardItem === "undefined" ||
-    html.length > MAX_CLIPBOARD_HTML_CHARS
-  ) {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
     return false;
   }
+  if (html.length > MAX_CLIPBOARD_HTML_CHARS) return false;
 
+  const cfHtml = buildCfHtmlDocument(html);
   try {
     await navigator.clipboard.write([
       new ClipboardItem({
         "text/plain": new Blob([plainText], { type: "text/plain" }),
-        "text/html": new Blob([wrapHtmlForClipboard(html)], { type: "text/html" }),
+        "text/html": new Blob([cfHtml], { type: "text/html" }),
       }),
     ]);
     return true;
   } catch {
     return false;
   }
+}
+
+export async function copyPreparedEmailHtmlToClipboardAsync(
+  html: string,
+  plainBody: string
+): Promise<boolean> {
+  if (copyRichHtmlToClipboardSync(html)) return true;
+  return copyRichHtmlViaClipboardApi(html, plainBody);
+}
+
+export function copyPreparedEmailHtmlToClipboard(html: string, plainBody: string): boolean {
+  return copyRichHtmlToClipboardSync(html);
 }
 
 type EmailClipboardOptions = {
@@ -324,12 +378,6 @@ export function buildEmailProposalRichHtml(
   }
 
   return html;
-}
-
-export function copyPreparedEmailHtmlToClipboard(html: string, plainBody: string): boolean {
-  if (copyRichHtmlToClipboardSync(html)) return true;
-  void copyRichHtmlViaClipboardApi(html, plainBody);
-  return false;
 }
 
 async function copyEmailProposalToClipboard(
