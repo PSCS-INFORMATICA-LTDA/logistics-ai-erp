@@ -334,26 +334,24 @@ export function buildProposalEmailMailtoHref(
   subject: string,
   body: string,
   proposalUrl: string,
-  to?: string | null,
-  options?: { emptyBody?: boolean }
+  to?: string | null
 ): string {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
   const mailtoPrefix = to?.trim() ? `mailto:${to.trim()}` : "mailto:";
-  const mailtoBody = options?.emptyBody ? "" : buildMailtoBodyForClient(plainBody, safeUrl);
+  const mailtoBody = buildMailtoBodyForClient(plainBody, safeUrl);
   return `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
 }
 
 /**
- * Fluxo original que funcionava (pre-efb3037): copia HTML com logo na área de transferência
- * e abre mailto com corpo vazio — Outlook/Mail cola texto + logo automaticamente.
+ * Abre mailto com texto completo (Gmail) e copia HTML com logo GRX (Ctrl+V no corpo para incluir logo).
  */
 export function launchProposalEmailShareSync(
   subject: string,
   body: string,
   proposalUrl: string,
-  options: {
-    logoDataUrl: string;
+  options?: {
+    logoDataUrl?: string | null;
     companyName?: string;
     to?: string | null;
     skipCopy?: boolean;
@@ -362,10 +360,10 @@ export function launchProposalEmailShareSync(
 ): EmailShareResult {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
-  const logoDataUrl = options.logoDataUrl;
+  const logoDataUrl = options.logoDataUrl ?? null;
 
   let richCopied = false;
-  if (!options.skipCopy && logoDataUrl.startsWith("data:image")) {
+  if (!options.skipCopy && logoDataUrl?.startsWith("data:image")) {
     const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
       qrDataUrl: null,
       logoDataUrl,
@@ -376,18 +374,13 @@ export function launchProposalEmailShareSync(
     richCopied = Boolean(options.richCopied);
   }
 
-  const hasRichPaste = Boolean(richCopied && logoDataUrl.startsWith("data:image"));
-  const mailtoHref = buildProposalEmailMailtoHref(subject, body, proposalUrl, options.to, {
-    emptyBody: hasRichPaste,
-  });
-
-  openMailtoLink(mailtoHref);
+  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options.to));
 
   return {
-    copied: richCopied || true,
-    richCopied: hasRichPaste,
+    copied: true,
+    richCopied: Boolean(richCopied && logoDataUrl?.startsWith("data:image")),
     hasQr: false,
-    hasLogo: logoDataUrl.startsWith("data:image"),
+    hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
     plainBody,
   };
 }
@@ -1174,17 +1167,12 @@ export async function openEmailShare(
 
   const plainCopied = richCopied ? true : await copyTextToClipboard(plainBody);
   const copied = richCopied || plainCopied;
-  const hasRichPaste = Boolean(richCopied && logoDataUrl?.startsWith("data:image"));
 
-  openMailtoLink(
-    buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to, {
-      emptyBody: hasRichPaste,
-    })
-  );
+  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to));
 
   return {
     copied,
-    richCopied: hasRichPaste,
+    richCopied: Boolean(richCopied && logoDataUrl?.startsWith("data:image")),
     hasQr: false,
     hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
     plainBody,

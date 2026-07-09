@@ -249,9 +249,8 @@ export function ServiceOrderProposalView({
     }
 
     if (!emailAssetsReady || !emailLogoDataUrl) {
-      window.alert(
-        "Aguarde alguns segundos após recarregar a página (F5) para o logo GRX carregar, e tente novamente."
-      );
+      const body = buildProposalEmailBody(order, context, url);
+      launchProposalEmailShareSync(`Proposta OS ${order.code} — ${context.companyName}`, body, url);
       return;
     }
 
