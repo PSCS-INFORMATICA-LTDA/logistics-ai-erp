@@ -1,5 +1,6 @@
 import {
   buildEmailBrandFooterHtml,
+  fetchBrandLogoDataUrl,
   fetchBrandLogoFlat2DDataUrl,
   resolveEmailBrandLogoSrc,
 } from "@/lib/brand-email";
@@ -333,47 +334,60 @@ export function buildProposalEmailMailtoHref(
   subject: string,
   body: string,
   proposalUrl: string,
-  to?: string | null
+  to?: string | null,
+  options?: { emptyBody?: boolean }
 ): string {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
   const mailtoPrefix = to?.trim() ? `mailto:${to.trim()}` : "mailto:";
-  const mailtoBody = buildMailtoBodyForClient(plainBody, safeUrl);
+  const mailtoBody = options?.emptyBody ? "" : buildMailtoBodyForClient(plainBody, safeUrl);
   return `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
 }
 
-/** Abre e-mail — mailto com texto completo; logo 2D copiado no mesmo clique (fluxo ce6a8da). */
+/**
+ * Fluxo original que funcionava (pre-efb3037): copia HTML com logo na área de transferência
+ * e abre mailto com corpo vazio — Outlook/Mail cola texto + logo automaticamente.
+ */
 export function launchProposalEmailShareSync(
   subject: string,
   body: string,
   proposalUrl: string,
-  options?: {
-    to?: string | null;
-    logoDataUrl?: string | null;
+  options: {
+    logoDataUrl: string;
     companyName?: string;
+    to?: string | null;
+    skipCopy?: boolean;
+    richCopied?: boolean;
   }
 ): EmailShareResult {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
-  const logoDataUrl = options?.logoDataUrl ?? null;
+  const logoDataUrl = options.logoDataUrl;
 
   let richCopied = false;
-  if (logoDataUrl?.startsWith("data:image")) {
+  if (!options.skipCopy && logoDataUrl.startsWith("data:image")) {
     const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
       qrDataUrl: null,
       logoDataUrl,
-      companyName: options?.companyName,
+      companyName: options.companyName,
     });
     richCopied = copyRichHtmlToClipboardSync(html, plainBody);
+  } else if (options.skipCopy) {
+    richCopied = Boolean(options.richCopied);
   }
 
-  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to));
+  const hasRichPaste = Boolean(richCopied && logoDataUrl.startsWith("data:image"));
+  const mailtoHref = buildProposalEmailMailtoHref(subject, body, proposalUrl, options.to, {
+    emptyBody: hasRichPaste,
+  });
+
+  openMailtoLink(mailtoHref);
 
   return {
-    copied: true,
-    richCopied,
+    copied: richCopied || true,
+    richCopied: hasRichPaste,
     hasQr: false,
-    hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
+    hasLogo: logoDataUrl.startsWith("data:image"),
     plainBody,
   };
 }
@@ -1137,7 +1151,7 @@ export async function openEmailShare(
   let logoDataUrl = options?.logoDataUrl ?? null;
 
   if (!logoDataUrl?.startsWith("data:image")) {
-    logoDataUrl = await fetchBrandLogoFlat2DDataUrl(getPublicAppOrigin());
+    logoDataUrl = await fetchBrandLogoDataUrl(getPublicAppOrigin());
   }
 
   const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
@@ -1160,13 +1174,18 @@ export async function openEmailShare(
 
   const plainCopied = richCopied ? true : await copyTextToClipboard(plainBody);
   const copied = richCopied || plainCopied;
+  const hasRichPaste = Boolean(richCopied && logoDataUrl?.startsWith("data:image"));
 
-  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to));
+  openMailtoLink(
+    buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to, {
+      emptyBody: hasRichPaste,
+    })
+  );
 
   return {
     copied,
-    richCopied,
-    hasQr: Boolean(qrDataUrl),
+    richCopied: hasRichPaste,
+    hasQr: false,
     hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
     plainBody,
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
@@ -14,11 +14,13 @@ import {
   perDiemChargeLabel,
   perDiemDayTotal,
 } from "@/lib/freight-per-diem";
-import { fetchBrandLogoFlat2DDataUrl } from "@/lib/brand-email";
+import { fetchBrandLogoDataUrl } from "@/lib/brand-email";
 import {
   buildProposalEmailBody,
+  buildEmailProposalRichHtml,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
+  copyRichHtmlToClipboardSync,
   copyTextToClipboardSync,
   formatServiceDate,
   getPublicAppOrigin,
@@ -69,7 +71,8 @@ export function ServiceOrderProposalView({
   const [resettingProposal, setResettingProposal] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [whatsappHint, setWhatsappHint] = useState<string | null>(null);
-  const [emailLogo2D, setEmailLogo2D] = useState<string | null>(null);
+  const [emailLogoDataUrl, setEmailLogoDataUrl] = useState<string | null>(null);
+  const emailRichCopiedRef = useRef(false);
   const [publicToken, setPublicToken] = useState(order.proposal_token);
   const [sentAt, setSentAt] = useState(order.proposal_sent_at);
 
@@ -82,20 +85,27 @@ export function ServiceOrderProposalView({
   const publicUrl = clientShareUrl;
   const qrUrl = acceptanceTestUrl ?? clientShareUrl;
   const shareUrl = publicUrl ?? "";
+  const emailAssetsReady = Boolean(emailLogoDataUrl?.startsWith("data:image"));
   const isDev = process.env.NODE_ENV === "development";
   const hasRoute = Boolean(order.freight_origin_address || order.freight_destination_address);
 
   useEffect(() => {
+    if (!clientShareUrl) {
+      setEmailLogoDataUrl(null);
+      return;
+    }
+
     let cancelled = false;
-    void fetchBrandLogoFlat2DDataUrl(getPublicAppOrigin()).then((logo) => {
-      if (!cancelled && logo?.startsWith("data:image")) {
-        setEmailLogo2D(logo);
+    void fetchBrandLogoDataUrl(getPublicAppOrigin()).then((logoDataUrl) => {
+      if (!cancelled && logoDataUrl?.startsWith("data:image")) {
+        setEmailLogoDataUrl(logoDataUrl);
       }
     });
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clientShareUrl]);
 
   const handleMarkSent = async () => {
     setMarkingSent(true);
@@ -213,6 +223,22 @@ export function ServiceOrderProposalView({
     });
   };
 
+  const handleEmailMouseDown = () => {
+    const url = resolveClientProposalShareUrl(publicToken);
+    if (!url || !emailLogoDataUrl?.startsWith("data:image")) {
+      emailRichCopiedRef.current = false;
+      return;
+    }
+
+    const body = buildProposalEmailBody(order, context, url);
+    const html = buildEmailProposalRichHtml(body, url, {
+      qrDataUrl: null,
+      logoDataUrl: emailLogoDataUrl,
+      companyName: context.companyName,
+    });
+    emailRichCopiedRef.current = copyRichHtmlToClipboardSync(html, body);
+  };
+
   const shareEmail = () => {
     const url = resolveClientProposalShareUrl(publicToken);
     if (!url) {
@@ -222,16 +248,29 @@ export function ServiceOrderProposalView({
       return;
     }
 
+    if (!emailAssetsReady || !emailLogoDataUrl) {
+      window.alert(
+        "Aguarde alguns segundos após recarregar a página (F5) para o logo GRX carregar, e tente novamente."
+      );
+      return;
+    }
+
     const body = buildProposalEmailBody(order, context, url);
+    const preCopied = emailRichCopiedRef.current;
+
     launchProposalEmailShareSync(
       `Proposta OS ${order.code} — ${context.companyName}`,
       body,
       url,
       {
-        logoDataUrl: emailLogo2D,
+        logoDataUrl: emailLogoDataUrl,
         companyName: context.companyName,
+        skipCopy: preCopied,
+        richCopied: preCopied,
       }
     );
+
+    emailRichCopiedRef.current = false;
   };
 
   const copyLink = async () => {
@@ -314,8 +353,14 @@ export function ServiceOrderProposalView({
                 Enviar no WhatsApp
               </Button>
             )}
-            <Button type="button" variant="secondary" onClick={shareEmail}>
-              Enviar por e-mail
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!emailAssetsReady}
+              onMouseDown={handleEmailMouseDown}
+              onClick={shareEmail}
+            >
+              {emailAssetsReady ? "Enviar por e-mail" : "Preparando logo GRX…"}
             </Button>
             <Button type="button" variant="secondary" onClick={() => void copyLink()}>
               Copiar link público
