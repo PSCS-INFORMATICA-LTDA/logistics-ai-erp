@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +20,8 @@ import {
   buildPublicProposalUrl,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
+  buildEmailProposalRichHtml,
+  copyRichHtmlToClipboardSync,
   copyTextToClipboardSync,
   formatServiceDate,
   generateProposalQrDataUrl,
@@ -76,6 +78,7 @@ export function ServiceOrderProposalView({
     qrDataUrl: string | null;
     logoDataUrl: string | null;
   }>({ qrDataUrl: null, logoDataUrl: null });
+  const emailRichCopiedRef = useRef(false);
   const [publicToken, setPublicToken] = useState(order.proposal_token);
   const [sentAt, setSentAt] = useState(order.proposal_sent_at);
 
@@ -228,6 +231,23 @@ export function ServiceOrderProposalView({
     });
   };
 
+  const handleEmailMouseDown = () => {
+    const url = resolveClientProposalShareUrl(publicToken);
+    const { qrDataUrl, logoDataUrl } = emailPasteAssets;
+    if (!url || !qrDataUrl || !logoDataUrl?.startsWith("data:image")) {
+      emailRichCopiedRef.current = false;
+      return;
+    }
+
+    const body = buildProposalEmailBody(order, context, url);
+    const html = buildEmailProposalRichHtml(body, url, {
+      qrDataUrl,
+      logoDataUrl,
+      companyName: context.companyName,
+    });
+    emailRichCopiedRef.current = copyRichHtmlToClipboardSync(html);
+  };
+
   const shareEmail = () => {
     void (async () => {
       const url = resolveClientProposalShareUrl(publicToken);
@@ -253,6 +273,8 @@ export function ServiceOrderProposalView({
           qrDataUrl,
           logoDataUrl,
           companyName: context.companyName,
+          skipCopy: emailRichCopiedRef.current,
+          richCopied: emailRichCopiedRef.current,
         }
       );
 
@@ -348,7 +370,12 @@ export function ServiceOrderProposalView({
                 Enviar no WhatsApp
               </Button>
             )}
-            <Button type="button" variant="secondary" onClick={shareEmail}>
+            <Button
+              type="button"
+              variant="secondary"
+              onMouseDown={handleEmailMouseDown}
+              onClick={shareEmail}
+            >
               Enviar por e-mail
             </Button>
             <Button type="button" variant="secondary" onClick={() => void copyLink()}>

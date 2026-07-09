@@ -16,7 +16,7 @@ const MAX_EMAIL_EMBEDDED_LOGO_CHARS = 64_000;
 
 let cachedBrandLogoPlaque3D: string | null = null;
 let cachedBrandLogoPlaqueVersion = 0;
-const PLAQUE_CACHE_VERSION = 3;
+const PLAQUE_CACHE_VERSION = 4;
 
 function resolveOrigin(origin?: string): string {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
@@ -125,6 +125,17 @@ function loadImageDirect(src: string): Promise<HTMLImageElement | null> {
 
 async function loadBrandLogoImage(origin?: string): Promise<HTMLImageElement | null> {
   if (typeof window === "undefined") return null;
+
+  const domImg = document.querySelector<HTMLImageElement>(
+    ".brand-logo-3d-stack img, .brand-logo-plaque img, .proposal-logo img"
+  );
+  if (domImg?.complete && domImg.naturalWidth > 0) {
+    return domImg;
+  }
+  if (domImg?.src) {
+    const fromDom = await loadImageDirect(domImg.src);
+    if (fromDom) return fromDom;
+  }
 
   const candidates: string[] = [];
   candidates.push(BRAND_LOGO_PATH);
@@ -305,9 +316,8 @@ export async function fetchBrandLogoDataUrl(origin?: string): Promise<string | n
 }
 
 export function buildEmailBrandFooterHtml(
-  logoSrc: string,
-  companyName = DEFAULT_COMPANY_TAGLINE,
-  options?: { framed?: boolean }
+  logoSrc: string | null,
+  companyName = DEFAULT_COMPANY_TAGLINE
 ): string {
   const safeCompany = companyName
     .replace(/&/g, "&amp;")
@@ -315,17 +325,17 @@ export function buildEmailBrandFooterHtml(
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-  const isEmbeddedPlaque = logoSrc.startsWith("data:image");
-  const framed = options?.framed ?? !isEmbeddedPlaque;
-  const logoBlock = framed
-    ? [
-        `<div style="display:inline-block;background:linear-gradient(165deg,#181818 0%,#0a0a0a 52%,#050505 100%);padding:16px 28px;border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.28)">`,
-        `<img src="${logoSrc}" alt="${safeCompany}" width="200" height="80" style="display:block;max-width:200px;height:auto" />`,
-        `</div>`,
-      ].join("")
-    : [
-        `<img src="${logoSrc}" alt="${safeCompany}" width="264" style="display:block;max-width:264px;height:auto;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,0.28),0 4px 10px rgba(208,0,31,0.08)" />`,
-      ].join("");
+  if (!logoSrc?.startsWith("data:image")) {
+    return [
+      `<div style="margin-top:28px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:left">`,
+      `<p style="margin:0;font-size:11px;color:#64748b;letter-spacing:0.06em;text-transform:uppercase">${safeCompany}</p>`,
+      `</div>`,
+    ].join("");
+  }
+
+  const logoBlock = [
+    `<img src="${logoSrc}" alt="${safeCompany}" width="264" style="display:block;max-width:264px;height:auto;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,0.28),0 4px 10px rgba(208,0,31,0.08)" />`,
+  ].join("");
 
   return [
     `<div style="margin-top:28px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:left">`,
@@ -335,10 +345,7 @@ export function buildEmailBrandFooterHtml(
   ].join("");
 }
 
-/** Prefer embedded 3D plaque for email paste; public URL only as last resort. */
-export function resolveEmailBrandLogoSrc(logoDataUrl: string | null, origin?: string): string {
-  if (logoDataUrl?.startsWith("data:image")) {
-    return logoDataUrl;
-  }
-  return getBrandLogoPublicUrl(origin);
+/** Apenas placa 3D embutida (data URL) — nunca URL plana de /grx-logo.png. */
+export function resolveEmailBrandLogoSrc(logoDataUrl: string | null): string | null {
+  return logoDataUrl?.startsWith("data:image") ? logoDataUrl : null;
 }
