@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
@@ -14,16 +14,12 @@ import {
   perDiemChargeLabel,
   perDiemDayTotal,
 } from "@/lib/freight-per-diem";
-import { fetchBrandLogoDataUrl } from "@/lib/brand-email";
 import {
   buildProposalEmailBody,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
-  buildEmailProposalRichHtml,
-  copyRichHtmlToClipboardSync,
   copyTextToClipboardSync,
   formatServiceDate,
-  getPublicAppOrigin,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
   launchProposalEmailShareSync,
@@ -70,11 +66,7 @@ export function ServiceOrderProposalView({
   const [markingSent, setMarkingSent] = useState(false);
   const [resettingProposal, setResettingProposal] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [emailHint, setEmailHint] = useState<string | null>(null);
   const [whatsappHint, setWhatsappHint] = useState<string | null>(null);
-  const [emailPasteAssets, setEmailPasteAssets] = useState<{
-    logoDataUrl: string | null;
-  }>({ logoDataUrl: null });
   const [publicToken, setPublicToken] = useState(order.proposal_token);
   const [sentAt, setSentAt] = useState(order.proposal_sent_at);
 
@@ -89,24 +81,6 @@ export function ServiceOrderProposalView({
   const shareUrl = publicUrl ?? "";
   const isDev = process.env.NODE_ENV === "development";
   const hasRoute = Boolean(order.freight_origin_address || order.freight_destination_address);
-
-  useEffect(() => {
-    if (!clientShareUrl) {
-      setEmailPasteAssets({ logoDataUrl: null });
-      return;
-    }
-
-    let cancelled = false;
-    void fetchBrandLogoDataUrl(getPublicAppOrigin()).then((logoDataUrl) => {
-      if (!cancelled) {
-        setEmailPasteAssets({ logoDataUrl });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clientShareUrl]);
 
   const handleMarkSent = async () => {
     setMarkingSent(true);
@@ -233,38 +207,12 @@ export function ServiceOrderProposalView({
       return;
     }
 
-    if (!url) {
-      window.alert(
-        "Registre o envio da proposta primeiro.\n\nO link e o e-mail só funcionam após gerar o link público de produção."
-      );
-      return;
-    }
-
     const body = buildProposalEmailBody(order, context, url);
-    const logoDataUrl = emailPasteAssets.logoDataUrl;
-
-    if (logoDataUrl?.startsWith("data:image")) {
-      const html = buildEmailProposalRichHtml(body, url, {
-        qrDataUrl: null,
-        logoDataUrl,
-        companyName: context.companyName,
-      });
-      copyRichHtmlToClipboardSync(html, body);
-    }
-
     launchProposalEmailShareSync(
       `Proposta OS ${order.code} — ${context.companyName}`,
       body,
-      url,
-      {
-        logoDataUrl: logoDataUrl ?? "",
-        companyName: context.companyName,
-        skipCopy: true,
-        richCopied: Boolean(logoDataUrl?.startsWith("data:image")),
-      }
+      url
     );
-
-    setEmailHint("E-mail aberto com assunto e texto da proposta.");
   };
 
   const copyLink = async () => {
@@ -374,12 +322,6 @@ export function ServiceOrderProposalView({
             Fluxo sugerido: registre o envio (link com aceite) → «Enviar no WhatsApp» (abre o app e copia a
             mensagem com o link) → opcional: anexe o PDF salvo com o clipe no WhatsApp.
           </p>
-
-          {emailHint && (
-            <p className="proposal-toolbar mb-4 rounded-lg border-2 border-blue-400 bg-blue-50 px-4 py-3 text-base font-medium text-blue-950 print:hidden">
-              {emailHint}
-            </p>
-          )}
 
           {whatsappHint && (
             <p className="proposal-toolbar mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900 print:hidden">

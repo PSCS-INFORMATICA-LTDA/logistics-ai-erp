@@ -292,47 +292,35 @@ export function copyRichHtmlToClipboardSync(html: string, plainText?: string): b
   return cfCopied && copied;
 }
 
-/** Abre e-mail no gesto do clique — logo 3D na área de transferência, mailto vazio se a cópia rica funcionar. */
+/** Monta o href mailto da proposta (útil para testes e integrações). */
+export function buildProposalEmailMailtoHref(
+  subject: string,
+  body: string,
+  proposalUrl: string,
+  to?: string | null
+): string {
+  const safeUrl = sanitizePublicProposalUrl(proposalUrl);
+  const plainBody = body.replace(/\r\n/g, "\n");
+  const mailtoPrefix = to?.trim() ? `mailto:${to.trim()}` : "mailto:";
+  const mailtoBody = buildMailtoBodyForClient(plainBody, safeUrl);
+  return `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
+}
+
+/** Abre o cliente de e-mail com assunto e corpo da proposta (texto puro via mailto). */
 export function launchProposalEmailShareSync(
   subject: string,
   body: string,
   proposalUrl: string,
-  options: {
-    logoDataUrl: string;
-    companyName?: string;
-    to?: string | null;
-    /** Quando true, a cópia rica já foi feita no mousedown — não repetir. */
-    skipCopy?: boolean;
-    richCopied?: boolean;
-  }
+  options?: { to?: string | null }
 ): EmailShareResult {
-  const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
-  const to = options.to?.trim();
-  const mailtoPrefix = to ? `mailto:${to}` : "mailto:";
-
-  const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
-    qrDataUrl: null,
-    logoDataUrl: options.logoDataUrl,
-    companyName: options.companyName,
-  });
-
-  const richCopied = options.skipCopy
-    ? Boolean(options.richCopied)
-    : copyRichHtmlToClipboardSync(html, plainBody);
-  const plainCopied = richCopied ? true : copyTextToClipboardSync(plainBody);
-  const copied = richCopied || plainCopied;
-
-  const mailtoBody = buildMailtoBodyForClient(plainBody, safeUrl);
-  const href = `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
-
-  openMailtoLink(href);
+  openMailtoLink(buildProposalEmailMailtoHref(subject, body, proposalUrl, options?.to));
 
   return {
-    copied,
-    richCopied,
+    copied: true,
+    richCopied: false,
     hasQr: false,
-    hasLogo: Boolean(options.logoDataUrl.startsWith("data:image")),
+    hasLogo: false,
     plainBody,
   };
 }
