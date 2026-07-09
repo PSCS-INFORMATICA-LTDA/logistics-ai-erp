@@ -20,9 +20,9 @@ import {
 import {
   copyPreparedEmailHtmlToClipboard,
   copyTextToClipboardSync,
-  isWhatsAppNativeHref,
   isWindowsWhatsAppDesktop,
   launchPreparedEmailShare,
+  openWhatsAppShareHref,
 } from "@/lib/service-order-proposal";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -247,6 +247,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
   const handleWhatsAppShareClick = () => {
     if (!sharePayload) return;
+    openWhatsAppShareHref(sharePayload.whatsappLinks.primaryHref);
     window.alert(
       isWindowsWhatsAppDesktop()
         ? "Mensagem copiada. Se o Chrome perguntar «Abrir WhatsApp?», clique Abrir e marque Sempre permitir."
@@ -271,10 +272,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     launchPreparedEmailShare(sharePayload.emailBundle, {
       skipCopy: true,
       richCopied: emailRichCopiedRef.current,
-      orderCode: order.code,
       copiedAlertMessage: emailRichCopiedRef.current
-        ? "E-mail aberto com a designação completa (texto, link, QR Code e logo GRX).\n\nRevise no seu programa de e-mail e clique Enviar."
-        : "E-mail aberto com assunto e texto.\n\nSe QR Code e logo não aparecerem, pressione Ctrl+V no corpo do e-mail.",
+        ? "Designação copiada (texto, link, QR Code e logo GRX).\n\n1. O e-mail abrirá com assunto e texto.\n2. Clique no corpo do e-mail e pressione Ctrl+V para colar QR Code e logo."
+        : "O e-mail abrirá com assunto e texto.\n\nPressione Ctrl+V no corpo — se QR/logo não aparecerem, clique em «Abrir e-mail» novamente.",
     });
   };
 
@@ -336,9 +336,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               {selectedDriver?.phone?.trim() ? (
                 <a
                   href={sharePayload.whatsappLinks.primaryHref}
-                  {...(isWhatsAppNativeHref(sharePayload.whatsappLinks.primaryHref)
-                    ? {}
-                    : { target: "_blank", rel: "noopener noreferrer" })}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={cn(secondaryActionClass, "w-full")}
                   onMouseDown={handleWhatsAppShareMouseDown}
                   onClick={handleWhatsAppShareClick}

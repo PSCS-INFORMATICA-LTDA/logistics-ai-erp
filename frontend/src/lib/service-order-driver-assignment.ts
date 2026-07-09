@@ -223,9 +223,8 @@ export async function openDriverAssignmentEmailShare(
   );
   const { launchPreparedEmailShare } = await import("@/lib/service-order-proposal");
   return launchPreparedEmailShare(bundle, {
-    orderCode: order.code,
     copiedAlertMessage:
-      "E-mail aberto com a designação completa (texto, link, QR Code e logo GRX).\n\nRevise no seu programa de e-mail e clique Enviar.",
+      "Designação copiada (texto, link, QR Code e logo GRX).\n\n1. O e-mail abrirá com assunto e texto.\n2. Clique no corpo do e-mail e pressione Ctrl+V para colar QR Code e logo.",
   });
 }
 

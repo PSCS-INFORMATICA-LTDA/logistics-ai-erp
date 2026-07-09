@@ -16,7 +16,7 @@ const MAX_EMAIL_EMBEDDED_LOGO_CHARS = 64_000;
 
 let cachedBrandLogoPlaque3D: string | null = null;
 let cachedBrandLogoPlaqueVersion = 0;
-const PLAQUE_CACHE_VERSION = 4;
+const PLAQUE_CACHE_VERSION = 3;
 
 function resolveOrigin(origin?: string): string {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
@@ -113,75 +113,49 @@ function loadImageFromObjectUrl(objectUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-function loadImageDirectNoCrossOrigin(src: string): Promise<HTMLImageElement | null> {
+function loadImageDirect(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const image = new window.Image();
+    image.crossOrigin = "anonymous";
     image.onload = () => resolve(image.naturalWidth > 0 ? image : null);
     image.onerror = () => resolve(null);
     image.src = src;
   });
 }
 
-/** Logo já decodificado na página (BrandLogo plaque3d) — evita falha de CORS no canvas. */
-function findLoadedBrandLogoInDom(): HTMLImageElement | null {
-  if (typeof document === "undefined") return null;
-
-  const selectors = [
-    ".brand-logo-image--front",
-    '.brand-logo-3d-stack img[alt="GRX Transportes e Logística"]',
-    `img[src="${BRAND_LOGO_PATH}"]`,
-    'img[src*="grx-logo"]',
-  ];
-
-  for (const selector of selectors) {
-    for (const node of document.querySelectorAll(selector)) {
-      if (node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0) {
-        return node;
-      }
-    }
-  }
-
-  return null;
-}
-
 async function loadBrandLogoImage(origin?: string): Promise<HTMLImageElement | null> {
   if (typeof window === "undefined") return null;
 
-  const domImage = findLoadedBrandLogoInDom();
-  if (domImage) return domImage;
-
-  const candidates: string[] = [BRAND_LOGO_PATH];
+  const candidates: string[] = [];
+  candidates.push(BRAND_LOGO_PATH);
   if (window.location.origin) {
     candidates.push(`${window.location.origin}${BRAND_LOGO_PATH}`);
   }
-  const publicUrl = getBrandLogoPublicUrl(origin);
-  if (!candidates.includes(publicUrl)) {
-    candidates.push(publicUrl);
-  }
+  candidates.push(getBrandLogoPublicUrl(origin));
+  candidates.push(getBrandLogoPublicUrl(window.location.origin));
 
   const seen = new Set<string>();
   for (const logoUrl of candidates) {
     if (seen.has(logoUrl)) continue;
     seen.add(logoUrl);
 
+    const direct = await loadImageDirect(logoUrl);
+    if (direct) return direct;
+
     try {
       const response = await fetch(logoUrl);
-      if (response.ok) {
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        try {
-          const image = await loadImageFromObjectUrl(objectUrl);
-          if (image.naturalWidth > 0) return image;
-        } finally {
-          URL.revokeObjectURL(objectUrl);
-        }
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const image = await loadImageFromObjectUrl(objectUrl);
+        if (image.naturalWidth > 0) return image;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
     } catch {
       /* tenta próxima origem */
     }
-
-    const direct = await loadImageDirectNoCrossOrigin(logoUrl);
-    if (direct) return direct;
   }
 
   return null;
@@ -331,8 +305,9 @@ export async function fetchBrandLogoDataUrl(origin?: string): Promise<string | n
 }
 
 export function buildEmailBrandFooterHtml(
-  logoSrc: string | null,
-  companyName = DEFAULT_COMPANY_TAGLINE
+  logoSrc: string,
+  companyName = DEFAULT_COMPANY_TAGLINE,
+  options?: { framed?: boolean }
 ): string {
   const safeCompany = companyName
     .replace(/&/g, "&amp;")
@@ -340,17 +315,17 @@ export function buildEmailBrandFooterHtml(
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-  if (!logoSrc?.startsWith("data:image")) {
-    return [
-      `<div style="margin-top:28px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:left">`,
-      `<p style="margin:0;font-size:11px;color:#64748b;letter-spacing:0.06em;text-transform:uppercase">${safeCompany}</p>`,
-      `</div>`,
-    ].join("");
-  }
-
-  const logoBlock = [
-    `<img src="${logoSrc}" alt="${safeCompany}" width="264" style="display:block;max-width:264px;height:auto;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,0.28),0 4px 10px rgba(208,0,31,0.08)" />`,
-  ].join("");
+  const isEmbeddedPlaque = logoSrc.startsWith("data:image");
+  const framed = options?.framed ?? !isEmbeddedPlaque;
+  const logoBlock = framed
+    ? [
+        `<div style="display:inline-block;background:linear-gradient(165deg,#181818 0%,#0a0a0a 52%,#050505 100%);padding:16px 28px;border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.28)">`,
+        `<img src="${logoSrc}" alt="${safeCompany}" width="200" height="80" style="display:block;max-width:200px;height:auto" />`,
+        `</div>`,
+      ].join("")
+    : [
+        `<img src="${logoSrc}" alt="${safeCompany}" width="264" style="display:block;max-width:264px;height:auto;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,0.28),0 4px 10px rgba(208,0,31,0.08)" />`,
+      ].join("");
 
   return [
     `<div style="margin-top:28px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:left">`,
@@ -360,7 +335,10 @@ export function buildEmailBrandFooterHtml(
   ].join("");
 }
 
-/** Apenas placa 3D embutida (data URL) — nunca URL plana de /grx-logo.png. */
-export function resolveEmailBrandLogoSrc(logoDataUrl: string | null): string | null {
-  return logoDataUrl?.startsWith("data:image") ? logoDataUrl : null;
+/** Prefer embedded 3D plaque for email paste; public URL only as last resort. */
+export function resolveEmailBrandLogoSrc(logoDataUrl: string | null, origin?: string): string {
+  if (logoDataUrl?.startsWith("data:image")) {
+    return logoDataUrl;
+  }
+  return getBrandLogoPublicUrl(origin);
 }

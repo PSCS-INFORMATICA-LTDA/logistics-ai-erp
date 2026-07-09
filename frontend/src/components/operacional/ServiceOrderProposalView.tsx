@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { EmailShareDialog, type EmailShareDialogData } from "@/components/operacional/EmailShareDialog";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
@@ -20,14 +21,13 @@ import {
   buildPublicProposalUrl,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
-  copyTextToClipboardSync,
+  copyTextToClipboard,
   formatServiceDate,
   generateProposalQrDataUrl,
   getPublicAppOrigin,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
   isWhatsAppNativeHref,
-  launchAutomaticProposalEmail,
   prepareEmailShareBundle,
   resolveClientProposalShareUrl,
   resolveProposalAcceptanceTestUrl,
@@ -78,6 +78,7 @@ export function ServiceOrderProposalView({
     qrDataUrl: string | null;
     logoDataUrl: string | null;
   }>({ qrDataUrl: null, logoDataUrl: null });
+  const [emailDialog, setEmailDialog] = useState<EmailShareDialogData | null>(null);
   const [publicToken, setPublicToken] = useState(order.proposal_token);
   const [sentAt, setSentAt] = useState(order.proposal_sent_at);
 
@@ -157,7 +158,7 @@ export function ServiceOrderProposalView({
 
   const handleWhatsAppAnchorMouseDown = () => {
     if (!whatsappShare) return;
-    copyTextToClipboardSync(whatsappShare.message);
+    void copyTextToClipboard(whatsappShare.message);
   };
 
   const handleWhatsAppAnchorClick = () => {
@@ -258,7 +259,14 @@ export function ServiceOrderProposalView({
         }
       );
 
-      launchAutomaticProposalEmail(bundle, { orderCode: order.code });
+      setEmailDialog({
+        subject: bundle.subject,
+        plainBody: bundle.plainBody,
+        htmlForClipboard: bundle.htmlForClipboard,
+        mailtoHref: bundle.mailtoHref,
+        hasQr: bundle.hasQr,
+        hasLogo: bundle.hasLogo,
+      });
     })();
   };
 
@@ -277,6 +285,7 @@ export function ServiceOrderProposalView({
 
   return (
     <>
+      <EmailShareDialog data={emailDialog} onClose={() => setEmailDialog(null)} />
       <style>{`
         @media print {
           aside, .app-shell-header, .proposal-toolbar { display: none !important; }
