@@ -242,11 +242,38 @@ function wrapHtmlForClipboard(innerHtml: string): string {
 }
 
 /**
- * Synchronous rich HTML copy — must run inside mousedown/click user gesture.
- * Never falls back to plain text (that would erase QR/logo from the clipboard).
+ * Synchronous rich HTML copy (CF_HTML) — must run inside mousedown/click user gesture.
+ * Gmail/Outlook on Windows need CF_HTML for QR Code and embedded logo images on paste.
  */
-export function copyRichHtmlToClipboardSync(html: string): boolean {
+export function copyRichHtmlToClipboardSync(html: string, plainText?: string): boolean {
   if (typeof document === "undefined") return false;
+
+  const plain = plainText ?? html.replace(/<[^>]+>/g, "");
+  const cfHtml = buildCfHtmlDocument(html);
+  let cfCopied = false;
+
+  const onCopy = (event: ClipboardEvent) => {
+    event.clipboardData?.setData("text/html", cfHtml);
+    event.clipboardData?.setData("text/plain", plain);
+    event.preventDefault();
+    cfCopied = true;
+  };
+
+  document.addEventListener("copy", onCopy, { once: true });
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = plain;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    if (ok && cfCopied) return true;
+  } catch {
+    /* fallback abaixo */
+  }
 
   const container = document.createElement("div");
   container.innerHTML = html;
@@ -309,7 +336,7 @@ export async function copyPreparedEmailHtmlToClipboardAsync(
 }
 
 export function copyPreparedEmailHtmlToClipboard(html: string, plainBody: string): boolean {
-  return copyRichHtmlToClipboardSync(html);
+  return copyRichHtmlToClipboardSync(html, plainBody);
 }
 
 type EmailClipboardOptions = {
@@ -1029,7 +1056,7 @@ export async function openEmailShare(
     companyName: options?.companyName,
   });
 
-  let richCopied = options?.skipCopy ? Boolean(options.richCopied) : copyRichHtmlToClipboardSync(html);
+  let richCopied = options?.skipCopy ? Boolean(options.richCopied) : copyRichHtmlToClipboardSync(html, plainBody);
   if (!options?.skipCopy && !richCopied) {
     richCopied = await copyRichHtmlViaClipboardApi(html, plainBody);
   }

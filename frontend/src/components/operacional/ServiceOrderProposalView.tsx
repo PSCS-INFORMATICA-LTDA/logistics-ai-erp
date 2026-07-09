@@ -91,6 +91,9 @@ export function ServiceOrderProposalView({
   const publicUrl = clientShareUrl;
   const qrUrl = acceptanceTestUrl ?? clientShareUrl;
   const shareUrl = publicUrl ?? "";
+  const emailAssetsReady = Boolean(
+    emailPasteAssets.qrDataUrl && emailPasteAssets.logoDataUrl?.startsWith("data:image")
+  );
   const isDev = process.env.NODE_ENV === "development";
   const hasRoute = Boolean(order.freight_origin_address || order.freight_destination_address);
 
@@ -245,10 +248,17 @@ export function ServiceOrderProposalView({
       logoDataUrl,
       companyName: context.companyName,
     });
-    emailRichCopiedRef.current = copyRichHtmlToClipboardSync(html);
+    emailRichCopiedRef.current = copyRichHtmlToClipboardSync(html, body);
   };
 
   const shareEmail = () => {
+    if (!emailAssetsReady) {
+      window.alert(
+        "Aguarde alguns segundos após recarregar a página (F5) para o QR Code e o logo 3D carregarem, e tente novamente."
+      );
+      return;
+    }
+
     void (async () => {
       const url = resolveClientProposalShareUrl(publicToken);
       if (!url) {
@@ -281,7 +291,7 @@ export function ServiceOrderProposalView({
       setEmailHint(
         richCopied
           ? hasQr && hasLogo
-            ? "Proposta copiada com QR + logo 3D. O e-mail abriu — clique no corpo e Ctrl+V se faltar imagem."
+            ? "Proposta copiada com QR + logo 3D. No Gmail: clique no corpo do e-mail e pressione Ctrl+V."
             : "Proposta copiada parcialmente. Clique no corpo do e-mail e Ctrl+V."
           : copied
             ? "Texto copiado. Use Ctrl+V no corpo se faltar QR ou logo."
@@ -373,10 +383,11 @@ export function ServiceOrderProposalView({
             <Button
               type="button"
               variant="secondary"
+              disabled={!emailAssetsReady}
               onMouseDown={handleEmailMouseDown}
               onClick={shareEmail}
             >
-              Enviar por e-mail
+              {emailAssetsReady ? "Enviar por e-mail" : "Preparando QR e logo 3D…"}
             </Button>
             <Button type="button" variant="secondary" onClick={() => void copyLink()}>
               Copiar link público
