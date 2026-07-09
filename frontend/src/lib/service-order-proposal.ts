@@ -460,6 +460,17 @@ export function formatPhoneForWhatsApp(phone: string | null | undefined): string
   return digits;
 }
 
+/** Telefone fictício do seed demo (OS001) — não existe no WhatsApp. */
+export function isDemoSeedWhatsAppPhone(phone: string | null | undefined): boolean {
+  const digits = phone?.replace(/\D/g, "") ?? "";
+  return digits === "5511987654321" || digits === "11987654321";
+}
+
+export type WhatsAppShareLinkOptions = {
+  /** Abre o app sem fixar chat (útil quando o telefone da OS é placeholder). */
+  omitPhone?: boolean;
+};
+
 function isMobileWhatsAppDevice(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -525,9 +536,11 @@ export type WhatsAppShareLinks = {
 
 export function buildWhatsAppShareLinks(
   text: string,
-  phone?: string | null
+  phone?: string | null,
+  options?: WhatsAppShareLinkOptions
 ): WhatsAppShareLinks {
-  const normalized = phone ? formatPhoneForWhatsApp(phone) : null;
+  const skipPhone = options?.omitPhone || isDemoSeedWhatsAppPhone(phone);
+  const normalized = skipPhone ? null : phone ? formatPhoneForWhatsApp(phone) : null;
   const messageForShare = formatWhatsAppShareMessage(text);
   const plainMessage = plainTextForWhatsAppUrl(messageForShare);
   const urlText = truncateTextForWhatsAppUrl(plainMessage);
@@ -541,7 +554,8 @@ export function buildWhatsAppShareLinks(
     ? `https://api.whatsapp.com/send?phone=${normalized}&text=${encodedText}`
     : `https://api.whatsapp.com/send?text=${encodedText}`;
 
-  const desktopHref = `whatsapp://send/?${desktopParams}`;
+  // Formato oficial: whatsapp://send?phone=… (sem barra extra após send).
+  const desktopHref = `whatsapp://send?${desktopParams}`;
   const mobileHref = `${mobileBase}?text=${encodedText}`;
 
   // Desktop: protocolo nativo whatsapp:// abre o app instalado; api.whatsapp.com abre o navegador (Web).
@@ -566,6 +580,7 @@ export function openWhatsAppShareHref(href: string, targetWindow?: Window | null
       targetWindow.location.href = href;
       return;
     }
+    // Deixa o clique nativo no <a href> abrir o protocolo quando possível.
     launchCustomProtocol(href);
     return;
   }

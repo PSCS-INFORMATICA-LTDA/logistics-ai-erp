@@ -27,7 +27,7 @@ import {
   getPublicAppOrigin,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
-  openWhatsAppShareHref,
+  isDemoSeedWhatsAppPhone,
   isWhatsAppNativeHref,
   launchPreparedEmailShare,
   prepareEmailShareBundle,
@@ -173,6 +173,7 @@ export function ServiceOrderProposalView({
     return buildWhatsAppShareLinks(message, order.phone);
   }, [publicToken, order, context]);
 
+  const whatsappUsesDemoPhone = isDemoSeedWhatsAppPhone(order.phone);
   const whatsappHref = whatsappShare?.primaryHref ?? null;
 
   const secondaryActionClass =
@@ -183,16 +184,14 @@ export function ServiceOrderProposalView({
     copyTextToClipboardSync(whatsappShare.message);
   };
 
-  const handleWhatsAppAnchorClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleWhatsAppAnchorClick = () => {
     if (!whatsappShare) return;
-    if (isWhatsAppNativeHref(whatsappShare.primaryHref)) {
-      event.preventDefault();
-      openWhatsAppShareHref(whatsappShare.primaryHref);
-    }
     setWhatsappHint(
-      isWindowsWhatsAppDesktop()
-        ? "Mensagem copiada. O WhatsApp desktop deve abrir (não o navegador). Se não abrir, use Alt+Tab → WhatsApp → Ctrl+V."
-        : "Mensagem copiada. Confira o chat do cliente e pressione Enter. Use Ctrl+V se o texto não aparecer."
+      whatsappUsesDemoPhone
+        ? "Número demo da OS (11) 98765-4321 — WhatsApp abre sem chat fixo. Cole (Ctrl+V) no seu contato. Para testar com seu número, edite o telefone da OS."
+        : isWindowsWhatsAppDesktop()
+          ? `Mensagem copiada. Abrindo WhatsApp desktop${order.phone?.trim() ? ` para ${order.phone.trim()}` : ""}. Se não abrir, use Alt+Tab → WhatsApp → Ctrl+V.`
+          : "Mensagem copiada. Confira o chat do cliente e pressione Enter. Use Ctrl+V se o texto não aparecer."
     );
   };
 
@@ -449,6 +448,13 @@ export function ServiceOrderProposalView({
 
           {whatsappShare && (
             <div className="proposal-toolbar mb-4 space-y-2 text-xs text-slate-500 print:hidden">
+              {whatsappUsesDemoPhone && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+                  <strong>Telefone demo:</strong> a OS001 usa <strong>(11) 98765-4321</strong>, que não
+                  existe no WhatsApp. O app abrirá sem chat fixo — cole a mensagem no seu contato. Para
+                  direcionar ao seu número, edite o campo telefone da OS antes de enviar.
+                </p>
+              )}
               <p>
                 <strong>WhatsApp desktop:</strong> abre o app instalado (não o WhatsApp Web). A mensagem é
                 copiada ao clicar; o link da proposta vem sem card de preview do site.
