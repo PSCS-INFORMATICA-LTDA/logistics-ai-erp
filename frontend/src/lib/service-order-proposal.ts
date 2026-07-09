@@ -250,30 +250,6 @@ export function copyRichHtmlToClipboardSync(html: string, plainText?: string): b
 
   const plain = plainText ?? html.replace(/<[^>]+>/g, "");
   const cfHtml = buildCfHtmlDocument(html);
-  let cfCopied = false;
-
-  const onCopy = (event: ClipboardEvent) => {
-    event.clipboardData?.setData("text/html", cfHtml);
-    event.clipboardData?.setData("text/plain", plain);
-    event.preventDefault();
-    cfCopied = true;
-  };
-
-  document.addEventListener("copy", onCopy, { once: true });
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = plain;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    document.body.appendChild(textarea);
-    textarea.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(textarea);
-    if (ok && cfCopied) return true;
-  } catch {
-    /* fallback abaixo */
-  }
 
   const container = document.createElement("div");
   container.innerHTML = html;
@@ -281,13 +257,23 @@ export function copyRichHtmlToClipboardSync(html: string, plainText?: string): b
   container.style.position = "fixed";
   container.style.left = "0";
   container.style.top = "0";
-  container.style.width = "2px";
-  container.style.height = "2px";
-  container.style.overflow = "hidden";
+  container.style.width = "1px";
+  container.style.height = "1px";
   container.style.opacity = "0.01";
+  container.style.overflow = "hidden";
   container.style.pointerEvents = "none";
   document.body.appendChild(container);
 
+  let cfCopied = false;
+  const onCopy = (event: ClipboardEvent) => {
+    if (!event.clipboardData) return;
+    event.clipboardData.setData("text/html", cfHtml);
+    event.clipboardData.setData("text/plain", plain);
+    event.preventDefault();
+    cfCopied = true;
+  };
+
+  document.addEventListener("copy", onCopy);
   container.focus();
   const selection = window.getSelection();
   const range = document.createRange();
@@ -302,9 +288,49 @@ export function copyRichHtmlToClipboardSync(html: string, plainText?: string): b
     copied = false;
   }
 
+  document.removeEventListener("copy", onCopy);
   selection?.removeAllRanges();
   document.body.removeChild(container);
   return copied;
+}
+
+/** Abre e-mail no gesto do clique — exige QR e logo já carregados (sem await). */
+export function launchProposalEmailShareSync(
+  subject: string,
+  body: string,
+  proposalUrl: string,
+  options: {
+    qrDataUrl: string;
+    logoDataUrl: string;
+    companyName?: string;
+    to?: string | null;
+  }
+): EmailShareResult {
+  const safeUrl = sanitizePublicProposalUrl(proposalUrl);
+  const plainBody = body.replace(/\r\n/g, "\n");
+  const to = options.to?.trim();
+  const mailtoPrefix = to ? `mailto:${to}` : "mailto:";
+
+  const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
+    qrDataUrl: options.qrDataUrl,
+    logoDataUrl: options.logoDataUrl,
+    companyName: options.companyName,
+  });
+
+  const richCopied = copyRichHtmlToClipboardSync(html, plainBody);
+  const plainCopied = richCopied ? true : copyTextToClipboardSync(plainBody);
+  const copied = richCopied || plainCopied;
+  const href = buildMailtoHref(mailtoPrefix, subject, plainBody, safeUrl);
+
+  openMailtoLink(href);
+
+  return {
+    copied,
+    richCopied,
+    hasQr: Boolean(options.qrDataUrl),
+    hasLogo: Boolean(options.logoDataUrl.startsWith("data:image")),
+    plainBody,
+  };
 }
 
 async function copyRichHtmlViaClipboardApi(html: string, plainText: string): Promise<boolean> {

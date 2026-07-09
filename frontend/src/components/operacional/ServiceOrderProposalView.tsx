@@ -28,7 +28,7 @@ import {
   getPublicAppOrigin,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
-  openEmailShare,
+  launchProposalEmailShareSync,
   resolveClientProposalShareUrl,
   resolveProposalAcceptanceTestUrl,
   resolveProposalAmount,
@@ -252,52 +252,42 @@ export function ServiceOrderProposalView({
   };
 
   const shareEmail = () => {
-    if (!emailAssetsReady) {
+    const url = resolveClientProposalShareUrl(publicToken);
+    if (!url) {
+      window.alert(
+        "Registre o envio da proposta primeiro.\n\nO link, o QR Code e o e-mail só funcionam após gerar o link público de produção."
+      );
+      return;
+    }
+
+    if (!emailAssetsReady || !emailPasteAssets.qrDataUrl || !emailPasteAssets.logoDataUrl) {
       window.alert(
         "Aguarde alguns segundos após recarregar a página (F5) para o QR Code e o logo 3D carregarem, e tente novamente."
       );
       return;
     }
 
-    void (async () => {
-      const url = resolveClientProposalShareUrl(publicToken);
-      if (!url) {
-        window.alert(
-          "Registre o envio da proposta primeiro.\n\nO link, o QR Code e o e-mail só funcionam após gerar o link público de produção."
-        );
-        return;
+    const body = buildProposalEmailBody(order, context, url);
+    const { copied, richCopied, hasQr, hasLogo } = launchProposalEmailShareSync(
+      `Proposta OS ${order.code} — ${context.companyName}`,
+      body,
+      url,
+      {
+        qrDataUrl: emailPasteAssets.qrDataUrl,
+        logoDataUrl: emailPasteAssets.logoDataUrl,
+        companyName: context.companyName,
       }
+    );
 
-      const body = buildProposalEmailBody(order, context, url);
-      const qrDataUrl =
-        emailPasteAssets.qrDataUrl ?? (await generateProposalQrDataUrl(url));
-      const logoDataUrl =
-        emailPasteAssets.logoDataUrl ??
-        (await fetchBrandLogoDataUrl(getPublicAppOrigin()));
-
-      const { copied, richCopied, hasQr, hasLogo } = await openEmailShare(
-        `Proposta OS ${order.code} — ${context.companyName}`,
-        body,
-        url,
-        {
-          qrDataUrl,
-          logoDataUrl,
-          companyName: context.companyName,
-          skipCopy: emailRichCopiedRef.current,
-          richCopied: emailRichCopiedRef.current,
-        }
-      );
-
-      setEmailHint(
-        richCopied
-          ? hasQr && hasLogo
-            ? "Proposta copiada com QR + logo 3D. No Gmail: clique no corpo do e-mail e pressione Ctrl+V."
-            : "Proposta copiada parcialmente. Clique no corpo do e-mail e Ctrl+V."
+    setEmailHint(
+      richCopied && hasQr && hasLogo
+        ? "✓ QR Code e logo 3D copiados. No Gmail: clique no corpo do e-mail e pressione Ctrl+V agora."
+        : richCopied
+          ? "Proposta copiada parcialmente. Ctrl+V no corpo do Gmail."
           : copied
-            ? "Texto copiado. Use Ctrl+V no corpo se faltar QR ou logo."
-            : "Recarregue a página (F5) e tente novamente."
-      );
-    })();
+            ? "Só o texto foi copiado. Recarregue (F5) e tente de novo."
+            : "Não foi possível copiar. Recarregue a página (F5) e tente novamente."
+    );
   };
 
   const copyLink = async () => {
@@ -415,7 +405,7 @@ export function ServiceOrderProposalView({
           </p>
 
           {emailHint && (
-            <p className="proposal-toolbar mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 print:hidden">
+            <p className="proposal-toolbar mb-4 rounded-lg border-2 border-blue-400 bg-blue-50 px-4 py-3 text-base font-medium text-blue-950 print:hidden">
               {emailHint}
             </p>
           )}
