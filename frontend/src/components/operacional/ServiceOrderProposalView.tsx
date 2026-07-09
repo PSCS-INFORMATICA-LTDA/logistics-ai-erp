@@ -22,10 +22,11 @@ import {
   copyRichHtmlToClipboardSync,
   copyTextToClipboardSync,
   formatServiceDate,
+  buildProposalEmailMailtoHref,
   generateProposalQrDataUrl,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
-  launchProposalEmailShareSync,
+  launchPreparedEmailShare,
   resolveClientProposalShareUrl,
   resolveProposalAcceptanceTestUrl,
   resolveProposalAmount,
@@ -249,32 +250,38 @@ export function ServiceOrderProposalView({
     }
 
     const body = buildProposalEmailBody(order, context, url);
-
-    if (!emailAssetsReady || !emailQrDataUrl) {
-      launchProposalEmailShareSync(`Proposta OS ${order.code} — ${context.companyName}`, body, url);
-      setEmailHint("E-mail aberto com texto. Recarregue (F5) e tente de novo para incluir o QR Code.");
-      return;
-    }
-
+    const subject = `Proposta OS ${order.code} — ${context.companyName}`;
+    const qrDataUrl = emailAssetsReady ? emailQrDataUrl : null;
     const preCopied = emailRichCopiedRef.current;
-    const { richCopied, hasQr } = launchProposalEmailShareSync(
-      `Proposta OS ${order.code} — ${context.companyName}`,
-      body,
-      url,
-      {
-        qrDataUrl: emailQrDataUrl,
+
+    const bundle = {
+      subject,
+      plainBody: body,
+      shareUrl: url,
+      htmlForClipboard: buildEmailProposalRichHtml(body, url, {
+        qrDataUrl,
+        logoDataUrl: null,
         companyName: context.companyName,
-        skipCopy: preCopied,
-        richCopied: preCopied,
-      }
-    );
+      }),
+      mailtoHref: buildProposalEmailMailtoHref(subject, body, url),
+      hasQr: Boolean(qrDataUrl),
+      hasLogo: false,
+    };
+
+    const result = launchPreparedEmailShare(bundle, {
+      skipCopy: preCopied,
+      richCopied: preCopied,
+      copiedAlertMessage: qrDataUrl
+        ? "Proposta copiada com QR Code.\n\n1. Clique OK para abrir o Gmail.\n2. Clique no corpo do e-mail (abaixo do texto).\n3. Pressione Ctrl+V para colar o QR Code.\n\nO texto já veio preenchido; o Ctrl+V adiciona a imagem."
+        : undefined,
+    });
 
     emailRichCopiedRef.current = false;
 
     setEmailHint(
-      richCopied && hasQr
-        ? "E-mail aberto com texto. Clique no corpo e pressione Ctrl+V para incluir o QR Code. (Logo na assinatura do Outlook.)"
-        : "E-mail aberto com texto. Recarregue (F5) se o QR Code não colar com Ctrl+V."
+      result.richCopied && result.hasQr
+        ? "QR copiado — use Ctrl+V no corpo do Gmail após clicar OK no alerta."
+        : "Aguarde «Preparando QR Code…» terminar e clique em Enviar por e-mail novamente."
     );
   };
 
