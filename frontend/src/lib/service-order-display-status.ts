@@ -12,6 +12,7 @@ export type ServiceOrderStatusRow = Pick<
   | "proposed_driver_id"
   | "driver_assignment_sent_at"
   | "driver_assignment_response"
+  | "driver_assignment_rejected_driver_ids"
 >;
 
 function isProposalRejectedByClient(row: ServiceOrderStatusRow): boolean {
@@ -79,11 +80,19 @@ export function resolveServiceOrderDisplayStatus(row: ServiceOrderStatusRow): st
 
 export function serviceOrderStatusVariant(
   row: ServiceOrderStatusRow
-): "success" | "warning" | "default" {
+): "success" | "warning" | "default" | "danger" {
   const label = resolveServiceOrderDisplayStatus(row);
+  if (label === DRIVER_ASSIGNMENT_RESPONSE_LABELS.rejected) return "danger";
+  if (label === PROPOSAL_RESPONSE_LABELS.rejected) return "danger";
   if (label === "Concluido" || label === PROPOSAL_RESPONSE_LABELS.accepted) return "success";
-  if (label === "Aberto" || label === "Aguardando aprovação cliente") return "warning";
-  if (label === PROPOSAL_RESPONSE_LABELS.rejected) return "default";
+  if (
+    label === "Aberto" ||
+    label === "Aguardando aprovação cliente" ||
+    label === DRIVER_ASSIGNMENT_RESPONSE_LABELS.pending
+  ) {
+    return "warning";
+  }
+  if (label === DRIVER_ASSIGNMENT_RESPONSE_LABELS.accepted) return "success";
   return "default";
 }
 
@@ -102,6 +111,34 @@ export function isPendingDriverAssignment(row: ServiceOrderStatusRow): boolean {
     Boolean(row.proposed_driver_id) &&
     Boolean(row.driver_assignment_sent_at)
   );
+}
+
+/** Motorista recusou a designação — Rafael pode designar outro. */
+export function isDriverAssignmentRejected(row: ServiceOrderStatusRow): boolean {
+  return (
+    isProposalAcceptedByClient(row) &&
+    (row.driver_assignment_response ?? "pending") === "rejected"
+  );
+}
+
+export function resolveServiceOrderDriverColumnLabel(
+  row: ServiceOrderStatusRow & { driver_name?: string | null }
+): string {
+  const assignment = (row.driver_assignment_response ?? "pending") as DriverAssignmentResponse;
+
+  if (assignment === "accepted" && row.driver_id && row.driver_name) {
+    return row.driver_name;
+  }
+
+  if (assignment === "rejected" && row.driver_name) {
+    return `${row.driver_name} (recusou)`;
+  }
+
+  if (row.proposed_driver_id && row.driver_name && assignment === "pending") {
+    return `${row.driver_name} (aguardando)`;
+  }
+
+  return row.driver_name ?? "—";
 }
 
 /** Bloqueia edição enquanto o cliente já aceitou ou recusou a proposta enviada. */

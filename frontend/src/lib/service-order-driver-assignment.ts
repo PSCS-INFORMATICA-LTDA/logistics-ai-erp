@@ -317,6 +317,7 @@ export async function respondToDriverAssignment(
 ): Promise<{
   driverAssignmentResponse: DriverAssignmentResponse | null;
   driverId: string | null;
+  proposedDriverId: string | null;
   error: string | null;
 }> {
   const { data, error } = await supabase.rpc("respond_to_driver_assignment", {
@@ -325,17 +326,24 @@ export async function respondToDriverAssignment(
   });
 
   if (error) {
-    return { driverAssignmentResponse: null, driverId: null, error: error.message };
+    return {
+      driverAssignmentResponse: null,
+      driverId: null,
+      proposedDriverId: null,
+      error: error.message,
+    };
   }
 
   const payload = data as {
     driver_assignment_response?: DriverAssignmentResponse;
     driver_id?: string;
+    proposed_driver_id?: string;
   } | null;
 
   return {
     driverAssignmentResponse: payload?.driver_assignment_response ?? null,
     driverId: payload?.driver_id ?? null,
+    proposedDriverId: payload?.proposed_driver_id ?? null,
     error: null,
   };
 }

@@ -8,6 +8,7 @@ import { SERVICE_ORDER_TYPE_LABELS } from "@/types/database";
 
 export type ServiceOrderListRow = ServiceOrder & {
   driver_name?: string;
+  proposed_driver_code?: string;
   dre_account_name?: string;
 };
 

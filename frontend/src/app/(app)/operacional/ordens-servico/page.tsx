@@ -24,8 +24,10 @@ import { isTruckCategory } from "@/lib/transport-van-estimate";
 import {
   canEditServiceOrder,
   isPendingClientProposal,
+  isDriverAssignmentRejected,
   matchesServiceOrderStatusFilter,
   resolveServiceOrderDisplayStatus,
+  resolveServiceOrderDriverColumnLabel,
   serviceOrderEditBlockedReason,
   serviceOrderStatusVariant,
 } from "@/lib/service-order-display-status";
@@ -103,12 +105,22 @@ function OrdensServicoPageContent() {
 
   const transformItems = useCallback(
     async (items: ServiceOrderListRow[]) => {
-      const driverIds = [...new Set(items.map((i) => i.driver_id).filter(Boolean))] as string[];
+      const driverIds = [
+        ...new Set(
+          items
+            .flatMap((i) => [
+              i.driver_id,
+              i.proposed_driver_id,
+              ...(i.driver_assignment_rejected_driver_ids ?? []),
+            ])
+            .filter(Boolean)
+        ),
+      ] as string[];
       const dreIds = [...new Set(items.map((i) => i.chart_of_account_id).filter(Boolean))] as string[];
 
       const [driversRes, dreRes] = await Promise.all([
         driverIds.length
-          ? supabase.from("drivers").select("id, name").in("id", driverIds)
+          ? supabase.from("drivers").select("id, name, code").in("id", driverIds)
           : Promise.resolve({ data: [] }),
         dreIds.length
           ? supabase.from("chart_of_accounts").select("id, name").in("id", dreIds)
@@ -116,18 +128,33 @@ function OrdensServicoPageContent() {
       ]);
 
       const nameById = new Map((driversRes.data ?? []).map((d) => [d.id, d.name as string]));
+      const codeById = new Map((driversRes.data ?? []).map((d) => [d.id, d.code as string]));
       const dreById = new Map((dreRes.data ?? []).map((d) => [d.id, d.name as string]));
 
-      const rows = items.map((item) => ({
-        ...item,
-        driver_name: item.driver_id ? nameById.get(item.driver_id) : undefined,
-        dre_account_name: item.chart_of_account_id
-          ? dreById.get(item.chart_of_account_id)
-          : undefined,
-        service_categories: item.service_categories ?? [],
-        proposal_response: item.proposal_response ?? "pending",
-        proposal_follow_up_count: item.proposal_follow_up_count ?? 0,
-      }));
+      const rows = items.map((item) => {
+        const rejectedIds = item.driver_assignment_rejected_driver_ids ?? [];
+        const driverIdForLabel =
+          item.driver_id ??
+          item.proposed_driver_id ??
+          (item.driver_assignment_response === "rejected" && rejectedIds.length
+            ? rejectedIds[rejectedIds.length - 1]
+            : null);
+        return {
+          ...item,
+          driver_assignment_rejected_driver_ids: rejectedIds,
+          driver_name: driverIdForLabel ? nameById.get(driverIdForLabel) : undefined,
+          proposed_driver_code: item.proposed_driver_id
+            ? codeById.get(item.proposed_driver_id)
+            : undefined,
+          dre_account_name: item.chart_of_account_id
+            ? dreById.get(item.chart_of_account_id)
+            : undefined,
+          service_categories: item.service_categories ?? [],
+          proposal_response: item.proposal_response ?? "pending",
+          proposal_follow_up_count: item.proposal_follow_up_count ?? 0,
+          driver_assignment_response: item.driver_assignment_response ?? "pending",
+        };
+      });
       setListRows(rows);
       return rows;
     },
@@ -220,23 +247,19 @@ function OrdensServicoPageContent() {
         driver_assignment_response: DriverAssignmentResponse;
         driver_id: string | null;
         proposed_driver_id: string | null;
-        clearDriverName?: boolean;
       }
     ) => {
       setListRows((rows) =>
-        rows.map((row) => {
-          if (row.id !== orderId) return row;
-          const updated: ServiceOrderListRow = {
-            ...row,
-            driver_assignment_response: patch.driver_assignment_response,
-            driver_id: patch.driver_id,
-            proposed_driver_id: patch.proposed_driver_id,
-          };
-          if (patch.clearDriverName) {
-            updated.driver_name = undefined;
-          }
-          return updated;
-        })
+        rows.map((row) =>
+          row.id === orderId
+            ? {
+                ...row,
+                driver_assignment_response: patch.driver_assignment_response,
+                driver_id: patch.driver_id,
+                proposed_driver_id: patch.proposed_driver_id,
+              }
+            : row
+        )
       );
       setListRefreshKey((key) => key + 1);
     },
@@ -341,7 +364,13 @@ function OrdensServicoPageContent() {
         {
           key: "driver_name",
           label: "Motorista",
-          render: (r) => r.driver_name ?? "—",
+          render: (r) => {
+            const label = resolveServiceOrderDriverColumnLabel(r);
+            if (isDriverAssignmentRejected(r)) {
+              return <span className="font-medium text-red-700">{label}</span>;
+            }
+            return label;
+          },
         },
         {
           key: "proposal_sent_at",
@@ -361,11 +390,34 @@ function OrdensServicoPageContent() {
         {
           key: "status",
           label: "Status",
-          render: (r) => (
-            <Badge variant={serviceOrderStatusVariant(r)}>
-              {resolveServiceOrderDisplayStatus(r)}
-            </Badge>
-          ),
+          render: (r) => {
+            const label = resolveServiceOrderDisplayStatus(r);
+            const rejected = isDriverAssignmentRejected(r);
+            return (
+              <div className="flex items-center gap-1.5">
+                {rejected ? (
+                  <span
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-red-500 bg-red-50 text-red-700"
+                    title="Motorista recusou a designação"
+                    aria-label="Motorista recusou"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      className="h-3 w-3"
+                      aria-hidden
+                    >
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </span>
+                ) : null}
+                <Badge variant={serviceOrderStatusVariant(r)}>{label}</Badge>
+              </div>
+            );
+          },
         },
         {
           key: "service_amount",

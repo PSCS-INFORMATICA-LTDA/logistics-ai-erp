@@ -40,7 +40,17 @@ type OrderSummary = Pick<
   | "freight_agreed_amount"
   | "freight_toll_amount"
   | "service_amount"
->;
+  | "driver_assignment_response"
+  | "proposed_driver_id"
+  | "driver_assignment_rejected_at"
+  | "driver_assignment_rejected_driver_ids"
+> & {
+  driver_name?: string | null;
+  proposed_driver_code?: string | null;
+};
+
+const ORDER_ASSIGNMENT_FIELDS =
+  "id, code, plate, client_name, service_type, service_date, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at, driver_assignment_rejected_driver_ids";
 
 type Props = {
   open: boolean;
@@ -60,6 +70,29 @@ function driverAvailabilityLabel(driver: DriverListRow): string {
   return "Indisponível";
 }
 
+function DriverRefusedMark({ orderCode }: { orderCode: string }) {
+  return (
+    <span
+      className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 border-red-500 bg-red-500 text-white shadow-sm"
+      title={`Recusou a ${orderCode}`}
+      aria-label={`Recusou a ${orderCode}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-2.5 w-2.5"
+        aria-hidden
+      >
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+    </span>
+  );
+}
+
 export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignmentSent }: Props) {
   const { companyId, company } = useCompany();
   const supabase = useMemo(() => createClient(), []);
@@ -68,6 +101,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("");
+  const [orderDetails, setOrderDetails] = useState<OrderSummary>(order);
 
   const [sharePayload, setSharePayload] = useState<DriverAssignmentSharePayload | null>(null);
   const [shareDriverName, setShareDriverName] = useState("");
@@ -75,8 +109,24 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   const secondaryActionClass =
     "inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50";
   const companyName = company?.trade_name || company?.name || "GRX Transportes e Logística";
-  const amount = order.freight_agreed_amount ?? order.service_amount;
+  const amount = orderDetails.freight_agreed_amount ?? orderDetails.service_amount;
   const selectedDriver = drivers.find((d) => d.id === selectedId);
+  const rejectedDriverIds = orderDetails.driver_assignment_rejected_driver_ids ?? [];
+
+  const isDriverRefusedForThisOrder = (driver: DriverListRow): boolean => {
+    if (rejectedDriverIds.includes(driver.id)) return true;
+
+    if (orderDetails.driver_assignment_response !== "rejected") return false;
+
+    if (orderDetails.proposed_driver_id && driver.id === orderDetails.proposed_driver_id) {
+      return true;
+    }
+    if (orderDetails.proposed_driver_code && driver.code === orderDetails.proposed_driver_code) {
+      return true;
+    }
+    if (orderDetails.driver_name && driver.name === orderDetails.driver_name) return true;
+    return false;
+  };
 
   const resetShareStep = () => {
     setSharePayload(null);
@@ -123,11 +173,61 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   }, [companyId, supabase]);
 
   useEffect(() => {
+    setOrderDetails(order);
+  }, [order]);
+
+  const refetchOrderAssignment = useCallback(async () => {
+    const { data, error: fetchError } = await supabase
+      .from("service_orders")
+      .select(ORDER_ASSIGNMENT_FIELDS)
+      .eq("id", order.id)
+      .single();
+
+    if (fetchError || !data) return;
+
+    const rejectedIds = (data.driver_assignment_rejected_driver_ids as string[] | null) ?? [];
+    const driverLookupIds = [
+      ...new Set([data.proposed_driver_id, ...rejectedIds].filter(Boolean)),
+    ] as string[];
+
+    let driverName = order.driver_name ?? null;
+    let proposedDriverCode = order.proposed_driver_code ?? null;
+
+    if (driverLookupIds.length) {
+      const { data: driversData } = await supabase
+        .from("drivers")
+        .select("id, name, code")
+        .in("id", driverLookupIds);
+      const byId = new Map((driversData ?? []).map((d) => [d.id, d]));
+
+      if (data.proposed_driver_id) {
+        const proposed = byId.get(data.proposed_driver_id);
+        driverName = proposed?.name ?? driverName;
+        proposedDriverCode = proposed?.code ?? proposedDriverCode;
+      } else if (data.driver_assignment_response === "rejected" && rejectedIds.length) {
+        const lastRejectedId = rejectedIds[rejectedIds.length - 1]!;
+        const rejected = byId.get(lastRejectedId);
+        driverName = rejected?.name ?? driverName;
+        proposedDriverCode = rejected?.code ?? proposedDriverCode;
+      }
+    }
+
+    setOrderDetails({
+      ...order,
+      ...data,
+      driver_assignment_rejected_driver_ids: rejectedIds,
+      driver_name: driverName,
+      proposed_driver_code: proposedDriverCode,
+    });
+  }, [order, supabase]);
+
+  useEffect(() => {
     if (!open) return;
     setSelectedId("");
     resetShareStep();
+    void refetchOrderAssignment();
     void loadDrivers();
-  }, [open, loadDrivers]);
+  }, [open, loadDrivers, refetchOrderAssignment]);
 
   useEffect(() => {
     if (!open) return;
@@ -141,6 +241,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   const registerAssignmentShareForDriver = async (
     driver: DriverListRow
   ): Promise<DriverAssignmentSharePayload | null> => {
+    if (isDriverRefusedForThisOrder(driver)) {
+      window.alert(
+        `Este motorista recusou a ${orderDetails.code}. Selecione outro motorista da lista.`
+      );
+      return null;
+    }
+
     if (!isDriverAvailableForContact(driver)) {
       window.alert("Motorista indisponível para esta designação.");
       return null;
@@ -165,7 +272,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     const assignmentUrl = buildPublicDriverAssignmentUrl(token);
     const payload = await prepareDriverAssignmentSharePayload(
       driver.email,
-      order,
+      orderDetails,
       companyName,
       driver.name,
       assignmentUrl,
@@ -189,6 +296,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   };
 
   const handleDirectAssign = async () => {
+    if (selectedDriver && isDriverRefusedForThisOrder(selectedDriver)) {
+      window.alert(
+        `Este motorista recusou a ${orderDetails.code}. Selecione outro motorista da lista.`
+      );
+      return;
+    }
+
     if (!selectedDriver || !isDriverAvailableForContact(selectedDriver)) {
       window.alert("Selecione um motorista disponível.");
       return;
@@ -278,6 +392,16 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   };
   if (!open) return null;
 
+  const sortedDrivers = [...drivers].sort((a, b) => {
+    const aRefused = isDriverRefusedForThisOrder(a);
+    const bRefused = isDriverRefusedForThisOrder(b);
+    if (aRefused !== bRefused) return aRefused ? -1 : 1;
+    const aAvail = isDriverAvailableForContact(a);
+    const bAvail = isDriverAvailableForContact(b);
+    if (aAvail !== bAvail) return aAvail ? -1 : 1;
+    return a.name.localeCompare(b.name, "pt-BR");
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
@@ -295,25 +419,27 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
             Designar motorista
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            OS <strong>{order.code}</strong>
-            {order.plate ? ` · ${order.plate}` : ""}
+            OS <strong>{orderDetails.code}</strong>
+            {orderDetails.plate ? ` · ${orderDetails.plate}` : ""}
           </p>
-          {order.client_name ? <p className="text-sm text-slate-600">{order.client_name}</p> : null}
-          {(order.freight_origin_address || order.freight_destination_address) && (
+          {orderDetails.client_name ? (
+            <p className="text-sm text-slate-600">{orderDetails.client_name}</p>
+          ) : null}
+          {(orderDetails.freight_origin_address || orderDetails.freight_destination_address) && (
             <div className="mt-1 space-y-0.5 text-sm text-slate-500">
               <p>
                 <span className="font-medium text-slate-600">A:</span>{" "}
-                {order.freight_origin_address ?? "—"}
+                {orderDetails.freight_origin_address ?? "—"}
               </p>
               <p>
                 <span className="font-medium text-slate-600">B:</span>{" "}
-                {order.freight_destination_address ?? "—"}
+                {orderDetails.freight_destination_address ?? "—"}
               </p>
-              {order.freight_distance_km ? (
-                <p className="text-xs">Distância: {order.freight_distance_km} km</p>
+              {orderDetails.freight_distance_km ? (
+                <p className="text-xs">Distância: {orderDetails.freight_distance_km} km</p>
               ) : null}
-              {order.freight_toll_amount ? (
-                <p className="text-xs">Pedágio: {formatCurrency(order.freight_toll_amount)}</p>
+              {orderDetails.freight_toll_amount ? (
+                <p className="text-xs">Pedágio: {formatCurrency(orderDetails.freight_toll_amount)}</p>
               ) : null}
             </div>
           )}
@@ -322,7 +448,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           ) : null}
           <p className="mt-2 text-xs text-slate-500">
             Envie por WhatsApp ou e-mail para o motorista aceitar ou recusar pelo link público (como
-            a proposta ao cliente). Se recusar, você poderá designar outro motorista.
+            a proposta ao cliente). Se recusar, você poderá designar outro motorista. No WhatsApp, o
+            link da designação exibe o logo GRX na prévia (conversas novas).
           </p>        </div>
 
         <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
@@ -372,10 +499,53 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
             <p className="text-sm text-slate-500">Nenhum motorista ativo cadastrado.</p>
           ) : (
             <ul className="space-y-2">
-              {drivers.map((driver) => {
+              {sortedDrivers.map((driver) => {
+                const refused = isDriverRefusedForThisOrder(driver);
                 const available = isDriverAvailableForContact(driver);
                 const label = driverAvailabilityLabel(driver);
                 const selected = selectedId === driver.id;
+
+                if (refused) {
+                  return (
+                    <li key={driver.id}>
+                      <div
+                        className="flex items-start gap-3 rounded-lg border-2 border-red-300 bg-red-50 px-3 py-3"
+                        role="note"
+                        aria-label={`${driver.name} recusou a ${orderDetails.code}`}
+                      >
+                        <DriverRefusedMark orderCode={orderDetails.code} />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-red-900">
+                              {driver.code} — {driver.name}
+                            </span>
+                            <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-900">
+                              Recusou
+                            </span>
+                          </span>
+                          <span className="mt-1 block text-xs font-medium text-red-800">
+                            Observação: recusou a {orderDetails.code}
+                            {orderDetails.driver_assignment_rejected_at
+                              ? ` · ${new Date(orderDetails.driver_assignment_rejected_at).toLocaleString("pt-BR")}`
+                              : ""}
+                            . Não selecione novamente — escolha outro motorista abaixo.
+                          </span>
+                          {driver.phone ? (
+                            <span className="mt-0.5 block text-xs text-red-800/80">
+                              {driver.phone}
+                              {driver.email ? ` · ${driver.email}` : ""}
+                            </span>
+                          ) : null}
+                          {driver.address ? (
+                            <span className="mt-0.5 block text-xs text-red-800/70">
+                              {driver.address}
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                }
 
                 return (
                   <li key={driver.id}>

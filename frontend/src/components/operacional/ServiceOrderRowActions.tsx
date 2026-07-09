@@ -6,6 +6,7 @@ import { AssignDriverModal } from "@/components/operacional/AssignDriverModal";
 import { cn } from "@/lib/utils";
 import {
   canAssignDriverToServiceOrder,
+  isDriverAssignmentRejected,
   isPendingClientProposal,
   isPendingDriverAssignment,
 } from "@/lib/service-order-display-status";
@@ -38,7 +39,6 @@ type Props = {
       driver_assignment_response: DriverAssignmentResponse;
       driver_id: string | null;
       proposed_driver_id: string | null;
-      clearDriverName?: boolean;
     }
   ) => void;
 };
@@ -133,6 +133,7 @@ export function ServiceOrderRowActions({
   const canPhoneResponse = isPendingClientProposal(row);
   const canDriverPhoneResponse = isPendingDriverAssignment(row);
   const canAssignDriver = canAssignDriverToServiceOrder(row);
+  const driverRejected = isDriverAssignmentRejected(row);
   const canResetProposal =
     Boolean(row.proposal_sent_at) && (row.proposal_response ?? "pending") !== "pending";
 
@@ -231,11 +232,8 @@ export function ServiceOrderRowActions({
     else setDriverRejecting(true);
 
     const supabase = createClient();
-    const { driverAssignmentResponse, driverId, error } = await respondToDriverAssignment(
-      supabase,
-      token,
-      action
-    );
+    const { driverAssignmentResponse, driverId, proposedDriverId, error } =
+      await respondToDriverAssignment(supabase, token, action);
 
     if (isAccept) setDriverAccepting(false);
     else setDriverRejecting(false);
@@ -249,8 +247,9 @@ export function ServiceOrderRowActions({
     onDriverAssignmentResponded?.(row.id, {
       driver_assignment_response: next,
       driver_id: isAccept ? driverId : null,
-      proposed_driver_id: isAccept ? row.proposed_driver_id ?? driverId : null,
-      clearDriverName: !isAccept,
+      proposed_driver_id: isAccept
+        ? proposedDriverId ?? row.proposed_driver_id ?? driverId
+        : proposedDriverId ?? row.proposed_driver_id,
     });
 
     window.alert(
@@ -305,13 +304,20 @@ export function ServiceOrderRowActions({
       {canAssignDriver && (
         <button
           type="button"
-          title="Designar motorista disponível"
+          title={
+            driverRejected
+              ? "Designar outro motorista (anterior recusou)"
+              : "Designar motorista disponível"
+          }
           onClick={() => setAssignOpen(true)}
           className={cn(
-            "inline-flex items-center justify-center rounded-lg border border-brand-400 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-900 transition-colors hover:bg-brand-100"
+            "inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+            driverRejected
+              ? "border-red-400 bg-red-50 text-red-900 hover:bg-red-100"
+              : "border-brand-400 bg-brand-50 text-brand-900 hover:bg-brand-100"
           )}
         >
-          Designar motorista
+          {driverRejected ? "Designar outro motorista" : "Designar motorista"}
         </button>
       )}
       {canDriverPhoneResponse && (

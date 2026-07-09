@@ -147,6 +147,7 @@ export type ServiceOrder = {
   driver_assignment_response: DriverAssignmentResponse;
   driver_assignment_accepted_at: string | null;
   driver_assignment_rejected_at: string | null;
+  driver_assignment_rejected_driver_ids: string[];
 };
 
 export type DriverAssignmentResponse = "pending" | "accepted" | "rejected";
