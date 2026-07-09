@@ -20,22 +20,17 @@ import {
   buildPublicProposalUrl,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
-  copyPreparedEmailHtmlToClipboardAsync,
-  copyTextToClipboardSync,
+  copyTextToClipboard,
   formatServiceDate,
   generateProposalQrDataUrl,
   getPublicAppOrigin,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
-  isDemoSeedWhatsAppPhone,
-  isWhatsAppNativeHref,
-  launchPreparedEmailShare,
-  prepareEmailShareBundle,
+  openEmailShare,
   resolveClientProposalShareUrl,
   resolveProposalAcceptanceTestUrl,
   resolveProposalAmount,
   triggerClientPdfForWhatsApp,
-  type EmailShareBundle,
   type ServiceOrderProposalContext,
 } from "@/lib/service-order-proposal";
 import { markProposalSent, resetProposalClientResponse } from "@/lib/service-order-proposal-api";
@@ -81,8 +76,6 @@ export function ServiceOrderProposalView({
     qrDataUrl: string | null;
     logoDataUrl: string | null;
   }>({ qrDataUrl: null, logoDataUrl: null });
-  const [emailShareBundle, setEmailShareBundle] = useState<EmailShareBundle | null>(null);
-  const [emailAssetsLoading, setEmailAssetsLoading] = useState(false);
   const [publicToken, setPublicToken] = useState(order.proposal_token);
   const [sentAt, setSentAt] = useState(order.proposal_sent_at);
 
@@ -101,42 +94,23 @@ export function ServiceOrderProposalView({
   useEffect(() => {
     if (!clientShareUrl) {
       setEmailPasteAssets({ qrDataUrl: null, logoDataUrl: null });
-      setEmailShareBundle(null);
       return;
     }
 
     let cancelled = false;
-    setEmailAssetsLoading(true);
-
     void Promise.all([
       generateProposalQrDataUrl(clientShareUrl),
       fetchBrandLogoDataUrl(getPublicAppOrigin()),
-    ])
-      .then(async ([qrDataUrl, logoDataUrl]) => {
-        if (cancelled) return;
+    ]).then(([qrDataUrl, logoDataUrl]) => {
+      if (!cancelled) {
         setEmailPasteAssets({ qrDataUrl, logoDataUrl });
-
-        const body = buildProposalEmailBody(order, context, clientShareUrl);
-        const bundle = await prepareEmailShareBundle(
-          `Proposta OS ${order.code} — ${context.companyName}`,
-          body,
-          clientShareUrl,
-          {
-            qrDataUrl,
-            logoDataUrl,
-            companyName: context.companyName,
-          }
-        );
-        if (!cancelled) setEmailShareBundle(bundle);
-      })
-      .finally(() => {
-        if (!cancelled) setEmailAssetsLoading(false);
-      });
+      }
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [clientShareUrl, order, context]);
+  }, [clientShareUrl]);
 
   const handleMarkSent = async () => {
     setMarkingSent(true);
@@ -173,7 +147,6 @@ export function ServiceOrderProposalView({
     return buildWhatsAppShareLinks(message, order.phone);
   }, [publicToken, order, context]);
 
-  const whatsappUsesDemoPhone = isDemoSeedWhatsAppPhone(order.phone);
   const whatsappHref = whatsappShare?.primaryHref ?? null;
 
   const secondaryActionClass =
@@ -181,17 +154,15 @@ export function ServiceOrderProposalView({
 
   const handleWhatsAppAnchorMouseDown = () => {
     if (!whatsappShare) return;
-    copyTextToClipboardSync(whatsappShare.message);
+    void copyTextToClipboard(whatsappShare.message);
   };
 
   const handleWhatsAppAnchorClick = () => {
     if (!whatsappShare) return;
     setWhatsappHint(
-      whatsappUsesDemoPhone
-        ? "Número demo — WhatsApp abre sem chat fixo. Cole (Ctrl+V) no seu contato."
-        : isWindowsWhatsAppDesktop()
-          ? `1) O Chrome pergunta «Abrir WhatsApp?» → clique Abrir WhatsApp e marque «Sempre permitir». 2) Mensagem copiada para ${order.phone?.trim() || "o cliente"}.`
-          : "Mensagem copiada. Confira o chat do cliente e pressione Enter."
+      isWindowsWhatsAppDesktop()
+        ? "Mensagem copiada. WhatsApp abrirá com o texto. Use Ctrl+V se o chat vier vazio."
+        : "Mensagem copiada. Confira o chat do cliente e pressione Enter."
     );
   };
 
@@ -256,59 +227,43 @@ export function ServiceOrderProposalView({
     });
   };
 
-  const handleEmailClick = () => {
+  const shareEmail = () => {
     void (async () => {
-      if (!clientShareUrl) {
+      const url = resolveClientProposalShareUrl(publicToken);
+      if (!url) {
         window.alert(
           "Registre o envio da proposta primeiro.\n\nO link, o QR Code e o e-mail só funcionam após gerar o link público de produção."
         );
         return;
       }
 
-      if (!emailShareBundle) {
-        window.alert(
-          emailAssetsLoading
-            ? "Aguarde — QR Code e logo ainda estão sendo preparados. Tente novamente em alguns segundos."
-            : "Não foi possível preparar o e-mail. Recarregue a página (F5) e tente novamente."
-        );
-        return;
-      }
+      const body = buildProposalEmailBody(order, context, url);
+      const qrDataUrl =
+        emailPasteAssets.qrDataUrl ?? (await generateProposalQrDataUrl(url));
+      const logoDataUrl =
+        emailPasteAssets.logoDataUrl ??
+        (await fetchBrandLogoDataUrl(getPublicAppOrigin()));
 
-      try {
-        const richCopied = await copyPreparedEmailHtmlToClipboardAsync(
-          emailShareBundle.htmlForClipboard,
-          emailShareBundle.plainBody
-        );
+      const { copied, richCopied, hasQr, hasLogo } = await openEmailShare(
+        `Proposta OS ${order.code} — ${context.companyName}`,
+        body,
+        url,
+        {
+          qrDataUrl,
+          logoDataUrl,
+          companyName: context.companyName,
+        }
+      );
 
-        const { copied, hasQr, hasLogo } = launchPreparedEmailShare(emailShareBundle, {
-          skipCopy: true,
-          richCopied,
-          copiedAlertMessage: richCopied
-            ? "IMPORTANTE — o Gmail abre só com TEXTO.\n\n" +
-              "Para QR Code e logo 3D GRX:\n" +
-              "1. Clique dentro do corpo do e-mail\n" +
-              "2. Pressione Ctrl+V\n\n" +
-              (emailShareBundle.hasLogo
-                ? "Logo 3D incluído na cópia."
-                : "Aviso: logo não foi gerado — recarregue a página.")
-            : "Não foi possível copiar QR/logo automaticamente.\n\n" +
-              "Recarregue a página (F5), aguarde «Enviar por e-mail» e tente de novo.",
-        });
-
-        setEmailHint(
-          richCopied
-            ? hasQr && hasLogo
-              ? "Copiado com QR + logo 3D. Gmail mostra só texto — use Ctrl+V no corpo do e-mail."
-              : "Copiado parcialmente. Use Ctrl+V no corpo do Gmail."
-            : copied
-              ? "Texto copiado. Use Ctrl+V no corpo se faltar QR ou logo."
-              : "Recarregue a página e tente novamente."
-        );
-      } catch {
-        setActionError(
-          "Não foi possível preparar o e-mail. Recarregue a página (F5) e tente novamente."
-        );
-      }
+      setEmailHint(
+        richCopied
+          ? hasQr && hasLogo
+            ? "Copiado com QR + logo. Gmail mostra só texto — use Ctrl+V no corpo."
+            : "Copiado parcialmente. Use Ctrl+V no corpo do Gmail."
+          : copied
+            ? "Texto copiado. Use Ctrl+V no corpo se faltar QR ou logo."
+            : "Recarregue a página (F5) e tente novamente."
+      );
     })();
   };
 
@@ -379,9 +334,8 @@ export function ServiceOrderProposalView({
             {whatsappHref ? (
               <a
                 href={whatsappHref}
-                {...(isWhatsAppNativeHref(whatsappHref)
-                  ? {}
-                  : { target: "_blank", rel: "noopener noreferrer" })}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={cn(secondaryActionClass, markingSent && "pointer-events-none opacity-50")}
                 onMouseDown={handleWhatsAppAnchorMouseDown}
                 onClick={handleWhatsAppAnchorClick}
@@ -393,22 +347,9 @@ export function ServiceOrderProposalView({
                 Enviar no WhatsApp
               </Button>
             )}
-            <button
-              type="button"
-              className={cn(
-                secondaryActionClass,
-                (emailAssetsLoading || !emailShareBundle) && "opacity-70"
-              )}
-              disabled={!clientShareUrl}
-              title={
-                emailAssetsLoading
-                  ? "Preparando QR Code e logo para colar no e-mail…"
-                  : "Copia QR + logo 3D; abre Gmail com texto — depois Ctrl+V no corpo"
-              }
-              onClick={handleEmailClick}
-            >
-              {emailAssetsLoading ? "Preparando e-mail…" : "Enviar por e-mail"}
-            </button>
+            <Button type="button" variant="secondary" onClick={shareEmail}>
+              Enviar por e-mail
+            </Button>
             <Button type="button" variant="secondary" onClick={() => void copyLink()}>
               Copiar link público
             </Button>
@@ -434,15 +375,6 @@ export function ServiceOrderProposalView({
             mensagem com o link) → opcional: anexe o PDF salvo com o clipe no WhatsApp.
           </p>
 
-          {emailShareBundle && !emailAssetsLoading && (
-            <p className="proposal-toolbar mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-950 print:hidden">
-              <strong>E-mail:</strong> o Gmail abre só com texto. Depois de clicar em «Enviar por e-mail»,
-              clique no <strong>corpo</strong> do e-mail e pressione <strong>Ctrl+V</strong> para colar QR
-              Code e logo 3D GRX.
-              {!emailShareBundle.hasLogo && " (Logo ainda não carregou — aguarde ou recarregue F5.)"}
-            </p>
-          )}
-
           {emailHint && (
             <p className="proposal-toolbar mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 print:hidden">
               {emailHint}
@@ -456,43 +388,10 @@ export function ServiceOrderProposalView({
           )}
 
           {whatsappShare && (
-            <div className="proposal-toolbar mb-4 space-y-2 text-xs text-slate-500 print:hidden">
-              <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-950">
-                <strong>1ª vez no Chrome:</strong> aparece «Abrir WhatsApp?» — clique{" "}
-                <strong>Abrir WhatsApp</strong> e marque <strong>Sempre permitir</strong>. O app desktop
-                abrirá (não o WhatsApp Web).
-              </p>
-              {whatsappUsesDemoPhone && (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
-                  <strong>Telefone demo:</strong> a OS001 usa <strong>(11) 98765-4321</strong>, que não
-                  existe no WhatsApp. O app abrirá sem chat fixo — cole a mensagem no seu contato. Para
-                  direcionar ao seu número, edite o campo telefone da OS antes de enviar.
-                </p>
-              )}
-              <p>
-                <strong>WhatsApp desktop:</strong> abre o app instalado (não o WhatsApp Web). A mensagem é
-                copiada ao clicar; o link da proposta vem sem card de preview do site.
-              </p>
-              <p>
-                Se o app não focar sozinho: <strong>Alt+Tab</strong> → WhatsApp → <strong>Ctrl+V</strong> no
-                chat {(order.phone ?? "").trim() || "do cliente"}.
-              </p>
-              <p>
-                Alternativa (abre no navegador):{" "}
-                <a
-                  href={whatsappShare.storeAppHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-brand-700 underline"
-                >
-                  api.whatsapp.com
-                </a>
-              </p>
-              <p>
-                Windows (1×): Configurações → Aplicativos → Aplicativos padrão →{" "}
-                <em>Escolher padrões por tipo de link</em> → <strong>WHATSAPP</strong> → WhatsApp.
-              </p>
-            </div>
+            <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
+              WhatsApp: mensagem copiada ao clicar. Se o chat vier vazio, use Ctrl+V. E-mail: Gmail abre só
+              com texto — Ctrl+V no corpo para QR e logo 3D.
+            </p>
           )}
 
           {isDev && acceptanceTestUrl && acceptanceTestUrl !== publicUrl && (

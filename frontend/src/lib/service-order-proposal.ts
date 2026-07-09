@@ -606,8 +606,8 @@ export function buildWhatsAppShareLinks(
   const desktopHref = `whatsapp://send?${desktopParams}`;
   const mobileHref = `${mobileBase}?text=${encodedText}`;
 
-  // Desktop: protocolo nativo whatsapp:// abre o app instalado; api.whatsapp.com abre o navegador (Web).
-  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
+  // Desktop: api.whatsapp.com abre WhatsApp Web/Store com texto — fluxo que funcionava nos testes.
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : storeAppHref;
 
   return {
     message: messageForShare,
@@ -981,10 +981,60 @@ export async function openEmailShare(
   proposalUrl = "",
   options?: EmailShareOptions & { to?: string | null }
 ): Promise<EmailShareResult> {
-  const bundle = await prepareEmailShareBundle(subject, body, proposalUrl, options);
-  return launchPreparedEmailShare(bundle, {
-    copiedAlertMessage: options?.copiedAlertMessage,
+  const safeUrl = sanitizePublicProposalUrl(proposalUrl);
+  const plainBody = body.replace(/\r\n/g, "\n");
+  const to = options?.to?.trim();
+  const mailtoPrefix = to ? `mailto:${to}` : "mailto:";
+  const qrDataUrl = options?.qrDataUrl ?? null;
+  const logoDataUrl = options?.logoDataUrl ?? null;
+
+  const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
+    qrDataUrl,
+    logoDataUrl,
+    companyName: options?.companyName,
   });
+
+  let richCopied = copyRichHtmlToClipboardSync(html);
+  if (!richCopied) {
+    richCopied = await copyRichHtmlViaClipboardApi(html, plainBody);
+  }
+  if (!richCopied) {
+    richCopied = await copyEmailProposalToClipboard(plainBody, safeUrl, {
+      qrDataUrl,
+      logoDataUrl,
+      companyName: options?.companyName,
+    });
+  }
+
+  const plainCopied = richCopied ? true : await copyTextToClipboard(plainBody);
+  const copied = richCopied || plainCopied;
+  const href = buildMailtoHref(mailtoPrefix, subject, plainBody, safeUrl);
+
+  if (richCopied) {
+    window.alert(
+      options?.copiedAlertMessage ??
+        "Proposta copiada (texto, link, QR Code e logo GRX).\n\n1. O e-mail abrirá com assunto e texto.\n2. Clique no corpo do e-mail e pressione Ctrl+V para colar QR Code e logo."
+    );
+  } else if (plainCopied) {
+    window.alert(
+      "Texto copiado.\n\nO e-mail abrirá com assunto e texto. Pressione Ctrl+V no corpo se quiser tentar colar novamente."
+    );
+  } else {
+    window.alert(
+      "Não foi possível copiar automaticamente.\n\nO e-mail abrirá com assunto e texto. Copie manualmente se necessário."
+    );
+    window.prompt("Copie a mensagem:", plainBody);
+  }
+
+  openMailtoLink(href);
+
+  return {
+    copied,
+    richCopied,
+    hasQr: Boolean(qrDataUrl),
+    hasLogo: Boolean(logoDataUrl),
+    plainBody,
+  };
 }
 
 export function triggerPrintPdf() {
