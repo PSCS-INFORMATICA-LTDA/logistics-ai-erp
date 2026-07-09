@@ -637,8 +637,8 @@ export function buildWhatsAppShareLinks(
   const desktopHref = `whatsapp://send?${desktopParams}`;
   const mobileHref = `${mobileBase}?text=${encodedText}`;
 
-  // Desktop Windows: whatsapp:// abre o app da Microsoft Store (não o navegador).
-  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
+  // Desktop: api.whatsapp.com abre Web ou delega ao app instalado (mais confiável que whatsapp:// no Chrome).
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : storeAppHref;
 
   return {
     message: messageForShare,

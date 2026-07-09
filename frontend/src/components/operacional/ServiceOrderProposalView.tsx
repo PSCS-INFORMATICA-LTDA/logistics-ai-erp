@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { EmailShareDialog, type EmailShareDialogData } from "@/components/operacional/EmailShareDialog";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
@@ -21,14 +20,13 @@ import {
   buildPublicProposalUrl,
   buildWhatsAppProposalText,
   buildWhatsAppShareLinks,
-  copyTextToClipboard,
+  copyTextToClipboardSync,
   formatServiceDate,
   generateProposalQrDataUrl,
   getPublicAppOrigin,
   isLocalhostPublicProposalUrl,
   isWindowsWhatsAppDesktop,
-  isWhatsAppNativeHref,
-  prepareEmailShareBundle,
+  openEmailShare,
   resolveClientProposalShareUrl,
   resolveProposalAcceptanceTestUrl,
   resolveProposalAmount,
@@ -78,7 +76,6 @@ export function ServiceOrderProposalView({
     qrDataUrl: string | null;
     logoDataUrl: string | null;
   }>({ qrDataUrl: null, logoDataUrl: null });
-  const [emailDialog, setEmailDialog] = useState<EmailShareDialogData | null>(null);
   const [publicToken, setPublicToken] = useState(order.proposal_token);
   const [sentAt, setSentAt] = useState(order.proposal_sent_at);
 
@@ -151,21 +148,21 @@ export function ServiceOrderProposalView({
   }, [publicToken, order, context]);
 
   const whatsappHref = whatsappShare?.primaryHref ?? null;
-  const whatsappWebHref = whatsappShare?.storeAppHref ?? null;
+  const whatsappAppHref = whatsappShare?.desktopHref ?? null;
 
   const secondaryActionClass =
     "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50";
 
   const handleWhatsAppAnchorMouseDown = () => {
     if (!whatsappShare) return;
-    void copyTextToClipboard(whatsappShare.message);
+    copyTextToClipboardSync(whatsappShare.message);
   };
 
   const handleWhatsAppAnchorClick = () => {
     if (!whatsappShare) return;
     setWhatsappHint(
       isWindowsWhatsAppDesktop()
-        ? "Mensagem copiada. Se o Chrome perguntar «Abrir WhatsApp?», clique Abrir e marque Sempre permitir."
+        ? "Mensagem copiada. WhatsApp abrirá com o texto — use Ctrl+V se o chat vier vazio."
         : "Mensagem copiada. Confira o chat do cliente e pressione Enter."
     );
   };
@@ -248,7 +245,7 @@ export function ServiceOrderProposalView({
         emailPasteAssets.logoDataUrl ??
         (await fetchBrandLogoDataUrl(getPublicAppOrigin()));
 
-      const bundle = await prepareEmailShareBundle(
+      const { copied, richCopied, hasQr, hasLogo } = await openEmailShare(
         `Proposta OS ${order.code} — ${context.companyName}`,
         body,
         url,
@@ -259,14 +256,15 @@ export function ServiceOrderProposalView({
         }
       );
 
-      setEmailDialog({
-        subject: bundle.subject,
-        plainBody: bundle.plainBody,
-        htmlForClipboard: bundle.htmlForClipboard,
-        mailtoHref: bundle.mailtoHref,
-        hasQr: bundle.hasQr,
-        hasLogo: bundle.hasLogo,
-      });
+      setEmailHint(
+        richCopied
+          ? hasQr && hasLogo
+            ? "Proposta copiada com QR + logo 3D. O e-mail abriu — clique no corpo e Ctrl+V se faltar imagem."
+            : "Proposta copiada parcialmente. Clique no corpo do e-mail e Ctrl+V."
+          : copied
+            ? "Texto copiado. Use Ctrl+V no corpo se faltar QR ou logo."
+            : "Recarregue a página (F5) e tente novamente."
+      );
     })();
   };
 
@@ -285,7 +283,6 @@ export function ServiceOrderProposalView({
 
   return (
     <>
-      <EmailShareDialog data={emailDialog} onClose={() => setEmailDialog(null)} />
       <style>{`
         @media print {
           aside, .app-shell-header, .proposal-toolbar { display: none !important; }
@@ -338,9 +335,8 @@ export function ServiceOrderProposalView({
             {whatsappHref ? (
               <a
                 href={whatsappHref}
-                {...(isWhatsAppNativeHref(whatsappHref)
-                  ? {}
-                  : { target: "_blank", rel: "noopener noreferrer" })}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={cn(secondaryActionClass, markingSent && "pointer-events-none opacity-50")}
                 onMouseDown={handleWhatsAppAnchorMouseDown}
                 onClick={handleWhatsAppAnchorClick}
@@ -394,18 +390,13 @@ export function ServiceOrderProposalView({
 
           {whatsappShare && (
             <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
-              WhatsApp abre o <strong>app desktop</strong> (não o Web). Na 1ª vez o Chrome pede permissão.
-              {whatsappWebHref ? (
+              WhatsApp: mensagem copiada ao clicar. Se o chat vier vazio, use Ctrl+V.
+              {whatsappAppHref ? (
                 <>
                   {" "}
-                  Alternativa:{" "}
-                  <a
-                    href={whatsappWebHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-brand-700 underline"
-                  >
-                    WhatsApp Web
+                  App desktop:{" "}
+                  <a href={whatsappAppHref} className="font-medium text-brand-700 underline">
+                    whatsapp://
                   </a>
                 </>
               ) : null}
