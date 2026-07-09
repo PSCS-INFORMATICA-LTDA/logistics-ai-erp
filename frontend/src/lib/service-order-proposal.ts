@@ -323,7 +323,7 @@ export function launchProposalEmailShareSync(
   const plainCopied = richCopied ? true : copyTextToClipboardSync(plainBody);
   const copied = richCopied || plainCopied;
 
-  const mailtoBody = richCopied ? "" : buildMailtoBodyForClient(plainBody, safeUrl);
+  const mailtoBody = buildMailtoBodyForClient(plainBody, safeUrl);
   const href = `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
 
   openMailtoLink(href);
@@ -712,12 +712,8 @@ export function buildWhatsAppShareLinks(
   const desktopHref = `whatsapp://send?${desktopParams}`;
   const mobileHref = `${mobileBase}?text=${encodedText}`;
 
-  // Desktop Windows: whatsapp:// abre o app instalado; api.whatsapp.com costuma cair no Web.
-  const primaryHref = isMobileWhatsAppDevice()
-    ? mobileHref
-    : isWindowsDesktop()
-      ? desktopHref
-      : storeAppHref;
+  // Desktop: api.whatsapp.com — abre Web ou delega ao app (funcionava antes; whatsapp:// falha no Chrome).
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : storeAppHref;
 
   return {
     message: messageForShare,
@@ -1126,7 +1122,7 @@ export async function openEmailShare(
 
   const plainCopied = richCopied ? true : await copyTextToClipboard(plainBody);
   const copied = richCopied || plainCopied;
-  const mailtoBody = richCopied ? "" : buildMailtoBodyForClient(plainBody, safeUrl);
+  const mailtoBody = buildMailtoBodyForClient(plainBody, safeUrl);
   const href = `${mailtoPrefix}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
 
   openMailtoLink(href);
