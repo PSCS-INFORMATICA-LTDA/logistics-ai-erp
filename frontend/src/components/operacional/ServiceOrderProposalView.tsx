@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,9 @@ export function ServiceOrderProposalView({
 
   const secondaryActionClass =
     "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50";
+
+  const shareIconButtonClass =
+    "inline-flex items-center justify-center rounded-lg border p-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
   const handleWhatsAppAnchorMouseDown = () => {
     if (!whatsappShare) return;
@@ -280,20 +284,45 @@ export function ServiceOrderProposalView({
                 href={whatsappHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={cn(secondaryActionClass, markingSent && "pointer-events-none opacity-50")}
+                title="Enviar no WhatsApp"
+                aria-label="Enviar proposta no WhatsApp"
+                className={cn(
+                  shareIconButtonClass,
+                  "border-green-300 bg-green-50 text-green-800 hover:bg-green-100",
+                  markingSent && "pointer-events-none opacity-50"
+                )}
                 onMouseDown={handleWhatsAppAnchorMouseDown}
                 onClick={handleWhatsAppAnchorClick}
               >
-                Enviar no WhatsApp
+                <WhatsAppIcon className="h-5 w-5" />
               </a>
             ) : (
-              <Button type="button" variant="secondary" disabled={markingSent} onClick={registerThenWhatsApp}>
-                Enviar no WhatsApp
-              </Button>
+              <button
+                type="button"
+                title="Enviar no WhatsApp"
+                aria-label="Enviar proposta no WhatsApp"
+                disabled={markingSent}
+                className={cn(
+                  shareIconButtonClass,
+                  "border-green-300 bg-green-50 text-green-800 hover:bg-green-100"
+                )}
+                onClick={registerThenWhatsApp}
+              >
+                <WhatsAppIcon className="h-5 w-5" />
+              </button>
             )}
-            <Button type="button" variant="secondary" onClick={shareEmail}>
-              Enviar por e-mail
-            </Button>
+            <button
+              type="button"
+              title="Enviar por e-mail"
+              aria-label="Enviar proposta por e-mail"
+              className={cn(
+                shareIconButtonClass,
+                "border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100"
+              )}
+              onClick={shareEmail}
+            >
+              <MailIcon className="h-5 w-5" />
+            </button>
             <Button type="button" variant="secondary" onClick={() => void copyLink()}>
               Copiar link público
             </Button>
@@ -315,7 +344,7 @@ export function ServiceOrderProposalView({
           </div>
 
           <p className="proposal-toolbar mb-4 text-sm text-slate-500 print:hidden">
-            Fluxo sugerido: registre o envio (link com aceite) → «Enviar no WhatsApp» ou «Enviar por e-mail»
+            Fluxo sugerido: registre o envio (link com aceite) → ícones WhatsApp ou e-mail
             (texto + link público) → opcional: anexe o PDF salvo com o clipe no WhatsApp.
           </p>
 
