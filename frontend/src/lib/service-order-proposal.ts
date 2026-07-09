@@ -1,7 +1,5 @@
 import {
   buildEmailBrandFooterHtml,
-  fetchBrandLogoDataUrl,
-  fetchBrandLogoFlat2DDataUrl,
   resolveEmailBrandLogoSrc,
 } from "@/lib/brand-email";
 import { formatCurrency } from "@/lib/utils";
@@ -344,14 +342,15 @@ export function buildProposalEmailMailtoHref(
 }
 
 /**
- * Abre mailto com texto completo (Gmail) e copia HTML com logo GRX (Ctrl+V no corpo para incluir logo).
+ * Abre mailto com texto completo. Copia HTML com QR Code (Ctrl+V no corpo).
+ * Logo fica na assinatura do Outlook — não é incluído pelo app.
  */
 export function launchProposalEmailShareSync(
   subject: string,
   body: string,
   proposalUrl: string,
   options?: {
-    logoDataUrl?: string | null;
+    qrDataUrl?: string | null;
     companyName?: string;
     to?: string | null;
     skipCopy?: boolean;
@@ -360,13 +359,13 @@ export function launchProposalEmailShareSync(
 ): EmailShareResult {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
-  const logoDataUrl = options?.logoDataUrl ?? null;
+  const qrDataUrl = options?.qrDataUrl ?? null;
 
   let richCopied = false;
-  if (!options?.skipCopy && logoDataUrl?.startsWith("data:image")) {
+  if (!options?.skipCopy && qrDataUrl) {
     const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
-      qrDataUrl: null,
-      logoDataUrl,
+      qrDataUrl,
+      logoDataUrl: null,
       companyName: options?.companyName,
     });
     richCopied = copyRichHtmlToClipboardSync(html, plainBody);
@@ -378,9 +377,9 @@ export function launchProposalEmailShareSync(
 
   return {
     copied: true,
-    richCopied: Boolean(richCopied && logoDataUrl?.startsWith("data:image")),
-    hasQr: false,
-    hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
+    richCopied: Boolean(richCopied && qrDataUrl),
+    hasQr: Boolean(qrDataUrl),
+    hasLogo: false,
     plainBody,
   };
 }
@@ -1141,15 +1140,15 @@ export async function openEmailShare(
 ): Promise<EmailShareResult> {
   const safeUrl = sanitizePublicProposalUrl(proposalUrl);
   const plainBody = body.replace(/\r\n/g, "\n");
-  let logoDataUrl = options?.logoDataUrl ?? null;
+  let qrDataUrl = options?.qrDataUrl ?? null;
 
-  if (!logoDataUrl?.startsWith("data:image")) {
-    logoDataUrl = await fetchBrandLogoDataUrl(getPublicAppOrigin());
+  if (!qrDataUrl && safeUrl) {
+    qrDataUrl = await generateProposalQrDataUrl(safeUrl);
   }
 
   const html = buildEmailProposalRichHtml(plainBody, safeUrl, {
-    qrDataUrl: null,
-    logoDataUrl,
+    qrDataUrl,
+    logoDataUrl: null,
     companyName: options?.companyName,
   });
 
@@ -1159,8 +1158,8 @@ export async function openEmailShare(
   }
   if (!options?.skipCopy && !richCopied) {
     richCopied = await copyEmailProposalToClipboard(plainBody, safeUrl, {
-      qrDataUrl: null,
-      logoDataUrl,
+      qrDataUrl,
+      logoDataUrl: null,
       companyName: options?.companyName,
     });
   }
@@ -1172,9 +1171,9 @@ export async function openEmailShare(
 
   return {
     copied,
-    richCopied: Boolean(richCopied && logoDataUrl?.startsWith("data:image")),
-    hasQr: false,
-    hasLogo: Boolean(logoDataUrl?.startsWith("data:image")),
+    richCopied: Boolean(richCopied && qrDataUrl),
+    hasQr: Boolean(qrDataUrl),
+    hasLogo: false,
     plainBody,
   };
 }
