@@ -30,6 +30,7 @@ export type PublicDriverAssignmentPayload = {
     | "client_name"
     | "freight_origin_address"
     | "freight_destination_address"
+    | "freight_distance_km"
     | "freight_agreed_amount"
     | "freight_toll_amount"
     | "service_amount"

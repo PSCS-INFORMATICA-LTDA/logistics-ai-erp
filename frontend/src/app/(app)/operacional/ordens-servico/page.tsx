@@ -38,7 +38,7 @@ import {
   type ServiceOrderListRow,
 } from "@/lib/service-order-filters";
 import { formatCurrency, normalizePlate } from "@/lib/utils";
-import type { DreAccount, Driver, Vehicle } from "@/types/database";
+import type { DreAccount, Driver, DriverAssignmentResponse, Vehicle } from "@/types/database";
 import {
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE_LABELS,
@@ -213,6 +213,36 @@ function OrdensServicoPageContent() {
     []
   );
 
+  const handleDriverAssignmentResponded = useCallback(
+    (
+      orderId: string,
+      patch: {
+        driver_assignment_response: DriverAssignmentResponse;
+        driver_id: string | null;
+        proposed_driver_id: string | null;
+        clearDriverName?: boolean;
+      }
+    ) => {
+      setListRows((rows) =>
+        rows.map((row) => {
+          if (row.id !== orderId) return row;
+          const updated: ServiceOrderListRow = {
+            ...row,
+            driver_assignment_response: patch.driver_assignment_response,
+            driver_id: patch.driver_id,
+            proposed_driver_id: patch.proposed_driver_id,
+          };
+          if (patch.clearDriverName) {
+            updated.driver_name = undefined;
+          }
+          return updated;
+        })
+      );
+      setListRefreshKey((key) => key + 1);
+    },
+    []
+  );
+
   const visibleCount = useMemo(
     () => listRows.filter(filterItem).length,
     [listRows, filterItem]
@@ -283,6 +313,7 @@ function OrdensServicoPageContent() {
           onProposalResponseChanged={handleProposalResponseChanged}
           onDriverAssigned={handleDriverAssigned}
           onAssignmentSent={handleAssignmentSent}
+          onDriverAssignmentResponded={handleDriverAssignmentResponded}
         />
       )}
       columns={[

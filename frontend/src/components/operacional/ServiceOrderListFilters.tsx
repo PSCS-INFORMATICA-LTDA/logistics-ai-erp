@@ -7,11 +7,15 @@ import {
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_TYPES,
 } from "@/types/database";
+import { DRIVER_ASSIGNMENT_RESPONSE_LABELS } from "@/lib/service-order-driver-assignment";
 
 const SERVICE_ORDER_STATUS_FILTER = [
   ...SERVICE_ORDER_STATUS,
   PROPOSAL_RESPONSE_LABELS.accepted,
   PROPOSAL_RESPONSE_LABELS.rejected,
+  DRIVER_ASSIGNMENT_RESPONSE_LABELS.pending,
+  DRIVER_ASSIGNMENT_RESPONSE_LABELS.accepted,
+  DRIVER_ASSIGNMENT_RESPONSE_LABELS.rejected,
 ] as const;
 
 type Props = {

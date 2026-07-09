@@ -94,6 +94,16 @@ export function isPendingClientProposal(row: ServiceOrderStatusRow): boolean {
   );
 }
 
+/** Designação enviada ao motorista, aguardando aceite/recusa (telefone ou link). */
+export function isPendingDriverAssignment(row: ServiceOrderStatusRow): boolean {
+  return (
+    isProposalAcceptedByClient(row) &&
+    (row.driver_assignment_response ?? "pending") === "pending" &&
+    Boolean(row.proposed_driver_id) &&
+    Boolean(row.driver_assignment_sent_at)
+  );
+}
+
 /** Bloqueia edição enquanto o cliente já aceitou ou recusou a proposta enviada. */
 export function canEditServiceOrder(row: ServiceOrderStatusRow): boolean {
   const label = resolveServiceOrderDisplayStatus(row);

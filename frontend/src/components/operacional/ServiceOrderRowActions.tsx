@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import {
   canAssignDriverToServiceOrder,
   isPendingClientProposal,
+  isPendingDriverAssignment,
 } from "@/lib/service-order-display-status";
+import { respondToDriverAssignment } from "@/lib/service-order-driver-assignment";
 import {
   registerProposalFollowUp,
   resetProposalClientResponse,
@@ -15,7 +17,7 @@ import {
 } from "@/lib/service-order-proposal-api";
 import { createClient } from "@/lib/supabase/client";
 import type { ServiceOrderListRow } from "@/lib/service-order-filters";
-import type { ProposalResponse } from "@/types/database";
+import type { ProposalResponse, DriverAssignmentResponse } from "@/types/database";
 
 type ProposalResponsePatch = {
   proposal_response: ProposalResponse;
@@ -30,6 +32,15 @@ type Props = {
   onProposalResponseChanged?: (orderId: string, patch: ProposalResponsePatch) => void;
   onDriverAssigned?: (orderId: string, driverId: string, driverName: string) => void;
   onAssignmentSent?: (orderId: string, driverId: string, driverName: string) => void;
+  onDriverAssignmentResponded?: (
+    orderId: string,
+    patch: {
+      driver_assignment_response: DriverAssignmentResponse;
+      driver_id: string | null;
+      proposed_driver_id: string | null;
+      clearDriverName?: boolean;
+    }
+  ) => void;
 };
 
 function PhoneIcon({ className }: { className?: string }) {
@@ -109,14 +120,18 @@ export function ServiceOrderRowActions({
   onProposalResponseChanged,
   onDriverAssigned,
   onAssignmentSent,
+  onDriverAssignmentResponded,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [driverAccepting, setDriverAccepting] = useState(false);
+  const [driverRejecting, setDriverRejecting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
 
   const canPhoneResponse = isPendingClientProposal(row);
+  const canDriverPhoneResponse = isPendingDriverAssignment(row);
   const canAssignDriver = canAssignDriverToServiceOrder(row);
   const canResetProposal =
     Boolean(row.proposal_sent_at) && (row.proposal_response ?? "pending") !== "pending";
@@ -193,6 +208,58 @@ export function ServiceOrderRowActions({
     );
   };
 
+  const handleDriverPhoneResponse = async (action: "accept" | "reject") => {
+    const token = row.driver_assignment_token?.trim();
+    if (!token || token.length < 32) {
+      window.alert("Token da designação indisponível. Gere o link novamente em «Designar motorista».");
+      return;
+    }
+
+    const isAccept = action === "accept";
+    const driverLabel = row.driver_name ?? "motorista";
+    if (
+      !window.confirm(
+        isAccept
+          ? `Registrar aceite da designação OS ${row.code} em nome de ${driverLabel} (confirmação por telefone)?`
+          : `Registrar recusa da designação OS ${row.code} em nome de ${driverLabel} (confirmação por telefone)?`
+      )
+    ) {
+      return;
+    }
+
+    if (isAccept) setDriverAccepting(true);
+    else setDriverRejecting(true);
+
+    const supabase = createClient();
+    const { driverAssignmentResponse, driverId, error } = await respondToDriverAssignment(
+      supabase,
+      token,
+      action
+    );
+
+    if (isAccept) setDriverAccepting(false);
+    else setDriverRejecting(false);
+
+    if (error) {
+      window.alert(error);
+      return;
+    }
+
+    const next = driverAssignmentResponse ?? (isAccept ? "accepted" : "rejected");
+    onDriverAssignmentResponded?.(row.id, {
+      driver_assignment_response: next,
+      driver_id: isAccept ? driverId : null,
+      proposed_driver_id: isAccept ? row.proposed_driver_id ?? driverId : null,
+      clearDriverName: !isAccept,
+    });
+
+    window.alert(
+      isAccept
+        ? "Aceite do motorista registrado. A ordem aparecerá como «Motorista confirmado»."
+        : "Recusa do motorista registrada. Você pode designar outro motorista."
+    );
+  };
+
   const handleResetProposal = async () => {
     if (
       !window.confirm(
@@ -246,6 +313,34 @@ export function ServiceOrderRowActions({
         >
           Designar motorista
         </button>
+      )}
+      {canDriverPhoneResponse && (
+        <>
+          <button
+            type="button"
+            disabled={driverAccepting || driverRejecting || accepting || rejecting}
+            title="Registrar aceite do motorista (telefone)"
+            aria-label={`Motorista aceitou por telefone — OS ${row.code}`}
+            onClick={() => void handleDriverPhoneResponse("accept")}
+            className={cn(
+              "inline-flex items-center justify-center rounded-lg border border-emerald-400 bg-emerald-50 px-2.5 py-1.5 text-emerald-900 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+            )}
+          >
+            <PhoneAcceptIcon />
+          </button>
+          <button
+            type="button"
+            disabled={driverAccepting || driverRejecting || accepting || rejecting}
+            title="Registrar recusa do motorista (telefone)"
+            aria-label={`Motorista recusou por telefone — OS ${row.code}`}
+            onClick={() => void handleDriverPhoneResponse("reject")}
+            className={cn(
+              "inline-flex items-center justify-center rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1.5 text-orange-900 transition-colors hover:bg-orange-100 disabled:opacity-50"
+            )}
+          >
+            <PhoneRejectIcon />
+          </button>
+        </>
       )}
       {canPhoneResponse && (
         <>
