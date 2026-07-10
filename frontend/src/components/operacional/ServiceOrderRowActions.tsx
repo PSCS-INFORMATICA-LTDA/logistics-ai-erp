@@ -406,7 +406,8 @@ export function ServiceOrderRowActions({
           href={`/operacional/ordens-servico/${row.id}/voucher-motorista`}
           target="_blank"
           rel="noreferrer"
-          className={glassAction("brand")}
+          title="Voucher operacional para enviar ao motorista"
+          className={glassAction("emerald")}
         >
           Voucher motorista
         </Link>

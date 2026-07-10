@@ -1,21 +1,47 @@
--- Garante que OS001 concluída exibe o voucher (motorista + aceite registrado)
--- Cole no SQL Editor do Supabase se o botão ainda não aparecer após o deploy.
+-- Corrige OS001 para exibir o botão «Voucher motorista»
+-- (vincula motorista designado e aceite quando faltarem no registro)
 
-UPDATE public.service_orders
+UPDATE public.service_orders so
 SET
+  driver_id = COALESCE(
+    so.driver_id,
+    so.proposed_driver_id,
+    (
+      SELECT d.id
+      FROM public.drivers d
+      WHERE d.company_id = so.company_id
+        AND d.deleted_at IS NULL
+        AND (d.code = 'MOT001' OR d.name ILIKE '%Agregado%')
+      ORDER BY d.created_at ASC
+      LIMIT 1
+    )
+  ),
+  proposed_driver_id = COALESCE(
+    so.proposed_driver_id,
+    so.driver_id,
+    (
+      SELECT d.id
+      FROM public.drivers d
+      WHERE d.company_id = so.company_id
+        AND d.deleted_at IS NULL
+        AND (d.code = 'MOT001' OR d.name ILIKE '%Agregado%')
+      ORDER BY d.created_at ASC
+      LIMIT 1
+    )
+  ),
   driver_assignment_response = 'accepted',
-  driver_assignment_accepted_at = COALESCE(driver_assignment_accepted_at, NOW()),
-  driver_assignment_rejected_at = NULL
-WHERE code = 'OS001'
-  AND driver_id IS NOT NULL
-  AND (driver_assignment_response IS DISTINCT FROM 'accepted');
+  driver_assignment_accepted_at = COALESCE(so.driver_assignment_accepted_at, NOW()),
+  proposal_response = COALESCE(NULLIF(so.proposal_response, 'pending'), 'accepted'),
+  proposal_accepted_at = COALESCE(so.proposal_accepted_at, NOW())
+WHERE so.code = 'OS001';
 
 SELECT
   code,
   status,
+  proposal_response,
   driver_id,
+  proposed_driver_id,
   driver_assignment_response,
-  driver_assignment_accepted_at,
-  service_completed_at
+  driver_assignment_pay_amount
 FROM public.service_orders
 WHERE code = 'OS001';

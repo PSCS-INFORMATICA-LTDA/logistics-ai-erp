@@ -8,7 +8,11 @@ import {
   type DriverVoucherContext,
 } from "@/components/operacional/ServiceOrderDriverVoucherView";
 import { Loading, Alert } from "@/components/ui/Badge";
-import { canViewDriverVoucher } from "@/lib/service-order-display-status";
+import {
+  canViewDriverVoucher,
+  isDriverAssignmentPendingAcceptance,
+  resolveDesignatedDriverId,
+} from "@/lib/service-order-display-status";
 import { useCompany } from "@/lib/company-context";
 import { createClient } from "@/lib/supabase/client";
 import type { Driver, ServiceOrder, Vehicle } from "@/types/database";
@@ -29,6 +33,7 @@ export default function ServiceOrderDriverVoucherPage() {
   const supabase = useMemo(() => createClient(), []);
   const [order, setOrder] = useState<ServiceOrder | null>(null);
   const [context, setContext] = useState<DriverVoucherContext | null>(null);
+  const [pendingAcceptance, setPendingAcceptance] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -63,17 +68,20 @@ export default function ServiceOrderDriverVoucherPage() {
 
       if (!canViewDriverVoucher(row)) {
         setError(
-          "O voucher do motorista só fica disponível depois que o motorista aceitar a designação e os valores."
+          "O voucher fica disponível depois que o cliente aceitar a proposta e você designar um motorista na OS."
         );
         setLoading(false);
         return;
       }
 
+      const driverId = resolveDesignatedDriverId(row);
+
       setOrder(row);
+      setPendingAcceptance(isDriverAssignmentPendingAcceptance(row));
 
       const [driverRes, vehicleRes] = await Promise.all([
-        row.driver_id
-          ? supabase.from("drivers").select("*").eq("id", row.driver_id).maybeSingle()
+        driverId
+          ? supabase.from("drivers").select("*").eq("id", driverId).maybeSingle()
           : Promise.resolve({ data: null }),
         row.vehicle_id
           ? supabase.from("vehicles").select("*").eq("id", row.vehicle_id).maybeSingle()
@@ -88,7 +96,7 @@ export default function ServiceOrderDriverVoucherPage() {
       setContext({
         companyName: company?.trade_name || company?.name || "GRX Management",
         companyDocument: company?.document ?? null,
-        driverName: driver?.name ?? "—",
+        driverName: driver?.name ?? "Motorista designado",
         driverDocument: driver?.document ?? driver?.cnh_number ?? null,
         driverPhone: driver?.phone ?? null,
         vehicleDescription: buildVehicleDescription(row, vehicle),
@@ -130,7 +138,11 @@ export default function ServiceOrderDriverVoucherPage() {
       >
         ← Voltar às ordens de serviço
       </Link>
-      <ServiceOrderDriverVoucherView order={order} context={context} />
+      <ServiceOrderDriverVoucherView
+        order={order}
+        context={context}
+        pendingDriverAcceptance={pendingAcceptance}
+      />
     </div>
   );
 }

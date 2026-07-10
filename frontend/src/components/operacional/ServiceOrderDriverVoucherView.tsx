@@ -83,9 +83,14 @@ function PassengersBlock({ passengers }: { passengers: ServiceOrderPassenger[] }
 type Props = {
   order: ServiceOrder;
   context: DriverVoucherContext;
+  pendingDriverAcceptance?: boolean;
 };
 
-export function ServiceOrderDriverVoucherView({ order, context }: Props) {
+export function ServiceOrderDriverVoucherView({
+  order,
+  context,
+  pendingDriverAcceptance = false,
+}: Props) {
   const passengers = normalizePassengers(order.passengers);
   const serviceLabel = SERVICE_ORDER_TYPE_LABELS[order.service_type] ?? order.service_type;
   const presentationAddress = order.freight_origin_address?.trim() || "—";
@@ -115,6 +120,13 @@ export function ServiceOrderDriverVoucherView({ order, context }: Props) {
           Imprimir / Salvar PDF
         </Button>
       </div>
+
+      {pendingDriverAcceptance ? (
+        <p className="driver-voucher-toolbar rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 print:hidden">
+          Aguardando aceite do motorista — envie este voucher junto com a designação. Os valores
+          abaixo serão confirmados após o aceite.
+        </p>
+      ) : null}
 
       <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm print:border-0 print:p-0 print:shadow-none">
         <header className="mb-4 flex flex-col gap-4 border-b-2 border-brand-600 pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -186,15 +198,20 @@ export function ServiceOrderDriverVoucherView({ order, context }: Props) {
           <VoucherCell label="Tipo de serviço" value={serviceLabel} />
           <VoucherCell
             label="Valores acordados (motorista)"
-            value={[
-              motoristaPay != null ? `Motorista: ${formatCurrency(motoristaPay)}` : null,
-              ajudantePay > 0 ? `Ajudante: ${formatCurrency(ajudantePay)}` : null,
+            value={
               motoristaPay != null
-                ? `Total: ${formatCurrency(motoristaPay + ajudantePay)}`
-                : null,
-            ]
-              .filter(Boolean)
-              .join("\n")}
+                ? [
+                    `Motorista: ${formatCurrency(motoristaPay)}`,
+                    ajudantePay > 0 ? `Ajudante: ${formatCurrency(ajudantePay)}` : null,
+                    `Total: ${formatCurrency(motoristaPay + ajudantePay)}`,
+                    pendingDriverAcceptance ? "(aguardando confirmação do motorista)" : null,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")
+                : pendingDriverAcceptance
+                  ? "A informar na designação"
+                  : "—"
+            }
           />
         </div>
 

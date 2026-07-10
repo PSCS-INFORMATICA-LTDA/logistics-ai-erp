@@ -51,12 +51,39 @@ export function isFreightInExecution(row: ServiceOrderStatusRow): boolean {
   return isDriverConfirmedOnServiceOrder(row) && !isServiceOrderCompleted(row);
 }
 
-/** Voucher operacional — após aceite do motorista ou frete concluído com motorista designado. */
-export function canViewDriverVoucher(row: ServiceOrderStatusRow): boolean {
-  if (!row.driver_id) return false;
-  if (isDriverConfirmedOnServiceOrder(row)) return true;
-  if (isServiceOrderCompleted(row)) return true;
+/** ID do motorista designado (confirmado ou aguardando aceite). */
+export function resolveDesignatedDriverId(
+  row: Pick<ServiceOrder, "driver_id" | "proposed_driver_id">
+): string | null {
+  return row.driver_id ?? row.proposed_driver_id ?? null;
+}
+
+/** Voucher operacional — após designar motorista (enviar ao motorista) ou frete concluído. */
+export function canViewDriverVoucher(
+  row: ServiceOrderStatusRow & { driver_assignment_pay_amount?: number | null }
+): boolean {
+  const designatedDriverId = resolveDesignatedDriverId(row);
+
+  if (designatedDriverId && isProposalAcceptedByClient(row)) {
+    return true;
+  }
+
+  if (isServiceOrderCompleted(row)) {
+    if (designatedDriverId) return true;
+    if (row.driver_assignment_pay_amount != null && row.driver_assignment_pay_amount > 0) {
+      return true;
+    }
+  }
+
   return false;
+}
+
+export function isDriverAssignmentPendingAcceptance(row: ServiceOrderStatusRow): boolean {
+  return (
+    Boolean(resolveDesignatedDriverId(row)) &&
+    !isDriverConfirmedOnServiceOrder(row) &&
+    (row.driver_assignment_response ?? "pending") === "pending"
+  );
 }
 
 export function canAssignDriverToServiceOrder(
