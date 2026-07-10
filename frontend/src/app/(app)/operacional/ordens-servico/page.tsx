@@ -24,7 +24,9 @@ import { isTruckCategory } from "@/lib/transport-van-estimate";
 import {
   canEditServiceOrder,
   isPendingClientProposal,
+  isPendingDriverAssignment,
   isDriverAssignmentRejected,
+  needsDriverAssignment,
   matchesServiceOrderStatusFilter,
   resolveServiceOrderDisplayStatus,
   resolveServiceOrderDriverColumnLabel,
@@ -394,6 +396,9 @@ function OrdensServicoPageContent() {
             const label = resolveServiceOrderDriverColumnLabel(r);
             if (isDriverAssignmentRejected(r)) {
               return <span className="font-medium text-red-700">{label}</span>;
+            }
+            if (needsDriverAssignment(r) && !isPendingDriverAssignment(r)) {
+              return <span className="font-medium text-amber-700">{label}</span>;
             }
             return label;
           },

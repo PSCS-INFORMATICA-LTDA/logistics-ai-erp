@@ -278,7 +278,7 @@ export function ServiceOrderRowActions({
   const handleCancelDriverAssignment = async () => {
     if (
       !window.confirm(
-        `Cancelar a designação pendente da OS ${row.code}? O status voltará para «Aceita pelo cliente» e você poderá escolher o motorista novamente.`
+        `Cancelar a designação pendente da OS ${row.code}? O status voltará para «Aguardando designação motorista» e você poderá escolher o motorista novamente.`
       )
     ) {
       return;
