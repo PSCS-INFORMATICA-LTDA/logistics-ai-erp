@@ -67,7 +67,7 @@ function SidebarNavLink({
 
 export function Sidebar() {
   return (
-    <aside className="sidebar-shell flex w-64 flex-col border-r border-white/5 text-white">
+    <aside className="sidebar-shell flex w-64 flex-col border-r border-white/10 text-white">
       <div className="sidebar-brand-zone">
         <Link href="/dashboard" className="brand-logo-link">
           <BrandLogo variant="plaque3d" plaqueSurface="sidebar" size="sm" />
