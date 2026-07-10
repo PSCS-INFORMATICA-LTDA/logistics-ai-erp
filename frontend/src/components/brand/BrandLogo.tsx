@@ -36,9 +36,9 @@ const markSizes = {
 /** Logo com placa branca (voucher, proposta, login). */
 const BRAND_LOGO_SRC = "/grx-logo.png?v=3";
 /** Marca GRX + tagline, fundo transparente (menu cinza do sistema). */
-const BRAND_LOGO_MARK_SRC = "/grx-logo-mark.png?v=4";
+const BRAND_LOGO_MARK_SRC = "/grx-logo-mark.png?v=5";
 
-const MARK_DEPTH_LAYERS = [3, 2, 1] as const;
+const MARK_DEPTH_LAYERS = [4, 3, 2, 1] as const;
 
 function LogoImage({
   dim,

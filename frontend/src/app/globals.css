@@ -711,7 +711,7 @@ body {
 }
 
 .brand-logo-link:hover .brand-logo-mark-3d-stage {
-  transform: perspective(880px) rotateY(-3deg) rotateX(3deg);
+  transform: perspective(720px) rotateY(-8deg) rotateX(5deg);
 }
 
 .brand-logo-link:active {
@@ -731,16 +731,21 @@ body {
 }
 
 .brand-logo-mark-3d-stage {
-  perspective: 880px;
-  transform: perspective(880px) rotateY(-5deg) rotateX(4deg);
+  perspective: 720px;
+  transform: perspective(720px) rotateY(-10deg) rotateX(7deg);
   transform-style: preserve-3d;
-  transition: transform 0.2s ease;
+  transition: transform 0.22s ease;
+}
+
+.brand-logo-mark--sidebar .brand-logo-mark-3d-stage {
+  transform: perspective(720px) rotateY(-12deg) rotateX(8deg);
 }
 
 .brand-logo-mark-stack {
   position: relative;
   display: grid;
   place-items: center;
+  transform-style: preserve-3d;
 }
 
 .brand-logo-mark-stack img {
@@ -751,12 +756,13 @@ body {
 }
 
 .brand-logo-mark-depth {
-  transform: translate(
-    calc(var(--depth) * 1px),
-    calc(var(--depth) * 1px)
+  transform: translate3d(
+    calc(var(--depth) * 2.5px),
+    calc(var(--depth) * 2.5px),
+    calc(var(--depth) * -2px)
   );
-  opacity: calc(0.28 - (var(--depth) * 0.04));
-  filter: brightness(0.5);
+  opacity: calc(0.62 - (var(--depth) * 0.1));
+  filter: brightness(0.06) saturate(0);
   pointer-events: none;
   user-select: none;
 }
@@ -767,17 +773,27 @@ body {
   display: block;
   width: 100%;
   height: auto;
-  transform: translateZ(6px);
+  transform: translateZ(10px);
   filter:
-    drop-shadow(-1px -1px 0 rgba(255, 255, 255, 0.1))
-    drop-shadow(2px 4px 10px rgba(0, 0, 0, 0.42));
-  transition: filter 0.18s ease;
+    drop-shadow(-2px -2px 1px rgba(255, 255, 255, 0.22))
+    drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.72))
+    drop-shadow(5px 7px 0 rgba(0, 0, 0, 0.45))
+    drop-shadow(8px 12px 16px rgba(0, 0, 0, 0.38));
+  transition:
+    filter 0.22s ease,
+    transform 0.22s ease;
+}
+
+.brand-logo-link:hover .brand-logo-mark--sidebar .brand-logo-mark-3d-stage {
+  transform: perspective(720px) rotateY(-9deg) rotateX(6deg);
 }
 
 .brand-logo-link:hover .brand-logo-mark-image {
   filter:
-    drop-shadow(-1px -1px 0 rgba(255, 255, 255, 0.14))
-    drop-shadow(3px 6px 14px rgba(0, 0, 0, 0.48));
+    drop-shadow(-2px -2px 1px rgba(255, 255, 255, 0.28))
+    drop-shadow(3px 4px 0 rgba(0, 0, 0, 0.78))
+    drop-shadow(6px 9px 0 rgba(0, 0, 0, 0.48))
+    drop-shadow(10px 14px 18px rgba(0, 0, 0, 0.42));
 }
 
 .brand-logo-plaque {
