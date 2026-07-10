@@ -122,15 +122,23 @@ export async function fetchDriverPaymentRows(
   supabase: SupabaseClient,
   companyId: string
 ): Promise<{ rows: DriverPaymentRow[]; error: string | null; schemaWarning: string | null }> {
-  const { data, error } = await supabase
-    .from("service_orders")
-    .select(ORDER_FIELDS)
-    .eq("company_id", companyId)
-    .eq("driver_assignment_response", "accepted")
-    .not("driver_id", "is", null)
-    .not("driver_assignment_pay_amount", "is", null)
-    .is("deleted_at", null)
-    .order("service_date", { ascending: false });
+  const baseQuery = () =>
+    supabase
+      .from("service_orders")
+      .select(ORDER_FIELDS)
+      .eq("company_id", companyId)
+      .eq("driver_assignment_response", "accepted")
+      .not("driver_id", "is", null)
+      .not("driver_assignment_pay_amount", "is", null)
+      .order("service_date", { ascending: false });
+
+  let { data, error } = await baseQuery().is("deleted_at", null);
+
+  if (error?.message.includes("deleted_at")) {
+    const retry = await baseQuery();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     if (
