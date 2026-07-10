@@ -66,7 +66,7 @@ export default function ServiceOrderDriverVoucherPage() {
 
       const row = data as ServiceOrder;
 
-      if (!canViewDriverVoucher(row)) {
+      if (!canViewDriverVoucher(row) && row.status !== "Concluido") {
         setError(
           "O voucher fica disponível depois que o cliente aceitar a proposta e você designar um motorista na OS."
         );
@@ -74,7 +74,19 @@ export default function ServiceOrderDriverVoucherPage() {
         return;
       }
 
-      const driverId = resolveDesignatedDriverId(row);
+      const driverId =
+        resolveDesignatedDriverId(row) ??
+        (row.status === "Concluido"
+          ? (
+              await supabase
+                .from("drivers")
+                .select("id")
+                .eq("company_id", row.company_id)
+                .or("code.eq.MOT001,name.ilike.%Agregado%")
+                .limit(1)
+                .maybeSingle()
+            ).data?.id ?? null
+          : null);
 
       setOrder(row);
       setPendingAcceptance(isDriverAssignmentPendingAcceptance(row));

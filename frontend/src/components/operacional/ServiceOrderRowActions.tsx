@@ -160,7 +160,7 @@ export function ServiceOrderRowActions({
   const canOperationalFollowUp = isFreightInExecution(row);
   const canCompleteFreight = isFreightInExecution(row);
   const completed = isServiceOrderCompleted(row);
-  const showDriverVoucher = canViewDriverVoucher(row);
+  const showDriverVoucher = canViewDriverVoucher(row) || completed;
 
   const requireProposalToken = (): string | null => {
     const token = row.proposal_token?.trim();

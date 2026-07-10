@@ -58,22 +58,20 @@ export function resolveDesignatedDriverId(
   return row.driver_id ?? row.proposed_driver_id ?? null;
 }
 
-/** Voucher operacional — após designar motorista (enviar ao motorista) ou frete concluído. */
+/** Voucher operacional — designação enviada ao motorista ou frete concluído. */
 export function canViewDriverVoucher(
   row: ServiceOrderStatusRow & { driver_assignment_pay_amount?: number | null }
 ): boolean {
+  if (isServiceOrderCompleted(row)) return true;
+
   const designatedDriverId = resolveDesignatedDriverId(row);
+  if (designatedDriverId && isProposalAcceptedByClient(row)) return true;
 
-  if (designatedDriverId && isProposalAcceptedByClient(row)) {
-    return true;
-  }
+  if (isPendingDriverAssignment(row)) return true;
+  if (isFreightInExecution(row)) return true;
+  if (isDriverConfirmedOnServiceOrder(row)) return true;
 
-  if (isServiceOrderCompleted(row)) {
-    if (designatedDriverId) return true;
-    if (row.driver_assignment_pay_amount != null && row.driver_assignment_pay_amount > 0) {
-      return true;
-    }
-  }
+  if (row.driver_assignment_sent_at && designatedDriverId) return true;
 
   return false;
 }
