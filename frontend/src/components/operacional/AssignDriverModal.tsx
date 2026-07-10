@@ -19,13 +19,13 @@ import {
   parseBrazilianMoneyInput,
   prepareDriverAssignmentSharePayload,
   sendDriverAssignment,
+  shareDriverAssignmentViaWhatsApp,
   type DriverAssignmentPayDetails,
   type DriverAssignmentSharePayload,
 } from "@/lib/service-order-driver-assignment";
 import {
   copyTextToClipboardSync,
   openMailtoLink,
-  openWhatsAppShareHref,
 } from "@/lib/service-order-proposal";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -313,7 +313,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
   const registerAssignmentShareForDriver = async (
     driver: DriverListRow,
-    payDetails?: DriverAssignmentPayDetails | null
+    payDetails?: DriverAssignmentPayDetails | null,
+    options?: { notifySent?: boolean }
   ): Promise<DriverAssignmentSharePayload | null> => {
     if (!isDriverAvailableForContact(driver)) {
       window.alert("Motorista indisponível para esta designação.");
@@ -351,7 +352,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
     setSharePayload(payload);
     setShareDriverName(driver.name);
-    onAssignmentSent?.(driver.id, driver.name);
+    if (options?.notifySent !== false) {
+      onAssignmentSent?.(driver.id, driver.name);
+    }
     return payload;
   };
 
@@ -390,7 +393,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     );
     if (!confirmed) return null;
 
-    return registerAssignmentShareForDriver(driver, payDetails);
+    return registerAssignmentShareForDriver(driver, payDetails, { notifySent: false });
   };
 
   const resolveSharePayloadForDriver = async (
@@ -436,13 +439,24 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     void registerAssignmentShare();
   };
 
+  const launchDriverWhatsAppShare = async (
+    payload: DriverAssignmentSharePayload,
+    phone: string | null | undefined,
+    preOpened?: Window | null
+  ) => {
+    await shareDriverAssignmentViaWhatsApp(payload.whatsappMessage, phone, {
+      preOpenedWindow: preOpened ?? null,
+      urlText: payload.whatsappLinks.message,
+    });
+  };
+
   const handleDriverWhatsAppMouseDown = (
     event: React.MouseEvent,
     payload: DriverAssignmentSharePayload | null
   ) => {
     event.stopPropagation();
     if (payload) {
-      copyTextToClipboardSync(payload.whatsappLinks.message);
+      copyTextToClipboardSync(payload.whatsappMessage);
     }
   };
 
@@ -452,10 +466,34 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     if (!driver.phone?.trim() || saving) return;
 
     void (async () => {
-      const payload = await resolveSharePayloadForDriver(driver);
-      if (!payload) return;
-      copyTextToClipboardSync(payload.whatsappLinks.message);
-      openWhatsAppShareHref(payload.whatsappLinks.primaryHref);
+      if (sharePayload && selectedId === driver.id) {
+        const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+        await launchDriverWhatsAppShare(sharePayload, driver.phone, popup);
+        return;
+      }
+
+      const payDetails = resolvePayDetails();
+      if (!payDetails) return;
+
+      const refused = isDriverRefusedForThisOrder(driver);
+      const confirmed = window.confirm(
+        refused
+          ? `Reenviar designação da ${orderDetails.code} para ${driver.name}?\n\nValor motorista: ${formatCurrency(payDetails.driverPayAmount)}${payDetails.assistantPayAmount ? `\nValor ajudante: ${formatCurrency(payDetails.assistantPayAmount)}` : ""}\n\nO link ficará ativo para o motorista aceitar ou recusar. Se fechar o WhatsApp sem enviar, use «Cancelar designação» na lista da OS.`
+          : `Registrar envio da designação da ${orderDetails.code} para ${driver.name}?\n\nValor motorista: ${formatCurrency(payDetails.driverPayAmount)}${payDetails.assistantPayAmount ? `\nValor ajudante: ${formatCurrency(payDetails.assistantPayAmount)}` : ""}\n\nO link ficará ativo para o motorista aceitar ou recusar. Se fechar o WhatsApp sem enviar, use «Cancelar designação» na lista da OS.`
+      );
+      if (!confirmed) return;
+
+      const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+      const payload = await registerAssignmentShareForDriver(driver, payDetails, {
+        notifySent: false,
+      });
+      if (!payload) {
+        popup?.close();
+        return;
+      }
+
+      await launchDriverWhatsAppShare(payload, driver.phone, popup);
+      onAssignmentSent?.(driver.id, driver.name);
     })();
   };
 
@@ -471,18 +509,21 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
         return;
       }
       openMailtoLink(payload.emailBundle.mailtoHref);
+      onAssignmentSent?.(driver.id, driver.name);
     })();
   };
 
   const handleWhatsAppShareMouseDown = () => {
     if (!sharePayload) return;
-    copyTextToClipboardSync(sharePayload.whatsappLinks.message);
+    copyTextToClipboardSync(sharePayload.whatsappMessage);
   };
 
   const handleWhatsAppShareClick = () => {
-    if (!sharePayload) return;
-    copyTextToClipboardSync(sharePayload.whatsappLinks.message);
-    openWhatsAppShareHref(sharePayload.whatsappLinks.primaryHref);
+    if (!sharePayload || !selectedDriver?.phone?.trim()) return;
+    void (async () => {
+      const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+      await launchDriverWhatsAppShare(sharePayload, selectedDriver.phone, popup);
+    })();
   };
 
   const handleEmailShareClick = () => {
