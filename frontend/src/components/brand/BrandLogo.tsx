@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import Image from "next/image";
-import { cn } from "@/lib/utils";type BrandLogoProps = {
+import { cn } from "@/lib/utils";
+
+type BrandLogoProps = {
   className?: string;
   imageClassName?: string;
   showTagline?: boolean;
@@ -33,9 +35,6 @@ const markSizes = {
 
 /** Logo com placa branca (voucher, proposta, login). */
 const BRAND_LOGO_SRC = "/grx-logo.png?v=3";
-/** Marca GRX + tagline, fundo transparente (menu cinza do sistema). */
-const BRAND_LOGO_MARK_SRC = "/grx-logo-mark.png?v=3";
-
 /** Marca GRX + tagline, fundo transparente (menu cinza do sistema). */
 const BRAND_LOGO_MARK_SRC = "/grx-logo-mark.png?v=4";
 
