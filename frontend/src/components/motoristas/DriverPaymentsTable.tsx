@@ -107,6 +107,7 @@ export function DriverPaymentsTable({
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-600">
                 <th className="px-3 py-2 font-medium">OS</th>
+                <th className="px-3 py-2 font-medium">Status OS</th>
                 <th className="px-3 py-2 font-medium">Data</th>
                 <th className="px-3 py-2 font-medium">Motorista</th>
                 <th className="px-3 py-2 font-medium">Motorista (R$)</th>
@@ -127,6 +128,13 @@ export function DriverPaymentsTable({
                 return (
                   <tr key={row.id} className="border-b border-slate-100">
                     <td className="px-3 py-2 font-medium text-slate-900">{row.code}</td>
+                    <td className="px-3 py-2">
+                      {row.status === "Concluido" ? (
+                        <span className="font-medium text-green-700">Concluído</span>
+                      ) : (
+                        <span className="text-slate-600">Motorista confirmado</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2">{formatDate(row.service_date)}</td>
                     <td className="px-3 py-2">
                       {row.driver_code} — {row.driver_name}

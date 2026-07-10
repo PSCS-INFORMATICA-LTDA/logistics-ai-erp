@@ -10,6 +10,7 @@ export type DreDriverExpenseRow = {
   service_order_code: string | null;
   pix_key: string | null;
   bank_code: string | null;
+  bank_agency: string | null;
   bank_account: string | null;
   description: string | null;
 };
@@ -111,18 +112,31 @@ export async function fetchDreDriverExpenses(
 
   const driverById = new Map<
     string,
-    { code: string; name: string; pix_key: string | null; bank_code: string | null; bank_account: string | null }
+    {
+      code: string;
+      name: string;
+      pix_key: string | null;
+      bank_code: string | null;
+      bank_agency: string | null;
+      bank_account: string | null;
+    }
   >();
   if (driverIds.length) {
     const full = await supabase
       .from("drivers")
-      .select("id, code, name, pix_key, bank_code, bank_account")
+      .select("id, code, name, pix_key, bank_code, bank_agency, bank_account")
       .in("id", driverIds);
 
     let drivers = full.data;
     if (full.error?.message.includes("pix_key")) {
       const basic = await supabase.from("drivers").select("id, code, name").in("id", driverIds);
-      drivers = (basic.data ?? []).map((d) => ({ ...d, pix_key: null, bank_code: null, bank_account: null }));
+      drivers = (basic.data ?? []).map((d) => ({
+        ...d,
+        pix_key: null,
+        bank_code: null,
+        bank_agency: null,
+        bank_account: null,
+      }));
     }
 
     for (const driver of drivers ?? []) {
@@ -131,6 +145,7 @@ export async function fetchDreDriverExpenses(
         name: driver.name as string,
         pix_key: (driver.pix_key as string | null) ?? null,
         bank_code: (driver.bank_code as string | null) ?? null,
+        bank_agency: (driver.bank_agency as string | null) ?? null,
         bank_account: (driver.bank_account as string | null) ?? null,
       });
     }
@@ -168,6 +183,7 @@ export async function fetchDreDriverExpenses(
         (orderId && orderCodeById.get(orderId)) ?? parseOrderCodeFromDescription(description),
       pix_key: driver?.pix_key ?? null,
       bank_code: driver?.bank_code ?? null,
+      bank_agency: driver?.bank_agency ?? null,
       bank_account: driver?.bank_account ?? null,
       description,
     });

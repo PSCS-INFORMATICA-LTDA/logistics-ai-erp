@@ -229,3 +229,23 @@ export function driverPaymentTotal(row: DriverPaymentRow): number {
   const assistant = row.driver_assignment_assistant_pay_amount ?? 0;
   return row.driver_assignment_pay_amount + assistant;
 }
+
+export function summarizeDriverPayments(rows: DriverPaymentRow[]): {
+  motoristaTotal: number;
+  ajudanteTotal: number;
+  combinedTotal: number;
+} {
+  let motoristaTotal = 0;
+  let ajudanteTotal = 0;
+
+  for (const row of rows) {
+    motoristaTotal += row.driver_assignment_pay_amount;
+    ajudanteTotal += row.driver_assignment_assistant_pay_amount ?? 0;
+  }
+
+  return {
+    motoristaTotal,
+    ajudanteTotal,
+    combinedTotal: motoristaTotal + ajudanteTotal,
+  };
+}

@@ -163,7 +163,6 @@ export function resolveServiceOrderDriverColumnLabel(
   return row.driver_name ?? "—";
 }
 
-/** Bloqueia edição enquanto o cliente já aceitou ou recusou a proposta enviada. */
 export function canEditServiceOrder(row: ServiceOrderStatusRow): boolean {
   const label = resolveServiceOrderDisplayStatus(row);
   return (
@@ -182,6 +181,27 @@ export function serviceOrderEditBlockedReason(row: ServiceOrderStatusRow): strin
 
   const label = resolveServiceOrderDisplayStatus(row);
   return `Edição indisponível com status «${label}». Use «Reabrir proposta» para alterar.`;
+}
+
+/** Impede exclusão após proposta enviada ou fluxo operacional iniciado — preserva histórico. */
+export function canDeleteServiceOrder(row: ServiceOrderStatusRow): boolean {
+  if (isServiceOrderCompleted(row)) return false;
+  if (isDriverConfirmedOnServiceOrder(row)) return false;
+  if (isPendingDriverAssignment(row)) return false;
+  if (isProposalAcceptedByClient(row)) return false;
+  if (row.proposal_sent_at) return false;
+  return true;
+}
+
+export function serviceOrderDeleteBlockedReason(row: ServiceOrderStatusRow): string | null {
+  if (canDeleteServiceOrder(row)) return null;
+
+  if (isServiceOrderCompleted(row)) {
+    return "OS concluída — exclusão bloqueada para preservar o histórico operacional e financeiro.";
+  }
+
+  const label = resolveServiceOrderDisplayStatus(row);
+  return `Exclusão indisponível com status «${label}». O registro faz parte do histórico da operação.`;
 }
 
 export function matchesServiceOrderStatusFilter(

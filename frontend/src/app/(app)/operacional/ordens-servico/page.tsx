@@ -23,6 +23,8 @@ import { requiresPerDiem } from "@/lib/freight-per-diem";
 import { isTruckCategory } from "@/lib/transport-van-estimate";
 import {
   canEditServiceOrder,
+  canDeleteServiceOrder,
+  serviceOrderDeleteBlockedReason,
   isPendingClientProposal,
   isPendingDriverAssignment,
   isDriverAssignmentRejected,
@@ -377,6 +379,8 @@ function OrdensServicoPageContent() {
       filterItem={filterItem}
       canEditRow={canEditServiceOrder}
       editBlockedReason={serviceOrderEditBlockedReason}
+      canDeleteRow={canDeleteServiceOrder}
+      deleteBlockedReason={serviceOrderDeleteBlockedReason}
       toolbar={
         <div className="space-y-4">
           <ServiceOrderListFilters

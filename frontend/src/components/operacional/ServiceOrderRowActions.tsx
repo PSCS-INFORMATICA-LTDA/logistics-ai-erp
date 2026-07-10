@@ -350,7 +350,9 @@ export function ServiceOrderRowActions({
     }
 
     onServiceOrderCompleted?.(row.id, completedAt);
-    window.alert("Frete concluído. Abra «PDF / Proposta» para salvar o documento da OS.");
+    window.alert(
+      `Frete concluído (OS ${row.code}).\n\nO pagamento ao motorista está disponível em DRE → Despesas motorista / ajudante, com Pix e dados bancários para o Rafael efetuar o pagamento.`
+    );
   };
 
   const handleResetProposal = async () => {
@@ -398,6 +400,16 @@ export function ServiceOrderRowActions({
       >
         PDF / {completed ? "OS concluída" : "Proposta"}
       </Link>
+      {completed && (
+        <Link
+          href="/dre/despesas-motorista"
+          className={cn(
+            "inline-flex items-center justify-center rounded-lg border border-brand-400 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-900 transition-colors hover:bg-brand-100"
+          )}
+        >
+          Pagamento DRE
+        </Link>
+      )}
       {canAssignDriver && (
         <button
           type="button"

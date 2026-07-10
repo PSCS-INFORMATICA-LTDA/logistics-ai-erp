@@ -34,6 +34,9 @@ type CrudPageProps<T extends { id: string }> = {
   /** When false, the Editar action is disabled for that row. */
   canEditRow?: (row: T) => boolean;
   editBlockedReason?: (row: T) => string | null;
+  /** When false, the Excluir action is disabled for that row. */
+  canDeleteRow?: (row: T) => boolean;
+  deleteBlockedReason?: (row: T) => string | null;
   /** Increment to refetch rows after external mutations (e.g. RPC row actions). */
   refreshKey?: number;
 };
@@ -53,6 +56,8 @@ export function CrudPage<T extends { id: string }>({
   renderRowActions,
   canEditRow,
   editBlockedReason,
+  canDeleteRow,
+  deleteBlockedReason,
   refreshKey = 0,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
@@ -213,6 +218,10 @@ export function CrudPage<T extends { id: string }>({
                   const editTitle = canEdit
                     ? undefined
                     : (editBlockedReason?.(row) ?? "Edição indisponível para este registro.");
+                  const canDelete = canDeleteRow?.(row) ?? true;
+                  const deleteTitle = canDelete
+                    ? undefined
+                    : (deleteBlockedReason?.(row) ?? "Exclusão indisponível para este registro.");
 
                   return (
                   <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/50">
@@ -242,7 +251,12 @@ export function CrudPage<T extends { id: string }>({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(row.id)}
+                          disabled={!canDelete}
+                          title={deleteTitle}
+                          onClick={() => {
+                            if (!canDelete) return;
+                            void handleDelete(row.id);
+                          }}
                         >
                           Excluir
                         </Button>
