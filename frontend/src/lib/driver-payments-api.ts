@@ -148,7 +148,11 @@ async function fetchPaymentOrders(
     .order("service_date", { ascending: false });
 
   if (!withDriver.error && withDriver.data?.length) {
-    return { data: withDriver.data as RawOrderRow[], error: null, schemaWarning: null };
+    return {
+      data: withDriver.data as unknown as RawOrderRow[],
+      error: null,
+      schemaWarning: null,
+    };
   }
 
   if (
