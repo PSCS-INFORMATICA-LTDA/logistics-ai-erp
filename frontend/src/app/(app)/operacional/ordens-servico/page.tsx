@@ -12,6 +12,7 @@ import { ServiceOrderOperationalPanel } from "@/components/operacional/ServiceOr
 import { ServiceOrderPassengersPanel } from "@/components/operacional/ServiceOrderPassengersPanel";
 import { ServiceOrderRowActions } from "@/components/operacional/ServiceOrderRowActions";
 import { Badge, Alert } from "@/components/ui/Badge";
+import { GlassSelect } from "@/components/ui/GlassSelect";
 import { nextCode } from "@/lib/codes";
 import { useCompany } from "@/lib/company-context";
 import {
@@ -790,23 +791,15 @@ function OrdensServicoPageContent() {
                 />
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Conta DRE (receita)</span>
-                    <select
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      value={selectedDreId}
-                      onChange={(e) => set("chart_of_account_id", e.target.value)}
-                    >
-                      {dreAccountOptions.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-xs text-slate-500">
-                      Deixe em automático para usar a conta sugerida pela natureza do serviço.
-                    </span>
-                  </label>
+                  <GlassSelect
+                    label="Conta DRE (receita)"
+                    value={selectedDreId}
+                    onChange={(next) => set("chart_of_account_id", next)}
+                    options={dreAccountOptions}
+                  />
+                  <span className="text-xs text-slate-500 sm:col-span-2">
+                    Deixe em automático para usar a conta sugerida pela natureza do serviço.
+                  </span>
                 </div>
 
                 {showRoutePanel && (

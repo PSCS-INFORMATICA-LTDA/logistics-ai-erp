@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
+import { GlassSelect } from "@/components/ui/GlassSelect";
 import { glassField } from "@/lib/liquid-glass-styles";
 
 type EntityFormRenderProps = {
@@ -69,19 +70,13 @@ export function FormFields({
           className={field.colSpan === 2 || field.type === "textarea" ? "sm:col-span-2" : ""}
         >
           {field.type === "select" ? (
-            <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">{field.label}</span>
-              <select
-                className={glassField()}
-                value={String(form[field.name] ?? "")}
-                onChange={(e) => set(field.name, e.target.value)}
-                required={field.required}
-              >
-                {field.options?.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+            <GlassSelect
+              label={field.label}
+              value={String(form[field.name] ?? "")}
+              onChange={(next) => set(field.name, next)}
+              options={field.options ?? []}
+              required={field.required}
+            />
           ) : field.type === "checkbox" ? (
             <label className="flex items-center gap-2 pt-6">
               <input
