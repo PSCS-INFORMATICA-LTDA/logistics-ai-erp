@@ -28,11 +28,20 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  const isAuthFlowPage =
+    request.nextUrl.pathname.startsWith("/auth/callback") ||
+    request.nextUrl.pathname.startsWith("/auth/redefinir-senha");
   const isSetupPage = request.nextUrl.pathname.startsWith("/setup");
   const isPublicProposal = request.nextUrl.pathname.startsWith("/proposta/");
   const isPublicDriverAssignment = request.nextUrl.pathname.startsWith("/designacao/");
 
-  if (!user && !isAuthPage && !isPublicProposal && !isPublicDriverAssignment) {
+  if (
+    !user &&
+    !isAuthPage &&
+    !isAuthFlowPage &&
+    !isPublicProposal &&
+    !isPublicDriverAssignment
+  ) {
     const url = request.nextUrl.clone();
     const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     url.pathname = "/login";
@@ -52,7 +61,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && !isSetupPage && !isAuthPage) {
+  // Em /auth/redefinir-senha o usuário chega autenticado pelo link de e-mail — não redirecionar.
+  if (user && !isSetupPage && !isAuthPage && !isAuthFlowPage) {
     const { count } = await supabase
       .from("company_members")
       .select("*", { count: "exact", head: true })
