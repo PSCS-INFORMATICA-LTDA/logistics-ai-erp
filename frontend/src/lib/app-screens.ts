@@ -33,6 +33,12 @@ export const APP_SCREENS: AppScreen[] = [
     group: "DRE",
     href: "/dre/despesas-motorista",
   },
+  {
+    key: "dre.despesas-veiculo",
+    label: "Despesas do veículo",
+    group: "DRE",
+    href: "/dre/despesas-veiculo",
+  },
   { key: "cadastros.socios", label: "Sócios", group: "Cadastros", href: "/cadastros/socios" },
   { key: "cadastros.veiculos", label: "Veículos", group: "Cadastros", href: "/cadastros/veiculos" },
   {

@@ -6,6 +6,7 @@ import { glassTabLink, glassTabsNav } from "@/lib/liquid-glass-styles";
 
 const TABS = [
   { href: "/dre/despesas-motorista", label: "Despesas motorista / ajudante" },
+  { href: "/dre/despesas-veiculo", label: "Despesas do veículo" },
 ] as const;
 
 export function DreSubNav() {
