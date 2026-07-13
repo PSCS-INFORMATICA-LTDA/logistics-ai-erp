@@ -14,6 +14,9 @@ export type ScheduleSegment = {
   startMin: number;
   endMin: number;
   isAllDay: boolean;
+  /** Concluída = só registro de uso; não bloqueia disponibilidade. */
+  isHistorical: boolean;
+  blocksAvailability: boolean;
 };
 
 export type FreeSlot = {
@@ -104,6 +107,14 @@ export type ScheduleOrderInput = {
   vehicle_id: string | null;
 };
 
+export function isHistoricalScheduleStatus(status: string): boolean {
+  return status === "Concluido";
+}
+
+export function blocksScheduleAvailability(status: string): boolean {
+  return status !== "Cancelado" && !isHistoricalScheduleStatus(status);
+}
+
 export function buildSegmentsForOrder(
   order: ScheduleOrderInput,
   weekKeys: string[]
@@ -138,6 +149,8 @@ export function buildSegmentsForOrder(
       segStart = Math.max(SCHEDULE_WORK_START_MIN, Math.min(segStart, SCHEDULE_WORK_END_MIN));
       segEnd = Math.max(segStart + 15, Math.min(segEnd, SCHEDULE_WORK_END_MIN));
 
+      const historical = isHistoricalScheduleStatus(order.status);
+
       segments.push({
         orderId: order.id,
         orderCode: order.code,
@@ -149,6 +162,8 @@ export function buildSegmentsForOrder(
         startMin: segStart,
         endMin: segEnd,
         isAllDay: !order.entry_time && !order.exit_time && compareDateKeys(startDate, endDate) === 0,
+        isHistorical: historical,
+        blocksAvailability: blocksScheduleAvailability(order.status),
       });
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -158,7 +173,8 @@ export function buildSegmentsForOrder(
 }
 
 export function computeFreeSlots(segments: ScheduleSegment[]): FreeSlot[] {
-  const busy = [...segments]
+  const blocking = segments.filter((s) => s.blocksAvailability);
+  const busy = [...blocking]
     .map((s) => ({ startMin: s.startMin, endMin: s.endMin }))
     .sort((a, b) => a.startMin - b.startMin);
 
@@ -186,7 +202,10 @@ export function computeFreeSlots(segments: ScheduleSegment[]): FreeSlot[] {
   return free;
 }
 
-export function serviceTypeColor(type: string): string {
+export function serviceTypeColor(type: string, historical = false): string {
+  if (historical) {
+    return "border-slate-300 bg-slate-100 text-slate-700 border-dashed";
+  }
   switch (type) {
     case "Frete":
       return "bg-amber-100 border-amber-300 text-amber-950";
@@ -195,4 +214,8 @@ export function serviceTypeColor(type: string): string {
     default:
       return "bg-brand-50 border-brand-200 text-brand-900";
   }
+}
+
+export function scheduleSegmentLabel(seg: ScheduleSegment): string {
+  return seg.isHistorical ? "Uso registrado" : "Agendado";
 }

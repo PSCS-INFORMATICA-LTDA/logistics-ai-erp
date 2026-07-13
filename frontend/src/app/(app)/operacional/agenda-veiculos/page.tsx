@@ -98,7 +98,7 @@ export default function AgendaVeiculosPage() {
     <Card>
       <CardHeader
         title="Agenda da frota"
-        description="Veja qual placa está agendada em cada dia e horário, com base nas Ordens de Serviço (entrada/saída). Horários livres aparecem ao selecionar o dia."
+        description="Veja qual placa está agendada ou já foi usada. OS concluídas só marcam o uso (data/hora); OS em aberto bloqueiam horário livre."
       />
       <CardBody className="space-y-4">
         <div className={`flex flex-wrap items-end gap-3 p-4 ${glassFilterPanel()}`}>
@@ -169,8 +169,8 @@ export default function AgendaVeiculosPage() {
         )}
 
         <p className="text-xs text-slate-500">
-          A agenda usa data/hora de entrada e saída da OS. Se não houver horário, assume 06:00–22:00 no dia
-          do serviço. Para bloquear a placa, cadastre ou edite a OS em Operacional → Ordens de Serviço.
+          A agenda usa entrada/saída da OS. Status <strong>Concluído</strong> = registro de uso (não bloqueia).
+          Demais status ativos reservam o horário na placa.
         </p>
       </CardBody>
     </Card>

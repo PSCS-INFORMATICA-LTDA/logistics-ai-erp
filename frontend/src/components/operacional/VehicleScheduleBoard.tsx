@@ -6,6 +6,7 @@ import {
   computeFreeSlots,
   dayLabel,
   formatMinutes,
+  scheduleSegmentLabel,
   serviceTypeColor,
   SCHEDULE_WORK_END_MIN,
   SCHEDULE_WORK_START_MIN,
@@ -49,6 +50,15 @@ export function VehicleScheduleBoard({
     return segmentsForCell(segments, selection.vehicleId, selection.dayKey);
   }, [segments, selection]);
 
+  const blockingSegments = useMemo(
+    () => selectedSegments.filter((s) => s.blocksAvailability),
+    [selectedSegments]
+  );
+  const historicalSegments = useMemo(
+    () => selectedSegments.filter((s) => s.isHistorical),
+    [selectedSegments]
+  );
+
   const freeSlots = useMemo(() => computeFreeSlots(selectedSegments), [selectedSegments]);
 
   const selectedVehicle = selection
@@ -57,6 +67,21 @@ export function VehicleScheduleBoard({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-6 rounded border border-sky-300 bg-sky-100" />
+          Agendado (bloqueia horário)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-6 rounded border border-dashed border-slate-300 bg-slate-100" />
+          Concluído — só registro de uso da placa
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-6 rounded border border-emerald-200 bg-emerald-50" />
+          Horário livre
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white/80 [-webkit-overflow-scrolling:touch]">
         <table className="min-w-[56rem] w-full border-collapse text-sm">
           <thead>
@@ -123,13 +148,18 @@ export function VehicleScheduleBoard({
                                   key={`${seg.orderId}-${seg.dayKey}`}
                                   className={cn(
                                     "rounded-md border px-1.5 py-1 text-[0.68rem] leading-tight",
-                                    serviceTypeColor(seg.serviceType)
+                                    serviceTypeColor(seg.serviceType, seg.isHistorical)
                                   )}
                                 >
                                   <span className="font-semibold">
                                     {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
                                   </span>
                                   <span className="block truncate">{seg.orderCode}</span>
+                                  {seg.isHistorical ? (
+                                    <span className="block text-[0.62rem] uppercase tracking-wide opacity-75">
+                                      Concluído
+                                    </span>
+                                  ) : null}
                                   {seg.clientName ? (
                                     <span className="block truncate opacity-80">{seg.clientName}</span>
                                   ) : null}
@@ -162,8 +192,9 @@ export function VehicleScheduleBoard({
                 {dayLabel(selection.dayKey).date}
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                Janela operacional {formatMinutes(SCHEDULE_WORK_START_MIN)}–
-                {formatMinutes(SCHEDULE_WORK_END_MIN)}. Clique na célula para fechar.
+                Janela {formatMinutes(SCHEDULE_WORK_START_MIN)}–{formatMinutes(SCHEDULE_WORK_END_MIN)}.
+                Frete/OS <strong>concluída</strong> aparece só para consultar quando a placa foi usada — não
+                bloqueia horário livre.
               </p>
             </div>
             <Link
@@ -176,24 +207,24 @@ export function VehicleScheduleBoard({
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <section>
-              <h4 className="text-sm font-semibold text-slate-800">Agendado (OS)</h4>
-              {selectedSegments.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">Nenhuma OS neste dia.</p>
+              <h4 className="text-sm font-semibold text-slate-800">Reservado na agenda</h4>
+              {blockingSegments.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">Nenhuma OS aberta/agendada neste dia.</p>
               ) : (
                 <ul className="mt-2 space-y-2">
-                  {selectedSegments.map((seg) => (
+                  {blockingSegments.map((seg) => (
                     <li
                       key={seg.orderId}
                       className={cn(
                         "rounded-lg border px-3 py-2 text-sm",
-                        serviceTypeColor(seg.serviceType)
+                        serviceTypeColor(seg.serviceType, false)
                       )}
                     >
                       <p className="font-semibold">
                         {seg.orderCode} · {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
                       </p>
                       <p className="text-xs opacity-90">
-                        {seg.serviceType}
+                        {scheduleSegmentLabel(seg)} · {seg.serviceType}
                         {seg.clientName ? ` · ${seg.clientName}` : ""} · {seg.status}
                       </p>
                     </li>
@@ -205,7 +236,9 @@ export function VehicleScheduleBoard({
             <section>
               <h4 className="text-sm font-semibold text-slate-800">Horários disponíveis</h4>
               {freeSlots.length === 0 ? (
-                <p className="mt-2 text-sm text-amber-800">Sem janela livre neste dia.</p>
+                <p className="mt-2 text-sm text-amber-800">
+                  Sem janela livre (há OS ainda não concluída neste dia).
+                </p>
               ) : (
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {freeSlots.map((slot, index) => (
@@ -221,42 +254,83 @@ export function VehicleScheduleBoard({
             </section>
           </div>
 
+          {historicalSegments.length > 0 ? (
+            <section className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50/80 p-3">
+              <h4 className="text-sm font-semibold text-slate-800">Uso registrado (concluído)</h4>
+              <p className="mt-1 text-xs text-slate-600">
+                Frete ou transporte já finalizado — consulta de data/hora em que o veículo foi utilizado.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {historicalSegments.map((seg) => (
+                  <li
+                    key={seg.orderId}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-sm",
+                      serviceTypeColor(seg.serviceType, true)
+                    )}
+                  >
+                    <p className="font-semibold">
+                      {seg.orderCode} · {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
+                    </p>
+                    <p className="text-xs opacity-90">
+                      {seg.serviceType}
+                      {seg.clientName ? ` · ${seg.clientName}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <div className="mt-4 hidden sm:block">
             <h4 className="mb-2 text-sm font-semibold text-slate-800">Linha do tempo (dia)</h4>
-            <VehicleDayTimeline segments={selectedSegments} />
+            <VehicleDayTimeline
+              blocking={blockingSegments}
+              historical={historicalSegments}
+            />
           </div>
         </div>
       ) : (
         <p className="text-sm text-slate-500">
-          Toque em um dia/placa para ver OS agendadas e horários livres (estilo agenda Teams).
+          Toque em um dia/placa: OS em aberto bloqueiam horário; concluídas mostram só quando a placa foi usada.
         </p>
       )}
     </div>
   );
 }
 
-function VehicleDayTimeline({ segments }: { segments: ScheduleSegment[] }) {
+function VehicleDayTimeline({
+  blocking,
+  historical,
+}: {
+  blocking: ScheduleSegment[];
+  historical: ScheduleSegment[];
+}) {
   const total = SCHEDULE_WORK_END_MIN - SCHEDULE_WORK_START_MIN;
 
+  const renderBar = (seg: ScheduleSegment, layer: "blocking" | "historical") => {
+    const left = ((seg.startMin - SCHEDULE_WORK_START_MIN) / total) * 100;
+    const width = ((seg.endMin - seg.startMin) / total) * 100;
+    return (
+      <div
+        key={`${layer}-${seg.orderId}`}
+        title={`${seg.orderCode} ${formatMinutes(seg.startMin)}–${formatMinutes(seg.endMin)}`}
+        className={cn(
+          "absolute top-1 bottom-1 rounded border px-1 text-[0.65rem] font-medium leading-tight overflow-hidden",
+          serviceTypeColor(seg.serviceType, layer === "historical"),
+          layer === "historical" && "opacity-80"
+        )}
+        style={{ left: `${left}%`, width: `${Math.max(width, 4)}%` }}
+      >
+        {seg.orderCode}
+      </div>
+    );
+  };
+
   return (
-    <div className="relative h-12 rounded-lg border border-slate-200 bg-slate-100/80">
-      {segments.map((seg) => {
-        const left = ((seg.startMin - SCHEDULE_WORK_START_MIN) / total) * 100;
-        const width = ((seg.endMin - seg.startMin) / total) * 100;
-        return (
-          <div
-            key={seg.orderId}
-            title={`${seg.orderCode} ${formatMinutes(seg.startMin)}–${formatMinutes(seg.endMin)}`}
-            className={cn(
-              "absolute top-1 bottom-1 rounded border px-1 text-[0.65rem] font-medium leading-tight overflow-hidden",
-              serviceTypeColor(seg.serviceType)
-            )}
-            style={{ left: `${left}%`, width: `${Math.max(width, 4)}%` }}
-          >
-            {seg.orderCode}
-          </div>
-        );
-      })}
+    <div className="relative h-14 rounded-lg border border-slate-200 bg-slate-100/80">
+      {historical.map((seg) => renderBar(seg, "historical"))}
+      {blocking.map((seg) => renderBar(seg, "blocking"))}
       <div className="pointer-events-none absolute inset-x-0 -bottom-5 flex justify-between text-[0.65rem] text-slate-500">
         <span>06:00</span>
         <span>14:00</span>
