@@ -67,6 +67,12 @@ export const APP_SCREENS: AppScreen[] = [
     href: "/configuracoes/integracoes",
   },
   {
+    key: "configuracoes.mensalidade",
+    label: "Mensalidade",
+    group: "Configurações",
+    href: "/configuracoes/mensalidade",
+  },
+  {
     key: "configuracoes.parametros",
     label: "Parâmetros (acesso master)",
     group: "Configurações",

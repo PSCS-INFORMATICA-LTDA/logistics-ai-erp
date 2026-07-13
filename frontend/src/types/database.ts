@@ -6,6 +6,28 @@ export type Company = {
   status: string;
 };
 
+export type CompanyBillingSettings = {
+  company_id: string;
+  charge_mode: "test" | "production";
+  test_amount: number;
+  monthly_amount: number;
+  billing_day: number;
+  payer_name: string | null;
+  payer_email: string | null;
+  payer_cpf_cnpj: string | null;
+  payer_phone: string | null;
+  payer_postal_code: string | null;
+  payer_address_number: string | null;
+  asaas_customer_id: string | null;
+  asaas_subscription_id: string | null;
+  subscription_status: "inactive" | "pending" | "active" | "overdue" | "canceled" | "error";
+  card_last4: string | null;
+  card_brand: string | null;
+  card_holder_name: string | null;
+  next_due_date: string | null;
+  last_error: string | null;
+};
+
 export type Partner = {
   id: string;
   company_id: string;

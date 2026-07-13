@@ -5,6 +5,7 @@ import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { GlassSelect } from "@/components/ui/GlassSelect";
+import { BillingParametersPanel } from "@/components/billing/BillingParametersPanel";
 import { APP_SCREENS } from "@/lib/app-screens";
 import { useCompany } from "@/lib/company-context";
 import { glassField } from "@/lib/liquid-glass-styles";
@@ -589,6 +590,8 @@ export default function ParametrosPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <BillingParametersPanel />
+
       <Card>
         <CardHeader
           title="Parâmetros"

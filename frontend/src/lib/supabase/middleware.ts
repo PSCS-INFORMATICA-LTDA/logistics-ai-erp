@@ -34,13 +34,15 @@ export async function updateSession(request: NextRequest) {
   const isSetupPage = request.nextUrl.pathname.startsWith("/setup");
   const isPublicProposal = request.nextUrl.pathname.startsWith("/proposta/");
   const isPublicDriverAssignment = request.nextUrl.pathname.startsWith("/designacao/");
+  const isBillingWebhook = request.nextUrl.pathname.startsWith("/api/billing/webhook");
 
   if (
     !user &&
     !isAuthPage &&
     !isAuthFlowPage &&
     !isPublicProposal &&
-    !isPublicDriverAssignment
+    !isPublicDriverAssignment &&
+    !isBillingWebhook
   ) {
     const url = request.nextUrl.clone();
     const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;

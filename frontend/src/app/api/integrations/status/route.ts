@@ -27,6 +27,7 @@ export async function GET() {
     QUALP_API_TOKEN: envConfigured("QUALP_API_TOKEN"),
     CIOT_ONLINE_API_TOKEN: envConfigured("CIOT_ONLINE_API_TOKEN"),
     GOOGLE_VISION_API_KEY: envConfigured("GOOGLE_VISION_API_KEY"),
+    ASAAS_API_KEY: envConfigured("ASAAS_API_KEY"),
   };
 
   const modules = INTEGRATION_MODULES.map((module) => ({

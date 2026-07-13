@@ -54,6 +54,21 @@ export const INTEGRATION_MODULES: IntegrationModule[] = [
     features: ["Todos os tipos de carga ANTT", "Complementa o cálculo local"],
     pricingHint: "Token comercial — configure quando necessário.",
   },
+  {
+    id: "asaas-billing",
+    name: "Mensalidade cartão (Asaas)",
+    description:
+      "Assinatura recorrente no cartão para cobrança mensal da PSCS (teste e produção).",
+    tier: "paid",
+    envVar: "ASAAS_API_KEY",
+    features: [
+      "Cadastro de cartão sem gravar número/CVV no GRX",
+      "Valor de teste e mensalidade de produção",
+      "Assinatura mensal automática",
+    ],
+    upgradeUrl: "https://www.asaas.com/",
+    pricingHint: "Crie conta Asaas (sandbox para teste) e cole a API Key no servidor.",
+  },
 ];
 
 export function resolveIntegrationStatus(

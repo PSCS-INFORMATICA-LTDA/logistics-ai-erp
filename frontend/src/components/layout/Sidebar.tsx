@@ -41,6 +41,7 @@ const NAV: NavItem[] = [
     label: "Configurações",
     children: [
       { href: "/configuracoes/integracoes", label: "Integrações" },
+      { href: "/configuracoes/mensalidade", label: "Mensalidade" },
       { href: "/configuracoes/parametros", label: "Parâmetros" },
     ],
   },
