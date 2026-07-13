@@ -14,6 +14,8 @@ export type Partner = {
   partner_type: string;
   status: string;
   use_in_allocation: boolean;
+  rg: string | null;
+  cpf: string | null;
   notes: string | null;
 };
 

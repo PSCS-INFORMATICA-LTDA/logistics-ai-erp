@@ -60,7 +60,8 @@ function SociosPageContent() {
         eqFilters={{ status: "Ativo" }}
         columns={[
           { key: "code", label: "Código" },
-          { key: "name", label: "Nome" },
+          { key: "name", label: "Nome completo" },
+          { key: "cpf", label: "CPF/CNPJ" },
           { key: "partner_type", label: "Tipo" },
           {
             key: "status",
@@ -85,12 +86,16 @@ function SociosPageContent() {
               partner_type: item?.partner_type ?? "Socio",
               status: item?.status ?? "Ativo",
               use_in_allocation: item?.use_in_allocation ?? true,
+              rg: item?.rg ?? "",
+              cpf: item?.cpf ?? "",
               notes: item?.notes ?? "",
             }}
             onSubmit={async (data) => {
               if (!item?.id && companyId && !data.code) {
                 data.code = await nextCode("partners", companyId, "SOC");
               }
+              if (data.rg === "") data.rg = null;
+              if (data.cpf === "") data.cpf = null;
               await onSave(data);
             }}
           >
@@ -100,7 +105,13 @@ function SociosPageContent() {
                 set={set}
                 fields={[
                   { name: "code", label: "Código", required: true },
-                  { name: "name", label: "Nome", required: true },
+                  {
+                    name: "name",
+                    label: "Nome completo",
+                    required: true,
+                    colSpan: 2,
+                    placeholder: "Nome completo do sócio",
+                  },
                   {
                     name: "partner_type",
                     label: "Tipo",
@@ -113,8 +124,14 @@ function SociosPageContent() {
                     type: "select",
                     options: STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
                   },
+                  { name: "rg", label: "RG", placeholder: "Opcional para Empresa" },
+                  {
+                    name: "cpf",
+                    label: "CPF / CNPJ",
+                    placeholder: "CPF (sócio) ou CNPJ (empresa)",
+                  },
                   { name: "use_in_allocation", label: "Usar em rateio?", type: "checkbox" },
-                  { name: "notes", label: "Observações", type: "textarea" },
+                  { name: "notes", label: "Observações", type: "textarea", colSpan: 2 },
                 ]}
               />
             )}
