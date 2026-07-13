@@ -3,9 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { useAccess } from "@/lib/access-context";
+import { screenKeyFromPath } from "@/lib/app-screens";
 import { cn } from "@/lib/utils";
 
-const NAV = [
+type NavChild = { href: string; label: string };
+type NavItem =
+  | { href: string; label: string; icon?: string; children?: undefined }
+  | { label: string; href?: undefined; icon?: undefined; children: NavChild[] };
+
+const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   {
     label: "Operacional",
@@ -32,7 +39,10 @@ const NAV = [
   },
   {
     label: "Configurações",
-    children: [{ href: "/configuracoes/integracoes", label: "Integrações" }],
+    children: [
+      { href: "/configuracoes/integracoes", label: "Integrações" },
+      { href: "/configuracoes/parametros", label: "Parâmetros" },
+    ],
   },
 ];
 
@@ -66,6 +76,23 @@ function SidebarNavLink({
 }
 
 export function Sidebar() {
+  const { canViewScreen, loading } = useAccess();
+
+  const visibleNav = NAV.map((item) => {
+    if (item.href) {
+      const key = screenKeyFromPath(item.href);
+      if (key && !canViewScreen(key) && !loading) return null;
+      return item;
+    }
+    const children = (item.children ?? []).filter((child) => {
+      const key = screenKeyFromPath(child.href);
+      if (!key) return true;
+      return loading || canViewScreen(key);
+    });
+    if (children.length === 0) return null;
+    return { ...item, children };
+  }).filter(Boolean) as NavItem[];
+
   return (
     <aside className="sidebar-shell flex w-64 flex-col border-r border-white/10 text-white">
       <div className="sidebar-brand-zone">
@@ -74,7 +101,7 @@ export function Sidebar() {
         </Link>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {NAV.map((item) =>
+        {visibleNav.map((item) =>
           item.href ? (
             <SidebarNavLink
               key={item.href}

@@ -1,0 +1,62 @@
+-- GRX Management — Segurança master + permissões por sócio/tela
+-- Migration: 035_access_parameters.sql
+
+-- Vínculo opcional membro ↔ sócio (usuário que é um partner cadastrado)
+ALTER TABLE public.company_members
+  ADD COLUMN IF NOT EXISTS partner_id UUID REFERENCES public.partners(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_company_members_partner
+  ON public.company_members(partner_id)
+  WHERE partner_id IS NOT NULL;
+
+-- Senha master da empresa (hash SHA-256 hex + salt)
+CREATE TABLE IF NOT EXISTS public.company_security_settings (
+    company_id            UUID PRIMARY KEY REFERENCES public.companies(id) ON DELETE CASCADE,
+    master_password_salt  TEXT NOT NULL,
+    master_password_hash  TEXT NOT NULL,
+    updated_by            UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE public.company_security_settings IS
+  'Senha master da empresa — acesso total e gestão de permissões por tela.';
+
+CREATE TRIGGER trg_company_security_settings_updated_at
+    BEFORE UPDATE ON public.company_security_settings
+    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- Permissões por sócio e tela (visão / alteração / exclusão)
+CREATE TABLE IF NOT EXISTS public.partner_screen_permissions (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id   UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    partner_id   UUID NOT NULL REFERENCES public.partners(id) ON DELETE CASCADE,
+    screen_key   TEXT NOT NULL,
+    can_view     BOOLEAN NOT NULL DEFAULT FALSE,
+    can_edit     BOOLEAN NOT NULL DEFAULT FALSE,
+    can_delete   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (company_id, partner_id, screen_key)
+);
+
+COMMENT ON TABLE public.partner_screen_permissions IS
+  'Acesso por tela para sócios (análise=view, alteração=edit, exclusão=delete).';
+
+CREATE INDEX IF NOT EXISTS idx_partner_screen_permissions_partner
+  ON public.partner_screen_permissions(company_id, partner_id);
+
+CREATE TRIGGER trg_partner_screen_permissions_updated_at
+    BEFORE UPDATE ON public.partner_screen_permissions
+    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.company_security_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.partner_screen_permissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY company_security_settings_all ON public.company_security_settings
+  FOR ALL USING (public.auth_user_has_company(company_id))
+  WITH CHECK (public.auth_user_has_company(company_id));
+
+CREATE POLICY partner_screen_permissions_all ON public.partner_screen_permissions
+  FOR ALL USING (public.auth_user_has_company(company_id))
+  WITH CHECK (public.auth_user_has_company(company_id));

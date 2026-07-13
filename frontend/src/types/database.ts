@@ -263,6 +263,7 @@ export type CompanyMember = {
   company_id: string;
   user_id: string;
   role: string;
+  partner_id: string | null;
 };
 
 export const OWNERSHIP_STATUS_OPTIONS = ["Ativo", "Inativo", "Encerrado"] as const;
