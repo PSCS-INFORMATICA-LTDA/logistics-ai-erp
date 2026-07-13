@@ -11,9 +11,12 @@ import { glassField } from "@/lib/liquid-glass-styles";
 import {
   createSalt,
   hashMasterPassword,
+  hashRecoveryPhrase,
   isMasterSessionUnlocked,
   setMasterSessionUnlocked,
+  validateRecoveryPhrase,
   verifyMasterPassword,
+  verifyRecoveryPhrase,
 } from "@/lib/master-password";
 import { createClient } from "@/lib/supabase/client";
 import type { Partner } from "@/types/database";
@@ -28,7 +31,11 @@ type PermissionRow = {
 type SecuritySettings = {
   master_password_salt: string;
   master_password_hash: string;
+  recovery_phrase_salt: string | null;
+  recovery_phrase_hash: string | null;
 };
+
+type GateMode = "create" | "unlock" | "recover";
 
 export default function ParametrosPage() {
   const { companyId } = useCompany();
@@ -37,9 +44,14 @@ export default function ParametrosPage() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<SecuritySettings | null>(null);
   const [unlocked, setUnlocked] = useState(false);
+  const [gateMode, setGateMode] = useState<GateMode>("create");
+
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [recoveryPhrase, setRecoveryPhrase] = useState("");
+  const [confirmRecoveryPhrase, setConfirmRecoveryPhrase] = useState("");
+
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,11 +65,15 @@ export default function ParametrosPage() {
     setLoading(true);
     const { data } = await supabase
       .from("company_security_settings")
-      .select("master_password_salt, master_password_hash")
+      .select(
+        "master_password_salt, master_password_hash, recovery_phrase_salt, recovery_phrase_hash"
+      )
       .eq("company_id", companyId)
       .maybeSingle();
 
-    setSettings((data as SecuritySettings | null) ?? null);
+    const next = (data as SecuritySettings | null) ?? null;
+    setSettings(next);
+    setGateMode(next ? "unlock" : "create");
     setUnlocked(Boolean(companyId && isMasterSessionUnlocked(companyId)));
     setLoading(false);
   }, [companyId, supabase]);
@@ -131,10 +147,19 @@ export default function ParametrosPage() {
     [partners]
   );
 
+  const clearGateFields = () => {
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setRecoveryPhrase("");
+    setConfirmRecoveryPhrase("");
+  };
+
   const createMasterPassword = async () => {
     if (!companyId) return;
     setError(null);
     setMsg(null);
+
     if (newPassword.length < 6) {
       setError("A senha master deve ter pelo menos 6 caracteres.");
       return;
@@ -143,16 +168,32 @@ export default function ParametrosPage() {
       setError("A confirmação da senha não confere.");
       return;
     }
+    const phraseError = validateRecoveryPhrase(recoveryPhrase);
+    if (phraseError) {
+      setError(phraseError);
+      return;
+    }
+    if (
+      recoveryPhrase.trim().toLowerCase() !== confirmRecoveryPhrase.trim().toLowerCase()
+    ) {
+      setError("A confirmação da frase de recuperação não confere.");
+      return;
+    }
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const salt = createSalt();
-    const hash = await hashMasterPassword(newPassword, salt);
+    const passwordSalt = createSalt();
+    const passwordHash = await hashMasterPassword(newPassword, passwordSalt);
+    const phraseSalt = createSalt();
+    const phraseHash = await hashRecoveryPhrase(recoveryPhrase, phraseSalt);
+
     const { error: upsertError } = await supabase.from("company_security_settings").upsert({
       company_id: companyId,
-      master_password_salt: salt,
-      master_password_hash: hash,
+      master_password_salt: passwordSalt,
+      master_password_hash: passwordHash,
+      recovery_phrase_salt: phraseSalt,
+      recovery_phrase_hash: phraseHash,
       updated_by: user?.id ?? null,
     });
 
@@ -163,10 +204,16 @@ export default function ParametrosPage() {
 
     setMasterSessionUnlocked(companyId);
     setUnlocked(true);
-    setSettings({ master_password_salt: salt, master_password_hash: hash });
-    setNewPassword("");
-    setConfirmPassword("");
-    setMsg("Senha master criada. Você tem acesso total às configurações de permissão.");
+    setSettings({
+      master_password_salt: passwordSalt,
+      master_password_hash: passwordHash,
+      recovery_phrase_salt: phraseSalt,
+      recovery_phrase_hash: phraseHash,
+    });
+    clearGateFields();
+    setMsg(
+      "Senha master criada. Guarde a frase de recuperação em local seguro — ela será pedida se você esquecer a senha."
+    );
   };
 
   const unlockMaster = async () => {
@@ -184,8 +231,70 @@ export default function ParametrosPage() {
     }
     setMasterSessionUnlocked(companyId);
     setUnlocked(true);
-    setPassword("");
+    clearGateFields();
     setMsg("Acesso master liberado nesta sessão.");
+  };
+
+  const recoverMasterPassword = async () => {
+    if (!companyId || !settings) return;
+    setError(null);
+    setMsg(null);
+
+    if (!settings.recovery_phrase_salt || !settings.recovery_phrase_hash) {
+      setError(
+        "Esta empresa ainda não tem frase de recuperação. Peça suporte PSCS para resetar a senha master."
+      );
+      return;
+    }
+
+    const phraseOk = await verifyRecoveryPhrase(
+      recoveryPhrase,
+      settings.recovery_phrase_salt,
+      settings.recovery_phrase_hash
+    );
+    if (!phraseOk) {
+      setError("Frase de recuperação incorreta.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("A nova senha master deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("A confirmação da nova senha não confere.");
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const passwordSalt = createSalt();
+    const passwordHash = await hashMasterPassword(newPassword, passwordSalt);
+
+    const { error: updateError } = await supabase
+      .from("company_security_settings")
+      .update({
+        master_password_salt: passwordSalt,
+        master_password_hash: passwordHash,
+        updated_by: user?.id ?? null,
+      })
+      .eq("company_id", companyId);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setSettings({
+      ...settings,
+      master_password_salt: passwordSalt,
+      master_password_hash: passwordHash,
+    });
+    setMasterSessionUnlocked(companyId);
+    setUnlocked(true);
+    clearGateFields();
+    setGateMode("unlock");
+    setMsg("Senha master redefinida com a frase de recuperação. Acesso liberado.");
   };
 
   const togglePerm = (
@@ -239,9 +348,7 @@ export default function ParametrosPage() {
       return;
     }
 
-    const { error: insError } = await supabase
-      .from("partner_screen_permissions")
-      .insert(rows);
+    const { error: insError } = await supabase.from("partner_screen_permissions").insert(rows);
 
     if (insError) {
       setError(insError.message);
@@ -253,25 +360,75 @@ export default function ParametrosPage() {
     setSavingPerms(false);
   };
 
+  const saveRecoveryPhraseWhileUnlocked = async () => {
+    if (!companyId || !settings) return;
+    setError(null);
+    setMsg(null);
+    const phraseError = validateRecoveryPhrase(recoveryPhrase);
+    if (phraseError) {
+      setError(phraseError);
+      return;
+    }
+    if (
+      recoveryPhrase.trim().toLowerCase() !== confirmRecoveryPhrase.trim().toLowerCase()
+    ) {
+      setError("A confirmação da frase de recuperação não confere.");
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const phraseSalt = createSalt();
+    const phraseHash = await hashRecoveryPhrase(recoveryPhrase, phraseSalt);
+    const { error: updateError } = await supabase
+      .from("company_security_settings")
+      .update({
+        recovery_phrase_salt: phraseSalt,
+        recovery_phrase_hash: phraseHash,
+        updated_by: user?.id ?? null,
+      })
+      .eq("company_id", companyId);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setSettings({
+      ...settings,
+      recovery_phrase_salt: phraseSalt,
+      recovery_phrase_hash: phraseHash,
+    });
+    setRecoveryPhrase("");
+    setConfirmRecoveryPhrase("");
+    setMsg("Frase de recuperação salva com sucesso.");
+  };
+
   if (loading) return <Loading />;
 
   if (!unlocked) {
+    const headerTitle =
+      gateMode === "create"
+        ? "Criar senha master"
+        : gateMode === "recover"
+          ? "Recuperar senha master"
+          : "Entrar com senha master";
+
     return (
-      <div className="mx-auto max-w-lg space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Parâmetros</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Área master: acesso a todas as telas e definição de permissões por sócio.
-          </p>
-        </div>
-
-        {error && <Alert variant="error">{error}</Alert>}
-        {msg && <Alert variant="info">{msg}</Alert>}
-
+      <div className="mx-auto max-w-lg">
         <Card>
-          <CardHeader title={settings ? "Digite a senha master" : "Criar senha master"} />
+          <CardHeader
+            title="Parâmetros"
+            description="Área master: acesso a todas as telas e definição de permissões por sócio."
+          />
           <CardBody className="space-y-4">
-            {!settings ? (
+            {error && <Alert variant="error">{error}</Alert>}
+            {msg && <Alert variant="info">{msg}</Alert>}
+
+            <h3 className="text-base font-semibold text-slate-800">{headerTitle}</h3>
+
+            {gateMode === "create" ? (
               <>
                 <p className="text-sm text-slate-600">
                   Defina a senha master do Rafael (administrador). Com ela, ele acessa todas as
@@ -295,12 +452,42 @@ export default function ParametrosPage() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />
                 </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Frase de recuperação</span>
+                  <input
+                    type="text"
+                    className={glassField()}
+                    value={recoveryPhrase}
+                    onChange={(e) => setRecoveryPhrase(e.target.value)}
+                    placeholder="Ex.: van vermelha viagem belo horizonte"
+                  />
+                  <span className="text-xs text-slate-500">
+                    Mínimo 3 palavras. Anote em local seguro — será a única forma de recuperar a
+                    senha.
+                  </span>
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium text-slate-700">
+                    Confirmar frase de recuperação
+                  </span>
+                  <input
+                    type="text"
+                    className={glassField()}
+                    value={confirmRecoveryPhrase}
+                    onChange={(e) => setConfirmRecoveryPhrase(e.target.value)}
+                  />
+                </label>
                 <Button type="button" onClick={() => void createMasterPassword()}>
                   Criar senha master
                 </Button>
               </>
-            ) : (
+            ) : null}
+
+            {gateMode === "unlock" ? (
               <>
+                <p className="text-sm text-slate-600">
+                  Digite a senha master para liberar a gestão de permissões.
+                </p>
                 <label className="block space-y-1">
                   <span className="text-sm font-medium text-slate-700">Senha master</span>
                   <input
@@ -313,11 +500,78 @@ export default function ParametrosPage() {
                     }}
                   />
                 </label>
-                <Button type="button" onClick={() => void unlockMaster()}>
-                  Entrar
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="button" onClick={() => void unlockMaster()}>
+                    Entrar
+                  </Button>
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-brand-700 underline-offset-2 hover:underline"
+                    onClick={() => {
+                      setError(null);
+                      setMsg(null);
+                      clearGateFields();
+                      setGateMode("recover");
+                    }}
+                  >
+                    Esqueci a senha
+                  </button>
+                </div>
               </>
-            )}
+            ) : null}
+
+            {gateMode === "recover" ? (
+              <>
+                <p className="text-sm text-slate-600">
+                  Informe a frase de recuperação cadastrada e defina uma nova senha master.
+                </p>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Frase de recuperação</span>
+                  <input
+                    type="text"
+                    className={glassField()}
+                    value={recoveryPhrase}
+                    onChange={(e) => setRecoveryPhrase(e.target.value)}
+                    placeholder="Digite a frase exatamente como cadastrou"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Nova senha master</span>
+                  <input
+                    type="password"
+                    className={glassField()}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Confirmar nova senha</span>
+                  <input
+                    type="password"
+                    className={glassField()}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="button" onClick={() => void recoverMasterPassword()}>
+                    Redefinir senha
+                  </Button>
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-slate-600 underline-offset-2 hover:underline"
+                    onClick={() => {
+                      setError(null);
+                      setMsg(null);
+                      clearGateFields();
+                      setGateMode("unlock");
+                    }}
+                  >
+                    Voltar
+                  </button>
+                </div>
+              </>
+            ) : null}
           </CardBody>
         </Card>
       </div>
@@ -334,21 +588,53 @@ export default function ParametrosPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Parâmetros</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Acesso master liberado. Defina, por sócio cadastrado, o que ele pode analisar, alterar
-          ou excluir em cada tela.
-        </p>
-      </div>
-
-      {error && <Alert variant="error">{error}</Alert>}
-      {msg && <Alert variant="info">{msg}</Alert>}
-
+    <div className="mx-auto max-w-5xl space-y-6">
       <Card>
-        <CardHeader title="Permissões por sócio" />
+        <CardHeader
+          title="Parâmetros"
+          description="Acesso master liberado. Defina, por sócio cadastrado, o que ele pode analisar, alterar ou excluir em cada tela."
+        />
         <CardBody className="space-y-4">
+          {error && <Alert variant="error">{error}</Alert>}
+          {msg && <Alert variant="info">{msg}</Alert>}
+
+          {!settings?.recovery_phrase_hash ? (
+            <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+              <p className="text-sm text-amber-900">
+                Esta senha master ainda não tem frase de recuperação. Cadastre agora para poder
+                recuperar se esquecer a senha.
+              </p>
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Frase de recuperação</span>
+                <input
+                  type="text"
+                  className={glassField()}
+                  value={recoveryPhrase}
+                  onChange={(e) => setRecoveryPhrase(e.target.value)}
+                  placeholder="Ex.: van vermelha viagem belo horizonte"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Confirmar frase</span>
+                <input
+                  type="text"
+                  className={glassField()}
+                  value={confirmRecoveryPhrase}
+                  onChange={(e) => setConfirmRecoveryPhrase(e.target.value)}
+                />
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void saveRecoveryPhraseWhileUnlocked()}
+              >
+                Salvar frase de recuperação
+              </Button>
+            </div>
+          ) : null}
+
+          <h3 className="text-base font-semibold text-slate-800">Permissões por sócio</h3>
+
           <GlassSelect
             label="Sócio (usuário cadastrado)"
             value={selectedPartnerId}
@@ -376,7 +662,10 @@ export default function ParametrosPage() {
                     {Object.entries(screensByGroup).map(([group, screens]) => (
                       <Fragment key={group}>
                         <tr className="bg-brand-50/40">
-                          <td colSpan={4} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-800">
+                          <td
+                            colSpan={4}
+                            className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-800"
+                          >
                             {group}
                           </td>
                         </tr>
