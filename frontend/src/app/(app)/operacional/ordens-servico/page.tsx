@@ -63,6 +63,7 @@ function OrdensServicoPageContent() {
   const { companyId } = useCompany();
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("q") ?? searchParams.get("code") ?? "";
+  const initialEditId = searchParams.get("edit") ?? searchParams.get("id");
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
@@ -374,6 +375,7 @@ function OrdensServicoPageContent() {
   return (
     <CrudPage<ServiceOrderListRow>
       refreshKey={listRefreshKey}
+      initialEditId={initialEditId}
       title="Ordens de Serviço"
       description="Transporte, estacionamento e lava-rápido — natureza do serviço vinculada às contas DRE"
       table="service_orders"

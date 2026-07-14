@@ -62,11 +62,12 @@ export async function fetchVehicleScheduleData(
     }
   };
 
+  const orderSelect =
+    "id, code, client_name, service_type, status, service_date, entry_date, entry_time, exit_date, exit_time, vehicle_id, freight_origin_address, freight_destination_address";
+
   let q1 = supabase
     .from("service_orders")
-    .select(
-      "id, code, client_name, service_type, status, service_date, entry_date, entry_time, exit_date, exit_time, vehicle_id"
-    )
+    .select(orderSelect)
     .eq("company_id", companyId)
     .neq("status", "Cancelado")
     .not("vehicle_id", "is", null)
@@ -84,9 +85,7 @@ export async function fetchVehicleScheduleData(
 
   let q2 = supabase
     .from("service_orders")
-    .select(
-      "id, code, client_name, service_type, status, service_date, entry_date, entry_time, exit_date, exit_time, vehicle_id"
-    )
+    .select(orderSelect)
     .eq("company_id", companyId)
     .neq("status", "Cancelado")
     .not("vehicle_id", "is", null)
@@ -102,9 +101,7 @@ export async function fetchVehicleScheduleData(
 
   let q3 = supabase
     .from("service_orders")
-    .select(
-      "id, code, client_name, service_type, status, service_date, entry_date, entry_time, exit_date, exit_time, vehicle_id"
-    )
+    .select(orderSelect)
     .eq("company_id", companyId)
     .neq("status", "Cancelado")
     .not("vehicle_id", "is", null)

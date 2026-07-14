@@ -39,6 +39,8 @@ type CrudPageProps<T extends { id: string }> = {
   deleteBlockedReason?: (row: T) => string | null;
   /** Increment to refetch rows after external mutations (e.g. RPC row actions). */
   refreshKey?: number;
+  /** Abre o formulário de edição deste id após carregar (ex.: link da agenda). */
+  initialEditId?: string | null;
 };
 
 export function CrudPage<T extends { id: string }>({
@@ -59,6 +61,7 @@ export function CrudPage<T extends { id: string }>({
   canDeleteRow,
   deleteBlockedReason,
   refreshKey = 0,
+  initialEditId = null,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const [items, setItems] = useState<T[]>([]);
@@ -68,6 +71,7 @@ export function CrudPage<T extends { id: string }>({
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const formPanelRef = useRef<HTMLDivElement>(null);
+  const openedEditIdRef = useRef<string | null>(null);
   const supabase = createClient();
 
   const formPanelKey = isNew ? "new" : String(editing?.id ?? "edit");
@@ -110,6 +114,21 @@ export function CrudPage<T extends { id: string }>({
   useEffect(() => {
     if (companyId) load();
   }, [companyId, load, refreshKey]);
+
+  useEffect(() => {
+    if (!initialEditId || loading) return;
+    if (openedEditIdRef.current === initialEditId) return;
+    const row = items.find((item) => item.id === initialEditId);
+    if (!row) return;
+    if (canEditRow && !canEditRow(row)) {
+      setError(editBlockedReason?.(row) ?? "Esta OS não pode ser editada no momento.");
+      openedEditIdRef.current = initialEditId;
+      return;
+    }
+    setEditing(row);
+    setIsNew(false);
+    openedEditIdRef.current = initialEditId;
+  }, [initialEditId, items, loading, canEditRow, editBlockedReason]);
 
   const handleSave = async (data: Record<string, unknown>): Promise<string | null> => {
     if (!companyId) return null;

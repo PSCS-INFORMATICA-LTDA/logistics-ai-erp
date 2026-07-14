@@ -17,6 +17,17 @@ export type ScheduleSegment = {
   /** Concluída = só registro de uso; não bloqueia disponibilidade. */
   isHistorical: boolean;
   blocksAvailability: boolean;
+  originAddress: string | null;
+  destinationAddress: string | null;
+};
+
+export const SCHEDULE_MORNING_END_MIN = 12 * 60;
+
+export type DayPeriodAvailability = {
+  morningFree: boolean;
+  afternoonFree: boolean;
+  morningLabel: string;
+  afternoonLabel: string;
 };
 
 export type FreeSlot = {
@@ -105,6 +116,8 @@ export type ScheduleOrderInput = {
   exit_date: string | null;
   exit_time: string | null;
   vehicle_id: string | null;
+  freight_origin_address?: string | null;
+  freight_destination_address?: string | null;
 };
 
 export function isHistoricalScheduleStatus(status: string): boolean {
@@ -164,6 +177,8 @@ export function buildSegmentsForOrder(
         isAllDay: !order.entry_time && !order.exit_time && compareDateKeys(startDate, endDate) === 0,
         isHistorical: historical,
         blocksAvailability: blocksScheduleAvailability(order.status),
+        originAddress: order.freight_origin_address?.trim() || null,
+        destinationAddress: order.freight_destination_address?.trim() || null,
       });
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -218,4 +233,47 @@ export function serviceTypeColor(type: string, historical = false): string {
 
 export function scheduleSegmentLabel(seg: ScheduleSegment): string {
   return seg.isHistorical ? "Uso registrado" : "Agendado";
+}
+
+export function orderHref(orderId: string): string {
+  return `/operacional/ordens-servico?edit=${encodeURIComponent(orderId)}`;
+}
+
+export function routeSummary(seg: ScheduleSegment): string | null {
+  if (!seg.originAddress && !seg.destinationAddress) return null;
+  const from = seg.originAddress || "—";
+  const to = seg.destinationAddress || "—";
+  return `${from} → ${to}`;
+}
+
+/** Manhã 06–12 / tarde 12–22 — útil para ver se a placa pode fazer 2ª viagem no dia. */
+export function dayPeriodAvailability(segments: ScheduleSegment[]): DayPeriodAvailability {
+  const free = computeFreeSlots(segments);
+  const covers = (from: number, to: number) =>
+    free.some((slot) => slot.startMin <= from && slot.endMin >= to);
+
+  const morningFree = covers(SCHEDULE_WORK_START_MIN, SCHEDULE_MORNING_END_MIN);
+  const afternoonFree = covers(SCHEDULE_MORNING_END_MIN, SCHEDULE_WORK_END_MIN);
+
+  const morningPartial = free.filter(
+    (s) => s.endMin > SCHEDULE_WORK_START_MIN && s.startMin < SCHEDULE_MORNING_END_MIN
+  );
+  const afternoonPartial = free.filter(
+    (s) => s.endMin > SCHEDULE_MORNING_END_MIN && s.startMin < SCHEDULE_WORK_END_MIN
+  );
+
+  const labelPart = (slots: FreeSlot[], full: boolean, fullLabel: string) => {
+    if (full) return fullLabel;
+    if (slots.length === 0) return "Ocupado";
+    return slots
+      .map((s) => `${formatMinutes(Math.max(s.startMin, SCHEDULE_WORK_START_MIN))}–${formatMinutes(Math.min(s.endMin, SCHEDULE_WORK_END_MIN))}`)
+      .join(", ");
+  };
+
+  return {
+    morningFree,
+    afternoonFree,
+    morningLabel: labelPart(morningPartial, morningFree, "Livre 06:00–12:00"),
+    afternoonLabel: labelPart(afternoonPartial, afternoonFree, "Livre 12:00–22:00"),
+  };
 }

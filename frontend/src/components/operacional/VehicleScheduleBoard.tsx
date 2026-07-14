@@ -5,7 +5,10 @@ import { useMemo } from "react";
 import {
   computeFreeSlots,
   dayLabel,
+  dayPeriodAvailability,
   formatMinutes,
+  orderHref,
+  routeSummary,
   scheduleSegmentLabel,
   serviceTypeColor,
   SCHEDULE_WORK_END_MIN,
@@ -26,6 +29,8 @@ type Props = {
   weekKeys: string[];
   selection: Selection;
   onSelect: (next: Selection) => void;
+  /** Quando filtrado por uma placa, destaca visão manhã/tarde da semana. */
+  plateFocus?: boolean;
 };
 
 function segmentsForCell(
@@ -38,12 +43,41 @@ function segmentsForCell(
     .sort((a, b) => a.startMin - b.startMin);
 }
 
+function SegmentCard({ seg, compact = false }: { seg: ScheduleSegment; compact?: boolean }) {
+  const route = routeSummary(seg);
+  return (
+    <Link
+      href={orderHref(seg.orderId)}
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        "block rounded-md border px-1.5 py-1 leading-tight transition hover:ring-2 hover:ring-brand-300",
+        compact ? "text-[0.68rem]" : "px-3 py-2 text-sm",
+        serviceTypeColor(seg.serviceType, seg.isHistorical)
+      )}
+      title={`Abrir OS ${seg.orderCode}`}
+    >
+      <span className={cn("font-semibold", !compact && "text-base")}>
+        {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
+      </span>
+      <span className="block truncate font-medium underline-offset-2 hover:underline">
+        {seg.orderCode} → abrir OS
+      </span>
+      {seg.isHistorical ? (
+        <span className="block text-[0.62rem] uppercase tracking-wide opacity-75">Concluído</span>
+      ) : null}
+      {seg.clientName ? <span className="block truncate opacity-80">{seg.clientName}</span> : null}
+      {route ? <span className="mt-0.5 block truncate text-[0.62rem] opacity-80">{route}</span> : null}
+    </Link>
+  );
+}
+
 export function VehicleScheduleBoard({
   vehicles,
   segments,
   weekKeys,
   selection,
   onSelect,
+  plateFocus = false,
 }: Props) {
   const selectedSegments = useMemo(() => {
     if (!selection) return [];
@@ -60,10 +94,13 @@ export function VehicleScheduleBoard({
   );
 
   const freeSlots = useMemo(() => computeFreeSlots(selectedSegments), [selectedSegments]);
+  const period = useMemo(() => dayPeriodAvailability(selectedSegments), [selectedSegments]);
 
   const selectedVehicle = selection
     ? vehicles.find((v) => v.id === selection.vehicleId)
     : null;
+
+  const focusVehicle = plateFocus && vehicles.length === 1 ? vehicles[0] : null;
 
   return (
     <div className="space-y-4">
@@ -74,13 +111,24 @@ export function VehicleScheduleBoard({
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3 w-6 rounded border border-dashed border-slate-300 bg-slate-100" />
-          Concluído — só registro de uso da placa
+          Concluído — só registro de uso
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3 w-6 rounded border border-emerald-200 bg-emerald-50" />
-          Horário livre
+          Horário livre (pode usar de novo)
         </span>
+        <span className="text-slate-500">Clique no código da OS para abrir o cadastro.</span>
       </div>
+
+      {focusVehicle ? (
+        <PlateWeekSummary
+          vehicle={focusVehicle}
+          weekKeys={weekKeys}
+          segments={segments}
+          selection={selection}
+          onSelect={onSelect}
+        />
+      ) : null}
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white/80 [-webkit-overflow-scrolling:touch]">
         <table className="min-w-[56rem] w-full border-collapse text-sm">
@@ -119,6 +167,7 @@ export function VehicleScheduleBoard({
                     const isSelected =
                       selection?.vehicleId === vehicle.id && selection.dayKey === dayKey;
                     const free = computeFreeSlots(cellSegments);
+                    const periods = dayPeriodAvailability(cellSegments);
                     const hasFree = free.some((s) => s.endMin - s.startMin >= 60);
 
                     return (
@@ -138,36 +187,22 @@ export function VehicleScheduleBoard({
                           )}
                         >
                           {cellSegments.length === 0 ? (
-                            <span className="block px-1 py-2 text-xs text-emerald-700">
-                              Livre (06:00–22:00)
+                            <span className="block space-y-0.5 px-1 py-2 text-xs text-emerald-700">
+                              <span className="block font-medium">Livre o dia</span>
+                              <span className="block text-[0.65rem]">Manhã e tarde</span>
                             </span>
                           ) : (
                             <div className="space-y-1">
                               {cellSegments.map((seg) => (
-                                <div
-                                  key={`${seg.orderId}-${seg.dayKey}`}
-                                  className={cn(
-                                    "rounded-md border px-1.5 py-1 text-[0.68rem] leading-tight",
-                                    serviceTypeColor(seg.serviceType, seg.isHistorical)
-                                  )}
-                                >
-                                  <span className="font-semibold">
-                                    {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
-                                  </span>
-                                  <span className="block truncate">{seg.orderCode}</span>
-                                  {seg.isHistorical ? (
-                                    <span className="block text-[0.62rem] uppercase tracking-wide opacity-75">
-                                      Concluído
-                                    </span>
-                                  ) : null}
-                                  {seg.clientName ? (
-                                    <span className="block truncate opacity-80">{seg.clientName}</span>
-                                  ) : null}
-                                </div>
+                                <SegmentCard key={`${seg.orderId}-${seg.dayKey}`} seg={seg} compact />
                               ))}
+                              <span className="block px-1 text-[0.62rem] text-slate-600">
+                                Manhã: {periods.morningFree ? "livre" : "ocupada"} · Tarde:{" "}
+                                {periods.afternoonFree ? "livre" : "ocupada"}
+                              </span>
                               {hasFree ? (
                                 <span className="block px-1 text-[0.65rem] text-emerald-700">
-                                  + horários livres
+                                  + horários livres no dia
                                 </span>
                               ) : null}
                             </div>
@@ -192,17 +227,41 @@ export function VehicleScheduleBoard({
                 {dayLabel(selection.dayKey).date}
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                Janela {formatMinutes(SCHEDULE_WORK_START_MIN)}–{formatMinutes(SCHEDULE_WORK_END_MIN)}.
-                Frete/OS <strong>concluída</strong> aparece só para consultar quando a placa foi usada — não
-                bloqueia horário livre.
+                Clique em <strong>abrir OS</strong> para ver origem, destino, cliente e demais dados.
+                Frete concluído não bloqueia; só registra o uso.
               </p>
             </div>
             <Link
               href="/operacional/ordens-servico"
               className="text-sm font-medium text-brand-700 underline-offset-2 hover:underline"
             >
-              Abrir Ordens de Serviço
+              Lista de OS
             </Link>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm",
+                period.morningFree
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-amber-200 bg-amber-50 text-amber-950"
+              )}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide">Manhã (06–12)</p>
+              <p className="mt-0.5 font-medium">{period.morningLabel}</p>
+            </div>
+            <div
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm",
+                period.afternoonFree
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-amber-200 bg-amber-50 text-amber-950"
+              )}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide">Tarde (12–22)</p>
+              <p className="mt-0.5 font-medium">{period.afternoonLabel}</p>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -213,19 +272,10 @@ export function VehicleScheduleBoard({
               ) : (
                 <ul className="mt-2 space-y-2">
                   {blockingSegments.map((seg) => (
-                    <li
-                      key={seg.orderId}
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-sm",
-                        serviceTypeColor(seg.serviceType, false)
-                      )}
-                    >
-                      <p className="font-semibold">
-                        {seg.orderCode} · {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
-                      </p>
-                      <p className="text-xs opacity-90">
-                        {scheduleSegmentLabel(seg)} · {seg.serviceType}
-                        {seg.clientName ? ` · ${seg.clientName}` : ""} · {seg.status}
+                    <li key={seg.orderId}>
+                      <SegmentCard seg={seg} />
+                      <p className="mt-1 px-1 text-xs text-slate-500">
+                        {scheduleSegmentLabel(seg)} · {seg.status}
                       </p>
                     </li>
                   ))}
@@ -251,6 +301,10 @@ export function VehicleScheduleBoard({
                   ))}
                 </ul>
               )}
+              <p className="mt-2 text-xs text-slate-500">
+                Se a OS da manhã for SP → interior/outro estado e a saída for à tarde, a tarde fica ocupada
+                até o horário de saída cadastrado na OS.
+              </p>
             </section>
           </div>
 
@@ -258,24 +312,12 @@ export function VehicleScheduleBoard({
             <section className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50/80 p-3">
               <h4 className="text-sm font-semibold text-slate-800">Uso registrado (concluído)</h4>
               <p className="mt-1 text-xs text-slate-600">
-                Frete ou transporte já finalizado — consulta de data/hora em que o veículo foi utilizado.
+                Frete já finalizado — consulta de quando a placa rodou. Clique para abrir a OS.
               </p>
               <ul className="mt-2 space-y-2">
                 {historicalSegments.map((seg) => (
-                  <li
-                    key={seg.orderId}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm",
-                      serviceTypeColor(seg.serviceType, true)
-                    )}
-                  >
-                    <p className="font-semibold">
-                      {seg.orderCode} · {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
-                    </p>
-                    <p className="text-xs opacity-90">
-                      {seg.serviceType}
-                      {seg.clientName ? ` · ${seg.clientName}` : ""}
-                    </p>
+                  <li key={seg.orderId}>
+                    <SegmentCard seg={seg} />
                   </li>
                 ))}
               </ul>
@@ -292,9 +334,77 @@ export function VehicleScheduleBoard({
         </div>
       ) : (
         <p className="text-sm text-slate-500">
-          Toque em um dia/placa: OS em aberto bloqueiam horário; concluídas mostram só quando a placa foi usada.
+          Toque em um dia/placa para ver manhã/tarde livres. No bloco da OS, clique em{" "}
+          <strong>abrir OS</strong> para ir ao cadastro.
         </p>
       )}
+    </div>
+  );
+}
+
+function PlateWeekSummary({
+  vehicle,
+  weekKeys,
+  segments,
+  selection,
+  onSelect,
+}: {
+  vehicle: VehicleScheduleRow;
+  weekKeys: string[];
+  segments: ScheduleSegment[];
+  selection: Selection;
+  onSelect: (next: Selection) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+      <h3 className="text-sm font-semibold text-brand-950">
+        Visão da placa {vehicle.plate} — manhã / tarde na semana
+      </h3>
+      <p className="mt-1 text-xs text-brand-900/80">
+        Use para ver se o veículo pode fazer mais de um frete no mesmo dia (ex.: manhã ocupada, tarde
+        livre).
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {weekKeys.map((dayKey) => {
+          const cell = segmentsForCell(segments, vehicle.id, dayKey);
+          const periods = dayPeriodAvailability(cell);
+          const { weekday, date } = dayLabel(dayKey);
+          const active = selection?.vehicleId === vehicle.id && selection.dayKey === dayKey;
+          return (
+            <button
+              key={dayKey}
+              type="button"
+              onClick={() => onSelect(active ? null : { vehicleId: vehicle.id, dayKey })}
+              className={cn(
+                "rounded-lg border bg-white p-2 text-left text-xs transition",
+                active ? "border-brand-400 ring-2 ring-brand-200" : "border-slate-200 hover:border-brand-200"
+              )}
+            >
+              <p className="font-semibold capitalize text-slate-800">
+                {weekday} {date}
+              </p>
+              <p
+                className={cn(
+                  "mt-1",
+                  periods.morningFree ? "text-emerald-700" : "text-amber-800"
+                )}
+              >
+                Manhã: {periods.morningFree ? "livre" : "ocupada"}
+              </p>
+              <p
+                className={cn(
+                  periods.afternoonFree ? "text-emerald-700" : "text-amber-800"
+                )}
+              >
+                Tarde: {periods.afternoonFree ? "livre" : "ocupada"}
+              </p>
+              {cell.length > 0 ? (
+                <p className="mt-1 truncate text-slate-500">{cell.length} OS</p>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -312,18 +422,19 @@ function VehicleDayTimeline({
     const left = ((seg.startMin - SCHEDULE_WORK_START_MIN) / total) * 100;
     const width = ((seg.endMin - seg.startMin) / total) * 100;
     return (
-      <div
+      <Link
         key={`${layer}-${seg.orderId}`}
-        title={`${seg.orderCode} ${formatMinutes(seg.startMin)}–${formatMinutes(seg.endMin)}`}
+        href={orderHref(seg.orderId)}
+        title={`${seg.orderCode} ${formatMinutes(seg.startMin)}–${formatMinutes(seg.endMin)} — abrir OS`}
         className={cn(
-          "absolute top-1 bottom-1 rounded border px-1 text-[0.65rem] font-medium leading-tight overflow-hidden",
+          "absolute top-1 bottom-1 overflow-hidden rounded border px-1 text-[0.65rem] font-medium leading-tight hover:ring-2 hover:ring-brand-300",
           serviceTypeColor(seg.serviceType, layer === "historical"),
           layer === "historical" && "opacity-80"
         )}
         style={{ left: `${left}%`, width: `${Math.max(width, 4)}%` }}
       >
         {seg.orderCode}
-      </div>
+      </Link>
     );
   };
 
@@ -333,7 +444,7 @@ function VehicleDayTimeline({
       {blocking.map((seg) => renderBar(seg, "blocking"))}
       <div className="pointer-events-none absolute inset-x-0 -bottom-5 flex justify-between text-[0.65rem] text-slate-500">
         <span>06:00</span>
-        <span>14:00</span>
+        <span>12:00</span>
         <span>22:00</span>
       </div>
     </div>
