@@ -73,7 +73,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Mobile web | Shell responsivo: menu ☰ (drawer), formulários com Salvar sticky, tabelas com scroll horizontal + ações fixas. Abrir/editar no celular pelo mesmo URL. |
 | Agenda frota | Aba **Agenda da frota** (semana por placa, horários livres, baseada em OS entrada/saída). |
 | DRE empresa | Aba **Lançamentos da empresa** — receitas/despesas gerais (geladeira, escritório…) sem placa. SQL: `apply-039-company-ledger.sql`. |
-| Estacionamento / Lava | Módulos próprios: portes + tabela de preços (diária/mensal/lava) em **Parâmetros do pátio**; ordens em Operacional → Estacionamento / Lava-rápido; DRE **Receita Estacionamento** / **Receita Lava Rápido** no fechamento. SQL: `apply-041-patio-parking-wash.sql`. Na OS geral: **Tipo** e **Natureza DRE** só **Frete** e **Transporte** (sem Estacionamento / Lavagem / Outros). |
+| Estacionamento / Lava | Módulos próprios: portes + tabela de preços (diária/mensal/lava) em **Parâmetros do pátio**; ordens em Operacional → Estacionamento / Lava-rápido; DRE **Receita Estacionamento** / **Receita Lava Rápido** no fechamento. Clipe de comprovante **opcional** antes de finalizar. SQL: `apply-041-patio-parking-wash.sql` + `apply-042-patio-payment-proof-attachments.sql`. Na OS geral: **Tipo** e **Natureza DRE** só **Frete** e **Transporte**. |
 | Multiempresa | `companies` + `company_members` + RLS desde o schema V1. |
 
 ---

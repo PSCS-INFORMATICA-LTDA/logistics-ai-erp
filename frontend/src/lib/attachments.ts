@@ -10,6 +10,7 @@ export type AttachmentEntityType =
   | "financial_transaction"
   | "cash_flow_entry"
   | "parking_entry"
+  | "car_wash_service"
   | "service_order"
   | "vehicle_event"
   | "traffic_infraction";

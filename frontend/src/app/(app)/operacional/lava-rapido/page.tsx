@@ -21,6 +21,7 @@ import {
   resolvePatioPrice,
   seedPatioDefaults,
 } from "@/lib/patio-api";
+import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
 
@@ -306,6 +307,7 @@ export default function LavaRapidoPage() {
               <th className="px-3 py-2">Porte</th>
               <th className="px-3 py-2">Serviço</th>
               <th className="px-3 py-2">Valor</th>
+              <th className="px-3 py-2">Comprovante</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2" />
             </tr>
@@ -320,6 +322,16 @@ export default function LavaRapidoPage() {
                 <td className="px-3 py-2">{row.service_name}</td>
                 <td className="px-3 py-2">
                   {row.service_amount != null ? formatCurrency(Number(row.service_amount)) : "—"}
+                </td>
+                <td className="px-3 py-2">
+                  {companyId ? (
+                    <PatioPaymentProofClip
+                      companyId={companyId}
+                      entityType="car_wash_service"
+                      entityId={row.id}
+                      code={row.code}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2">
                   <Badge
@@ -345,7 +357,7 @@ export default function LavaRapidoPage() {
             ))}
             {rows.length === 0 && !loading ? (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
                   Nenhuma ordem ainda.
                 </td>
               </tr>

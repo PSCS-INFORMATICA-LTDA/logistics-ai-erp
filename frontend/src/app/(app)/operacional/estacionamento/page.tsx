@@ -20,6 +20,7 @@ import {
   listPatioVehicleTypes,
   seedPatioDefaults,
 } from "@/lib/patio-api";
+import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDateTimeBR } from "@/lib/utils";
 
@@ -252,6 +253,7 @@ export default function EstacionamentoPage() {
               <th className="px-3 py-2">Porte</th>
               <th className="px-3 py-2">Entrada</th>
               <th className="px-3 py-2">Saída / fechar</th>
+              <th className="px-3 py-2">Comprovante</th>
               <th className="px-3 py-2">Total</th>
               <th className="px-3 py-2">Status</th>
             </tr>
@@ -309,6 +311,16 @@ export default function EstacionamentoPage() {
                     )}
                   </td>
                   <td className="px-3 py-2">
+                    {companyId ? (
+                      <PatioPaymentProofClip
+                        companyId={companyId}
+                        entityType="parking_entry"
+                        entityId={row.id}
+                        code={row.code}
+                      />
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2">
                     {row.total_amount != null ? formatCurrency(Number(row.total_amount)) : "—"}
                     {row.daily_count != null ? (
                       <div className="text-xs text-slate-500">
@@ -334,7 +346,7 @@ export default function EstacionamentoPage() {
             })}
             {rows.length === 0 && !loading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
                   Nenhuma ordem ainda.
                 </td>
               </tr>
