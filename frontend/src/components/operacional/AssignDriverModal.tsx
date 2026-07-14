@@ -38,6 +38,7 @@ type OrderSummary = Pick<
   | "client_name"
   | "service_type"
   | "service_date"
+  | "entry_time"
   | "freight_origin_address"
   | "freight_destination_address"
   | "freight_distance_km"
@@ -56,10 +57,10 @@ type OrderSummary = Pick<
 };
 
 const ORDER_ASSIGNMENT_FIELDS =
-  "id, code, plate, client_name, service_type, service_date, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at, driver_assignment_rejected_driver_ids, driver_assignment_pay_amount, driver_assignment_assistant_pay_amount";
+  "id, code, plate, client_name, service_type, service_date, entry_time, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at, driver_assignment_rejected_driver_ids, driver_assignment_pay_amount, driver_assignment_assistant_pay_amount";
 
 const ORDER_ASSIGNMENT_FIELDS_LEGACY =
-  "id, code, plate, client_name, service_type, service_date, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at";
+  "id, code, plate, client_name, service_type, service_date, entry_time, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at";
 
 type Props = {
   open: boolean;
