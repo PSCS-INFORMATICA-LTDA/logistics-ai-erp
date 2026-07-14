@@ -21,7 +21,7 @@ import {
   seedPatioDefaults,
 } from "@/lib/patio-api";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTimeBR } from "@/lib/utils";
 
 export default function EstacionamentoPage() {
   const { companyId } = useCompany();
@@ -268,8 +268,7 @@ export default function EstacionamentoPage() {
                   <td className="px-3 py-2">{row.plate}</td>
                   <td className="px-3 py-2">{row.vehicle_type ?? "—"}</td>
                   <td className="px-3 py-2">
-                    {row.entry_date}
-                    {row.entry_time ? ` ${String(row.entry_time).slice(0, 5)}` : ""}
+                    {formatDateTimeBR(row.entry_date, row.entry_time)}
                     <div className="text-xs text-slate-500">{row.billing_mode ?? "Diária"}</div>
                   </td>
                   <td className="px-3 py-2">
@@ -306,10 +305,7 @@ export default function EstacionamentoPage() {
                         </Button>
                       </div>
                     ) : (
-                      <span>
-                        {row.exit_date ?? "—"}
-                        {row.exit_time ? ` ${String(row.exit_time).slice(0, 5)}` : ""}
-                      </span>
+                      <span>{formatDateTimeBR(row.exit_date, row.exit_time)}</span>
                     )}
                   </td>
                   <td className="px-3 py-2">

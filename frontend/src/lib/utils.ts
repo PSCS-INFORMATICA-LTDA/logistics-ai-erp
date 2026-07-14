@@ -21,6 +21,26 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Exibe data ISO `YYYY-MM-DD` como `DD/MM/YYYY`. */
+export function formatDateBR(value: string | null | undefined): string {
+  if (!value) return "—";
+  const datePart = String(value).slice(0, 10);
+  const [y, m, d] = datePart.split("-");
+  if (!y || !m || !d) return String(value);
+  return `${d}/${m}/${y}`;
+}
+
+/** Data + hora: `14/07/2026 17:00`. */
+export function formatDateTimeBR(
+  date: string | null | undefined,
+  time?: string | null
+): string {
+  const dateLabel = formatDateBR(date);
+  if (dateLabel === "—") return "—";
+  const timePart = time ? String(time).slice(0, 5) : "";
+  return timePart ? `${dateLabel} ${timePart}` : dateLabel;
+}
+
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }

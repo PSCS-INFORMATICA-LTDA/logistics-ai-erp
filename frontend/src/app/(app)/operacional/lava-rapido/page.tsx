@@ -22,7 +22,7 @@ import {
   seedPatioDefaults,
 } from "@/lib/patio-api";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, normalizePlate } from "@/lib/utils";
+import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
 
 export default function LavaRapidoPage() {
   const { companyId } = useCompany();
@@ -314,7 +314,7 @@ export default function LavaRapidoPage() {
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-medium">{row.code}</td>
-                <td className="px-3 py-2">{row.service_date}</td>
+                <td className="px-3 py-2">{formatDateBR(row.service_date)}</td>
                 <td className="px-3 py-2">{row.plate}</td>
                 <td className="px-3 py-2">{row.vehicle_type ?? "—"}</td>
                 <td className="px-3 py-2">{row.service_name}</td>
