@@ -142,7 +142,7 @@ export default function InfracoesPage() {
 
   const driverOptions = [
     { value: "", label: "— Pendente atribuição —" },
-    ...drivers.map((d) => ({ value: d.id, label: `${d.code} — ${d.name}` })),
+    ...drivers.map((d) => ({ value: d.id, label: d.name })),
   ];
 
   const visibleCount = listRows.filter((row) => matchesInfractionFilter(row, alertFilter)).length;

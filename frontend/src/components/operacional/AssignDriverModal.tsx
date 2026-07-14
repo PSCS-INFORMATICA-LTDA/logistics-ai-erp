@@ -725,7 +725,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                                 refused ? "text-red-900" : "text-slate-900"
                               )}
                             >
-                              {driver.code} — {driver.name}
+                              {driver.name}
                             </span>
                             {refused ? (
                               <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-900">

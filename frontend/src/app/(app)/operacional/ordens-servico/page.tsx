@@ -422,7 +422,8 @@ function OrdensServicoPageContent() {
 
   const driverOptions = [
     { value: "", label: "— Sem motorista —" },
-    ...drivers.map((d) => ({ value: d.id, label: `${d.code} — ${d.name}` })),
+    // Felipe: na seleção da OS aparece só o nome (sem MOT001 — …).
+    ...drivers.map((d) => ({ value: d.id, label: d.name })),
   ];
 
   const resolveChartOfAccountId = (
