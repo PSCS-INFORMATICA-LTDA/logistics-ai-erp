@@ -1,3 +1,8 @@
+/**
+ * Natureza DRE na OS geral: só Frete e Transporte.
+ * Estacionamento e Lava-rápido usam os módulos próprios (e contas DRE próprias).
+ */
+
 export const SERVICE_ORDER_CATEGORY_OPTIONS = [
   {
     value: "Transporte",
@@ -11,35 +16,18 @@ export const SERVICE_ORDER_CATEGORY_OPTIONS = [
     dreAccountName: "Receita Caminhão",
     hint: "Carga e caminhões",
   },
-  {
-    value: "Estacionamento",
-    label: "Estacionamento",
-    dreAccountName: "Receita Estacionamento",
-    hint: "Vaga e permanência",
-  },
-  {
-    value: "Lavagem",
-    label: "Lavagem rápida",
-    dreAccountName: "Receita Lava Rápido",
-    hint: "Serviços de lava-rápido",
-  },
-  {
-    value: "Outros",
-    label: "Outros",
-    dreAccountName: "Receita diversas",
-    hint: "Demais receitas operacionais",
-  },
 ] as const;
+
+/** Labels para exibir naturezas legadas já salvas no banco. */
+const LEGACY_CATEGORY_LABELS: Record<string, string> = {
+  Estacionamento: "Estacionamento",
+  Lavagem: "Lavagem rápida",
+  Outros: "Outros",
+};
 
 export type ServiceOrderCategory = (typeof SERVICE_ORDER_CATEGORY_OPTIONS)[number]["value"];
 
-const DRE_PRIORITY: ServiceOrderCategory[] = [
-  "Frete",
-  "Transporte",
-  "Estacionamento",
-  "Lavagem",
-  "Outros",
-];
+const DRE_PRIORITY: ServiceOrderCategory[] = ["Frete", "Transporte"];
 
 export function toggleServiceCategory(categories: string[], value: string): string[] {
   const set = new Set(categories);
@@ -49,9 +37,13 @@ export function toggleServiceCategory(categories: string[], value: string): stri
 }
 
 export function formatServiceCategories(categories: string[]): string {
-  const labels = SERVICE_ORDER_CATEGORY_OPTIONS.filter((o) => categories.includes(o.value)).map(
-    (o) => o.label
-  );
+  const labels = categories
+    .map((value) => {
+      const opt = SERVICE_ORDER_CATEGORY_OPTIONS.find((o) => o.value === value);
+      if (opt) return opt.label;
+      return LEGACY_CATEGORY_LABELS[value] ?? value;
+    })
+    .filter(Boolean);
   return labels.join(", ");
 }
 
@@ -75,9 +67,6 @@ export function getCategoryHint(categories: string[]): string | null {
 const SERVICE_TYPE_TO_CATEGORY: Record<string, ServiceOrderCategory> = {
   Frete: "Frete",
   Transporte: "Transporte",
-  Estacionamento: "Estacionamento",
-  CarWash: "Lavagem",
-  Outro: "Outros",
 };
 
 export function categoriesForServiceType(serviceType: string): string[] {

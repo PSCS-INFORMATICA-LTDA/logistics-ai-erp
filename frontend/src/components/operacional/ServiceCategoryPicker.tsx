@@ -18,7 +18,7 @@ export function ServiceCategoryPicker({ categories, onChange, dreAccountLabel }:
       <div>
         <p className="text-sm font-medium text-slate-800">Natureza do serviço (DRE)</p>
         <p className="text-xs text-slate-500">
-          Marque o que foi prestado — Transporte e Frete separados das demais opções para alimentar as contas de receita.
+          Só Frete e Transporte nesta OS. Estacionamento e lava-rápido ficam nos módulos do menu Operacional.
         </p>
       </div>
 

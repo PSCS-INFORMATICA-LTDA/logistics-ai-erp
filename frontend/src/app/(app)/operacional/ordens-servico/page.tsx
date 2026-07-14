@@ -442,7 +442,7 @@ function OrdensServicoPageContent() {
       initialEditId={initialEditId}
       initialNewDraft={initialNewDraft}
       title="Ordens de Serviço"
-      description="Transporte, estacionamento e lava-rápido — natureza do serviço vinculada às contas DRE"
+      description="Frete e Transporte — natureza do serviço vinculada às contas DRE (pátio e lava nos módulos próprios)"
       table="service_orders"
       orderBy="service_date"
       softDelete={false}
@@ -611,7 +611,7 @@ function OrdensServicoPageContent() {
               : [];
 
             if (categories.length === 0) {
-              window.alert("Selecione ao menos uma natureza de serviço (Transporte, Frete, etc.).");
+              window.alert("Selecione ao menos uma natureza de serviço (Transporte ou Frete).");
               return;
             }
 
