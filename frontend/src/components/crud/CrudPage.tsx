@@ -41,6 +41,8 @@ type CrudPageProps<T extends { id: string }> = {
   refreshKey?: number;
   /** Abre o formulário de edição deste id após carregar (ex.: link da agenda). */
   initialEditId?: string | null;
+  /** Abre «Novo» com campos pré-preenchidos (ex.: placa/data da agenda). */
+  initialNewDraft?: Partial<T> | null;
 };
 
 export function CrudPage<T extends { id: string }>({
@@ -62,6 +64,7 @@ export function CrudPage<T extends { id: string }>({
   deleteBlockedReason,
   refreshKey = 0,
   initialEditId = null,
+  initialNewDraft = null,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const [items, setItems] = useState<T[]>([]);
@@ -72,6 +75,7 @@ export function CrudPage<T extends { id: string }>({
   const [saving, setSaving] = useState(false);
   const formPanelRef = useRef<HTMLDivElement>(null);
   const openedEditIdRef = useRef<string | null>(null);
+  const openedNewDraftRef = useRef(false);
   const supabase = createClient();
 
   const formPanelKey = isNew ? "new" : String(editing?.id ?? "edit");
@@ -129,6 +133,14 @@ export function CrudPage<T extends { id: string }>({
     setIsNew(false);
     openedEditIdRef.current = initialEditId;
   }, [initialEditId, items, loading, canEditRow, editBlockedReason]);
+
+  useEffect(() => {
+    if (initialEditId || !initialNewDraft || loading) return;
+    if (openedNewDraftRef.current) return;
+    setEditing({ ...initialNewDraft });
+    setIsNew(true);
+    openedNewDraftRef.current = true;
+  }, [initialEditId, initialNewDraft, loading]);
 
   const handleSave = async (data: Record<string, unknown>): Promise<string | null> => {
     if (!companyId) return null;

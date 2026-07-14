@@ -7,15 +7,18 @@ import {
   dayLabel,
   dayPeriodAvailability,
   formatMinutes,
+  newOsFromScheduleHref,
   orderHref,
   routeSummary,
   scheduleSegmentLabel,
   serviceTypeColor,
   SCHEDULE_WORK_END_MIN,
   SCHEDULE_WORK_START_MIN,
+  type FreeSlot,
   type ScheduleSegment,
 } from "@/lib/vehicle-schedule";
 import type { VehicleScheduleRow } from "@/lib/vehicle-schedule-api";
+import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
 type Selection = {
@@ -190,6 +193,20 @@ export function VehicleScheduleBoard({
                             <span className="block space-y-0.5 px-1 py-2 text-xs text-emerald-700">
                               <span className="block font-medium">Livre o dia</span>
                               <span className="block text-[0.65rem]">Manhã e tarde</span>
+                              <Link
+                                href={newOsFromScheduleHref({
+                                  vehicleId: vehicle.id,
+                                  dayKey,
+                                  startMin: SCHEDULE_WORK_START_MIN,
+                                  endMin: SCHEDULE_WORK_END_MIN,
+                                })}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-1 inline-flex"
+                              >
+                                <Button type="button" size="sm" variant="secondary">
+                                  Nova OS
+                                </Button>
+                              </Link>
                             </span>
                           ) : (
                             <div className="space-y-1">
@@ -290,20 +307,21 @@ export function VehicleScheduleBoard({
                   Sem janela livre (há OS ainda não concluída neste dia).
                 </p>
               ) : (
-                <ul className="mt-2 flex flex-wrap gap-2">
+                <ul className="mt-2 space-y-2">
                   {freeSlots.map((slot, index) => (
-                    <li
+                    <FreeSlotRow
                       key={index}
-                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-900"
-                    >
-                      {formatMinutes(slot.startMin)} – {formatMinutes(slot.endMin)}
-                    </li>
+                      slot={slot}
+                      vehicleId={selectedVehicle.id}
+                      dayKey={selection.dayKey}
+                    />
                   ))}
                 </ul>
               )}
               <p className="mt-2 text-xs text-slate-500">
-                Se a OS da manhã for SP → interior/outro estado e a saída for à tarde, a tarde fica ocupada
-                até o horário de saída cadastrado na OS.
+                Clique em <strong>Nova OS neste horário</strong> para abrir o cadastro já com placa, data
+                e janela. Se a manhã for SP → fora e a saída for à tarde, a tarde fica ocupada até a
+                saída da OS.
               </p>
             </section>
           </div>
@@ -339,6 +357,35 @@ export function VehicleScheduleBoard({
         </p>
       )}
     </div>
+  );
+}
+
+function FreeSlotRow({
+  slot,
+  vehicleId,
+  dayKey,
+}: {
+  slot: FreeSlot;
+  vehicleId: string;
+  dayKey: string;
+}) {
+  const href = newOsFromScheduleHref({
+    vehicleId,
+    dayKey,
+    startMin: slot.startMin,
+    endMin: slot.endMin,
+  });
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2">
+      <span className="text-sm font-medium text-emerald-900">
+        {formatMinutes(slot.startMin)} – {formatMinutes(slot.endMin)}
+      </span>
+      <Link href={href} className="inline-flex">
+        <Button type="button" size="sm">
+          Nova OS neste horário
+        </Button>
+      </Link>
+    </li>
   );
 }
 

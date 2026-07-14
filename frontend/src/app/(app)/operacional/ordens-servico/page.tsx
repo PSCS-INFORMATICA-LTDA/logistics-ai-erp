@@ -64,6 +64,7 @@ function OrdensServicoPageContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("q") ?? searchParams.get("code") ?? "";
   const initialEditId = searchParams.get("edit") ?? searchParams.get("id");
+  const wantsNewFromSchedule = searchParams.get("new") === "1";
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
@@ -357,6 +358,38 @@ function OrdensServicoPageContent() {
     vehicle_category: v.vehicle_category,
   }));
 
+  const initialNewDraft = useMemo(() => {
+    if (!wantsNewFromSchedule || initialEditId) return null;
+    const vehicleId = searchParams.get("vehicle_id") ?? "";
+    // Espera a frota carregar para pré-preencher placa corretamente
+    if (vehicleId && vehicles.length === 0) return null;
+    const serviceDate =
+      searchParams.get("service_date") ??
+      searchParams.get("entry_date") ??
+      new Date().toISOString().slice(0, 10);
+    const entryDate = searchParams.get("entry_date") ?? serviceDate;
+    const exitDate = searchParams.get("exit_date") ?? "";
+    const entryTime = searchParams.get("entry_time") ?? "";
+    const exitTime = searchParams.get("exit_time") ?? "";
+    const serviceType = searchParams.get("service_type") ?? "Transporte";
+    const selected = vehicleOptions.find((v) => v.value === vehicleId);
+    return {
+      vehicle_id: vehicleId,
+      plate: selected ? normalizePlate(selected.plate) : "",
+      vehicle_type: selected?.vehicle_category ?? "",
+      model: selected?.model ?? "",
+      year: selected?.year ?? "",
+      service_date: serviceDate,
+      entry_date: entryDate,
+      entry_time: entryTime,
+      exit_date: exitDate,
+      exit_time: exitTime,
+      service_type: serviceType,
+      status: "Aberto",
+      service_categories: categoriesForServiceType(serviceType),
+    } as Partial<ServiceOrderListRow>;
+  }, [wantsNewFromSchedule, initialEditId, searchParams, vehicleOptions, vehicles.length]);
+
   const driverOptions = [
     { value: "", label: "— Sem motorista —" },
     ...drivers.map((d) => ({ value: d.id, label: `${d.code} — ${d.name}` })),
@@ -376,6 +409,7 @@ function OrdensServicoPageContent() {
     <CrudPage<ServiceOrderListRow>
       refreshKey={listRefreshKey}
       initialEditId={initialEditId}
+      initialNewDraft={initialNewDraft}
       title="Ordens de Serviço"
       description="Transporte, estacionamento e lava-rápido — natureza do serviço vinculada às contas DRE"
       table="service_orders"
@@ -858,6 +892,7 @@ function VehicleSelectionSync({
   vehicleId: string;
   vehicleOptions: Array<{
     value: string;
+    plate?: string;
     vehicle_category?: string;
     axle_count?: number | null;
   }>;
@@ -868,11 +903,17 @@ function VehicleSelectionSync({
   useEffect(() => {
     if (!vehicleId || vehicleOptions.length === 0) return;
     const vehicle = vehicleOptions.find((v) => v.value === vehicleId);
-    if (!vehicle?.vehicle_category) return;
+    if (!vehicle) return;
 
-    if (currentCategory !== vehicle.vehicle_category) {
+    if (vehicle.plate) {
+      set("plate", normalizePlate(vehicle.plate));
+    }
+
+    if (vehicle.vehicle_category && currentCategory !== vehicle.vehicle_category) {
       set("vehicle_type", vehicle.vehicle_category);
     }
+
+    if (!vehicle.vehicle_category) return;
 
     if (isTruckCategory(vehicle.vehicle_category)) {
       if (!currentAxles && vehicle.axle_count != null) {

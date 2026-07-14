@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import { fetchVehicleScheduleData } from "@/lib/vehicle-schedule-api";
-import { formatWeekRangeLabel } from "@/lib/vehicle-schedule";
+import { formatWeekRangeLabel, newOsFromScheduleHref, toDayKey } from "@/lib/vehicle-schedule";
 import { useCompany } from "@/lib/company-context";
 import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
@@ -120,6 +120,10 @@ export default function AgendaVeiculosPage() {
               Clique em <strong>abrir OS</strong> no bloco — vai direto para a Ordem de Serviço
               (origem, destino, cliente, etc.).
             </li>
+            <li>
+              Em horário livre, use <strong>Nova OS neste horário</strong> — já abre com placa, data e
+              janela preenchidas.
+            </li>
           </ol>
         </div>
 
@@ -187,10 +191,20 @@ export default function AgendaVeiculosPage() {
             </Button>
           ) : null}
           <Link
-            href="/operacional/ordens-servico"
-            className="text-sm font-medium text-brand-700 underline-offset-2 hover:underline"
+            href={
+              vehicleId
+                ? newOsFromScheduleHref({
+                    vehicleId,
+                    dayKey: selection?.dayKey ?? toDayKey(weekAnchor),
+                    startMin: 6 * 60,
+                    endMin: 22 * 60,
+                    serviceType: serviceType || undefined,
+                  })
+                : "/operacional/ordens-servico?new=1"
+            }
+            className="inline-flex"
           >
-            + Nova OS
+            <Button type="button">+ Nova OS</Button>
           </Link>
         </div>
 

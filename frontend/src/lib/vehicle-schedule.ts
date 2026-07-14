@@ -239,6 +239,30 @@ export function orderHref(orderId: string): string {
   return `/operacional/ordens-servico?edit=${encodeURIComponent(orderId)}`;
 }
 
+export type NewOsFromScheduleParams = {
+  vehicleId: string;
+  dayKey: string;
+  startMin?: number;
+  endMin?: number;
+  serviceType?: string;
+};
+
+/** Link para nova OS já com placa, data e janela de horário da agenda. */
+export function newOsFromScheduleHref(params: NewOsFromScheduleParams): string {
+  const q = new URLSearchParams();
+  q.set("new", "1");
+  q.set("vehicle_id", params.vehicleId);
+  q.set("service_date", params.dayKey);
+  q.set("entry_date", params.dayKey);
+  if (params.startMin != null) q.set("entry_time", formatMinutes(params.startMin));
+  if (params.endMin != null) {
+    q.set("exit_date", params.dayKey);
+    q.set("exit_time", formatMinutes(params.endMin));
+  }
+  if (params.serviceType) q.set("service_type", params.serviceType);
+  return `/operacional/ordens-servico?${q.toString()}`;
+}
+
 export function routeSummary(seg: ScheduleSegment): string | null {
   if (!seg.originAddress && !seg.destinationAddress) return null;
   const from = seg.originAddress || "—";
