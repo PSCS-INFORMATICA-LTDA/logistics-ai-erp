@@ -63,8 +63,8 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Área | Decisão / estado |
 |------|------------------|
 | Campos formulário | Liquid glass: **verde** = preencher; **amarelo** = obrigatório (pedido Filipe). |
-| Passageiros na OS | Botão **+ Passageiro** corrigido; linhas vazias só limpas no save. Campos de passageiros e voo só no tipo **Transporte** (ocultos em Frete, Estacionamento, Lava-rápido). |
-| Voucher motorista | Valores motorista/ajudante **em branco** no voucher; sistema/designação guardam os valores. |
+| Passageiros na OS | Só no tipo **Transporte**. Frete/Estacionamento/Lava-rápido escondem o painel; natureza DRE só-Frete também alinha o tipo e esconde. |
+| Voucher motorista | Valores motorista/ajudante **em branco** no voucher; sistema/designação guardam os valores. Foto do motorista no cadastro → voucher Transporte/Frete. SQL: `apply-040-driver-photo.sql`. |
 | Sócios | RG / CPF / CNPJ + validações BR. |
 | Parâmetros | Senha master + frase de recuperação + permissões por tela/sócio. |
 | Auth | Cadastro/login e-mail + reset de senha. |

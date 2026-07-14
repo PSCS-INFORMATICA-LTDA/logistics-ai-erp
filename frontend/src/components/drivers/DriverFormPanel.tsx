@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { AttachmentGallery } from "@/components/drivers/AttachmentGallery";
 import { CnhScanner, type CnhScanPayload } from "@/components/drivers/CnhScanner";
+import { DriverPhotoUpload } from "@/components/drivers/DriverPhotoUpload";
 import { Alert } from "@/components/ui/Badge";
 import { uploadEntityAttachment } from "@/lib/attachments";
+import { uploadDriverPhoto } from "@/lib/driver-photo";
 import { applyCnhOcrToForm } from "@/lib/cnh-ocr";
 import type { CnhScanAsset } from "@/lib/cnh-document";
 import {
@@ -40,14 +42,20 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
   const [cnhError, setCnhError] = useState<string | null>(null);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [pendingCnhAssets, setPendingCnhAssets] = useState<CnhScanAsset[]>([]);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [photoStoragePath, setPhotoStoragePath] = useState<string | null>(
+    item?.photo_storage_path ?? null
+  );
   const [attachmentRefreshKey, setAttachmentRefreshKey] = useState(0);
 
   useEffect(() => {
     setPendingCnhAssets([]);
+    setPendingPhotoFile(null);
+    setPhotoStoragePath(item?.photo_storage_path ?? null);
     setUploadMsg(null);
     setCnhError(null);
     setDuplicateWarning(null);
-  }, [item?.id]);
+  }, [item?.id, item?.photo_storage_path]);
 
   const checkDuplicate = async (name: string) => {
     if (!companyId || !name) {
@@ -122,6 +130,18 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
 
           const driverId = await onSave(data);
           if (!driverId || !companyId) return;
+
+          if (pendingPhotoFile) {
+            const { error: photoError } = await uploadDriverPhoto({
+              companyId,
+              driverId,
+              file: pendingPhotoFile,
+              previousPath: photoStoragePath,
+            });
+            if (photoError) {
+              window.alert(`Motorista salvo, mas a foto não foi enviada: ${photoError}`);
+            }
+          }
 
           if (pendingCnhAssets.length > 0) {
             let uploaded = 0;
@@ -218,6 +238,16 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
                     options: STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
                   },
                 ]}
+              />
+
+              <DriverPhotoUpload
+                companyId={companyId}
+                driverId={item?.id ?? null}
+                photoStoragePath={photoStoragePath}
+                disabled={saving}
+                pendingFile={pendingPhotoFile}
+                onPendingFileChange={setPendingPhotoFile}
+                onPhotoPathChange={setPhotoStoragePath}
               />
 
               <fieldset className="space-y-4 rounded-lg border border-slate-200 p-4">

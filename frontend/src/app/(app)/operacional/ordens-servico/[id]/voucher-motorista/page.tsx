@@ -14,6 +14,7 @@ import {
   resolveDesignatedDriverId,
 } from "@/lib/service-order-display-status";
 import { useCompany } from "@/lib/company-context";
+import { getDriverPhotoUrl } from "@/lib/driver-photo";
 import { createClient } from "@/lib/supabase/client";
 import type { Driver, ServiceOrder, Vehicle } from "@/types/database";
 
@@ -104,6 +105,9 @@ export default function ServiceOrderDriverVoucherPage() {
 
       const driver = driverRes.data as Driver | null;
       const vehicle = vehicleRes.data as Vehicle | null;
+      const driverPhotoUrl = await getDriverPhotoUrl(driver?.photo_storage_path);
+
+      if (cancelled) return;
 
       setContext({
         companyName: company?.trade_name || company?.name || "GRX Management",
@@ -111,6 +115,7 @@ export default function ServiceOrderDriverVoucherPage() {
         driverName: driver?.name ?? "Motorista designado",
         driverDocument: driver?.document ?? driver?.cnh_number ?? null,
         driverPhone: driver?.phone ?? null,
+        driverPhotoUrl,
         vehicleDescription: buildVehicleDescription(row, vehicle),
       });
 

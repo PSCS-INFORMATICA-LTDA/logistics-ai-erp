@@ -20,6 +20,7 @@ export type DriverVoucherContext = {
   driverName: string;
   driverDocument: string | null;
   driverPhone: string | null;
+  driverPhotoUrl?: string | null;
   vehicleDescription: string;
 };
 
@@ -187,7 +188,20 @@ export function ServiceOrderDriverVoucherView({
           </div>
         ) : null}
 
-        <div className="mt-4 grid gap-0 sm:grid-cols-2">
+        <div className="mt-4 grid gap-0 sm:grid-cols-[auto_1fr_1fr]">
+          {context.driverPhotoUrl ? (
+            <div className="border border-slate-300 p-2">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Foto
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={context.driverPhotoUrl}
+                alt={context.driverName}
+                className="h-28 w-28 rounded object-cover print:h-24 print:w-24"
+              />
+            </div>
+          ) : null}
           <VoucherCell
             label="Motorista"
             value={[context.driverName, context.driverDocument, context.driverPhone]

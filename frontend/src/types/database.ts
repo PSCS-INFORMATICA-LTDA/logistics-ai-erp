@@ -97,6 +97,8 @@ export type Driver = {
   bank_code: string | null;
   bank_agency: string | null;
   bank_account: string | null;
+  /** Caminho Storage da foto usada no voucher (Transporte / Frete). */
+  photo_storage_path: string | null;
 };
 
 export type ServiceOrderPassenger = {
