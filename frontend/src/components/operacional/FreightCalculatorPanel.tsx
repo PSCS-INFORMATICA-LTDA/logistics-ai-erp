@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AddressWithCepField } from "@/components/operacional/AddressWithCepField";
 import { Alert } from "@/components/ui/Badge";
@@ -10,15 +10,19 @@ import { buildTollLookupLinks } from "@/lib/freight-toll-links";
 import type { FreightTollPlaza } from "@/lib/qualp-freight";
 import { billablePerDiemTotal } from "@/lib/freight-per-diem";
 import {
+  DEFAULT_ROUND_TRIP_FROM_KM,
+  estimateKmRevenue,
+} from "@/lib/freight-rates";
+import { resolveFreightRate, seedFreightRateDefaults } from "@/lib/freight-rates-api";
+import {
   DEFAULT_VAN_KM_RATE,
-  estimateVanTransportReference,
   formatKmRate,
   isTruckCategory,
   resolveQualpAxlesForTolls,
   resolveVanKmRate,
-  VAN_TRANSPORT_REFERENCE_TABLE,
 } from "@/lib/transport-van-estimate";
 import { glassField } from "@/lib/liquid-glass-styles";
+import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 
 type FreightForm = {
@@ -57,6 +61,8 @@ type Props = {
   onApplyAgreedToServiceAmount?: (value: number) => void;
   mode?: "frete" | "transporte";
   vehicleCategory?: string | null;
+  companyId?: string | null;
+  serviceDate?: string | null;
 };
 
 function updateSuggestedTotal(
@@ -77,9 +83,12 @@ export function FreightCalculatorPanel({
   onApplyAgreedToServiceAmount,
   mode = "frete",
   vehicleCategory = null,
+  companyId = null,
+  serviceDate = null,
 }: Props) {
   const isFrete = mode === "frete";
   const isTruck = isTruckCategory(vehicleCategory);
+  const supabase = useMemo(() => createClient(), []);
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [loadingAntt, setLoadingAntt] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +96,10 @@ export function FreightCalculatorPanel({
   const [routeInfo, setRouteInfo] = useState<string | null>(null);
   const [qualpLink, setQualpLink] = useState<string | null>(null);
   const [qualpActive, setQualpActive] = useState<boolean | null>(null);
+  const [masterRatePerKm, setMasterRatePerKm] = useState<number | null>(null);
+  const [roundTripFromKm, setRoundTripFromKm] = useState(DEFAULT_ROUND_TRIP_FROM_KM);
+  const [masterRateCode, setMasterRateCode] = useState<string | null>(null);
+  const [masterRateError, setMasterRateError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -101,6 +114,41 @@ export function FreightCalculatorPanel({
     })();
   }, []);
 
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    const onDate = (serviceDate && String(serviceDate).slice(0, 10)) || new Date().toISOString().slice(0, 10);
+    const modality = isFrete ? "Frete" : "Transporte";
+    void (async () => {
+      await seedFreightRateDefaults(supabase, companyId);
+      const resolved = await resolveFreightRate({
+        supabase,
+        companyId,
+        modality,
+        vehicleCategory,
+        onDate,
+      });
+      if (cancelled) return;
+      if ("error" in resolved) {
+        setMasterRateError(resolved.error);
+        setMasterRatePerKm(null);
+        setMasterRateCode(null);
+        return;
+      }
+      setMasterRateError(null);
+      setMasterRatePerKm(resolved.ratePerKm);
+      setRoundTripFromKm(resolved.roundTripFromKm);
+      setMasterRateCode(resolved.code);
+      // Ao mudar categoria/modalidade, aplica a tarifa mestre (override fica no campo amarelo depois).
+      set("freight_transport_km_rate", resolved.ratePerKm);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Só reage a company/modalidade/categoria/data — não ao override digitado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, isFrete, vehicleCategory, serviceDate, supabase]);
+
   const tolls = Array.isArray(form.freight_toll_detail) ? form.freight_toll_detail : [];
   const piso = Number(form.freight_antt_minimum) || 0;
   const pedagio = Number(form.freight_toll_amount) || 0;
@@ -114,11 +162,12 @@ export function FreightCalculatorPanel({
   const diff = fechado > 0 ? fechado - sugerido : 0;
   const tollCount = Number(form.freight_toll_count) || tolls.length;
   const distanceKm = Number(form.freight_distance_km) || 0;
-  const vanKmRate = resolveVanKmRate(form.freight_transport_km_rate);
-  const vanReference = estimateVanTransportReference(distanceKm, vanKmRate);
-  const presetMatch = VAN_TRANSPORT_REFERENCE_TABLE.some(
-    (row) => Math.abs(row.ratePerKm - vanKmRate) < 0.001
+  const kmRate = resolveVanKmRate(
+    form.freight_transport_km_rate ?? masterRatePerKm ?? DEFAULT_VAN_KM_RATE
   );
+  const kmEstimate = estimateKmRevenue(distanceKm, kmRate, roundTripFromKm);
+  const isOverride =
+    masterRatePerKm != null && Math.abs(kmRate - masterRatePerKm) >= 0.001;
   const tollLookupLinks = buildTollLookupLinks(
     String(form.freight_origin_address ?? ""),
     String(form.freight_destination_address ?? "")
@@ -238,11 +287,15 @@ export function FreightCalculatorPanel({
     }
   };
 
-  const applyVanReference = () => {
-    const suggested = Math.round((vanReference + pedagio + perDiem) * 100) / 100;
+  const applyKmReference = () => {
+    const suggested = Math.round((kmEstimate.amount + pedagio + perDiem) * 100) / 100;
     set("freight_suggested_total", suggested);
     set("freight_agreed_amount", suggested);
     onApplyAgreedToServiceAmount?.(suggested);
+  };
+
+  const resetToMasterRate = () => {
+    if (masterRatePerKm != null) set("freight_transport_km_rate", masterRatePerKm);
   };
 
   const applySuggested = () => {
@@ -430,103 +483,91 @@ export function FreightCalculatorPanel({
           </>
         )}
 
-        {!isFrete && (
-          <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50/50 p-3 sm:col-span-2">
-            <div>
-              <p className="text-sm font-medium text-slate-800">Tabela orientativa — transporte em van</p>
+        <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50/50 p-3 sm:col-span-2">
+          <div>
+            <p className="text-sm font-medium text-slate-800">Tarifa da empresa (R$/km)</p>
+            <p className="text-xs text-slate-500">
+              Preço-base em{" "}
+              <Link href="/configuracoes/parametros-frete" className="text-brand-700 underline">
+                Parâmetros de frete
+              </Link>
+              . Amarelo = override só desta OS (recalcula na hora).
+            </p>
+          </div>
+
+          {masterRateError ? <Alert variant="warning">{masterRateError}</Alert> : null}
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Tarifa mestre</span>
+              <input
+                className={glassField(false)}
+                readOnly
+                value={
+                  masterRatePerKm != null
+                    ? `${formatKmRate(masterRatePerKm)}${masterRateCode ? ` (${masterRateCode})` : ""}`
+                    : "— sem cadastro —"
+                }
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Valor por km (R$) desta OS</span>
+              <input
+                type="number"
+                min={0.01}
+                step="0.01"
+                className={glassField(true)}
+                value={String(form.freight_transport_km_rate ?? masterRatePerKm ?? "")}
+                onChange={(e) => set("freight_transport_km_rate", e.target.value)}
+              />
+              <span className="text-xs text-slate-500">
+                {isOverride
+                  ? "Override ativo (diferente do cadastro mestre)."
+                  : "Usando tarifa do cadastro mestre."}
+              </span>
+            </label>
+            <div className="flex flex-col justify-end gap-1 text-sm">
+              <p>
+                Distância rota: <strong>{distanceKm || "—"} km</strong>
+              </p>
+              <p>
+                Km cobrados:{" "}
+                <strong>
+                  {distanceKm > 0 ? `${kmEstimate.billableKm} km` : "—"}
+                  {kmEstimate.isRoundTrip ? " (ida e volta)" : ""}
+                </strong>
+              </p>
               <p className="text-xs text-slate-500">
-                A ANTT não define piso para van de passageiros. Escolha um perfil ou informe valor/km
-                personalizado.
+                Regra ida/volta a partir de {roundTripFromKm} km
               </p>
             </div>
+          </div>
 
-            <div className="overflow-x-auto rounded-md border border-brand-100 bg-white">
-              <table className="min-w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Perfil</th>
-                    <th className="px-3 py-2 font-medium">R$/km</th>
-                    <th className="px-3 py-2 font-medium">Indicação</th>
-                    <th className="px-3 py-2 font-medium text-right">Ref. 500 km</th>
-                    <th className="px-3 py-2 font-medium text-right">Ref. 1.000 km</th>
-                    <th className="px-3 py-2 font-medium" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {VAN_TRANSPORT_REFERENCE_TABLE.map((row) => {
-                    const selected = Math.abs(row.ratePerKm - vanKmRate) < 0.001;
-                    return (
-                      <tr
-                        key={row.id}
-                        className={`border-t border-slate-100 ${selected ? "bg-brand-50" : ""}`}
-                      >
-                        <td className="px-3 py-2 font-medium text-slate-800">{row.profile}</td>
-                        <td className="px-3 py-2">{formatKmRate(row.ratePerKm)}</td>
-                        <td className="px-3 py-2 text-slate-600">{row.hint}</td>
-                        <td className="px-3 py-2 text-right">
-                          {formatCurrency(estimateVanTransportReference(500, row.ratePerKm))}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          {formatCurrency(estimateVanTransportReference(1000, row.ratePerKm))}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <Button
-                            type="button"
-                            variant={selected ? "primary" : "secondary"}
-                            size="sm"
-                            onClick={() => set("freight_transport_km_rate", row.ratePerKm)}
-                          >
-                            {selected ? "Selecionado" : "Usar"}
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Valor por km (R$) — personalizado</span>
-                <input
-                  type="number"
-                  min={0.01}
-                  step="0.01"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  value={String(form.freight_transport_km_rate ?? DEFAULT_VAN_KM_RATE)}
-                  onChange={(e) => set("freight_transport_km_rate", e.target.value)}
-                />
-                <span className="text-xs text-slate-500">
-                  {presetMatch
-                    ? "Tarifa alinhada a um perfil da tabela."
-                    : "Tarifa personalizada (fora dos perfis padrão)."}
-                </span>
-              </label>
-              <div className="flex flex-col justify-end text-sm">
-                <p>
-                  Tarifa ativa: <strong>{formatKmRate(vanKmRate)}</strong>
-                </p>
-                <p>
-                  Referência desta rota ({distanceKm || "—"} km):{" "}
-                  <strong>{distanceKm > 0 ? formatCurrency(vanReference) : "—"}</strong>
-                </p>
-                <p className="text-xs text-slate-500">
-                  + pedágio {formatCurrency(pedagio)}
-                  {perDiem > 0 ? ` + despesas ${formatCurrency(perDiem)}` : ""}
-                </p>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-end gap-3 text-sm">
+            <p>
+              Referência km:{" "}
+              <strong>{distanceKm > 0 ? formatCurrency(kmEstimate.amount) : "—"}</strong>
+              <span className="text-xs text-slate-500">
+                {" "}
+                + pedágio {formatCurrency(pedagio)}
+                {perDiem > 0 ? ` + despesas ${formatCurrency(perDiem)}` : ""}
+              </span>
+            </p>
+            {isOverride && masterRatePerKm != null ? (
+              <Button type="button" variant="ghost" size="sm" onClick={resetToMasterRate}>
+                Voltar à tarifa mestre
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="secondary"
-              disabled={distanceKm <= 0}
-              onClick={applyVanReference}
+              disabled={distanceKm <= 0 || kmEstimate.amount <= 0}
+              onClick={applyKmReference}
             >
-              Usar referência + pedágio na OS
+              {isFrete ? "Usar tarifa km + pedágio no sugerido" : "Usar referência + pedágio na OS"}
             </Button>
           </div>
-        )}
+        </div>
       </div>
 
       {tollLookupLinks.length > 0 && qualpActive !== true && (

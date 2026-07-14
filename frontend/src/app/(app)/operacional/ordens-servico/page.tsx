@@ -1016,6 +1016,8 @@ function OrdensServicoPageContent() {
                       set={set}
                       mode={isFrete ? "frete" : "transporte"}
                       vehicleCategory={String(form.vehicle_type ?? "") || null}
+                      companyId={companyId}
+                      serviceDate={String(form.service_date ?? "") || null}
                       onApplyAgreedToServiceAmount={(value) => set("service_amount", value)}
                     />
                     <FreightPerDiemPanel

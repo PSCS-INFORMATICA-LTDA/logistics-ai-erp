@@ -74,6 +74,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Agenda frota | Aba **Agenda da frota** (semana por placa, horários livres, baseada em OS entrada/saída). |
 | DRE empresa | Aba **Lançamentos da empresa** — receitas/despesas gerais (geladeira, escritório…) sem placa. SQL: `apply-039-company-ledger.sql`. |
 | Estacionamento / Lava | Módulos próprios: portes + tabela de preços (diária/mensal/lava) em **Parâmetros do pátio**; ordens em Operacional → Estacionamento / Lava-rápido; DRE **Receita Estacionamento** / **Receita Lava Rápido** no fechamento. Clipe de comprovante **opcional** antes de finalizar. SQL: `apply-041-patio-parking-wash.sql` + `apply-042-patio-payment-proof-attachments.sql`. Na OS geral: **Tipo** e **Natureza DRE** só **Frete** e **Transporte**. |
+| Tarifas frete/km | Cadastro mestre em **Parâmetros de frete** (R$/km por modalidade + categoria; ida/volta a partir de N km, padrão 500). OS puxa a tarifa e permite override amarelo — sem chips de sugestão. SQL: `apply-043-freight-rate-tables.sql`. |
 | Multiempresa | `companies` + `company_members` + RLS desde o schema V1. |
 
 ---
