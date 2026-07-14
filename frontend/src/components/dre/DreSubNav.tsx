@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { glassTabLink, glassTabsNav } from "@/lib/liquid-glass-styles";
 
 const TABS = [
+  { href: "/dre/lancamentos", label: "Lançamentos da empresa" },
   { href: "/dre/despesas-motorista", label: "Despesas motorista / ajudante" },
   { href: "/dre/despesas-veiculo", label: "Despesas do veículo" },
 ] as const;

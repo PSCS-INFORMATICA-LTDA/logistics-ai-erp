@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   {
     label: "DRE",
     children: [
+      { href: "/dre/lancamentos", label: "Lançamentos da empresa" },
       { href: "/dre/despesas-motorista", label: "Despesas motorista / ajudante" },
       { href: "/dre/despesas-veiculo", label: "Despesas do veículo" },
     ],

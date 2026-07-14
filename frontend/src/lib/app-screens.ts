@@ -34,6 +34,12 @@ export const APP_SCREENS: AppScreen[] = [
     href: "/operacional/infracoes",
   },
   {
+    key: "dre.lancamentos",
+    label: "Lançamentos da empresa",
+    group: "DRE",
+    href: "/dre/lancamentos",
+  },
+  {
     key: "dre.despesas-motorista",
     label: "Despesas motorista / ajudante",
     group: "DRE",
