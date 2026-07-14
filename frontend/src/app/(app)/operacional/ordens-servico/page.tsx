@@ -64,6 +64,31 @@ function serviceTypeLabel(type: string): string {
   return SERVICE_ORDER_TYPE_LABELS[type] ?? type;
 }
 
+/** Pré-preenche o próximo código (OS00x) ao abrir nova OS — o campo não fica em branco. */
+function SuggestedOsCode({
+  companyId,
+  isNew,
+  code,
+  set,
+}: {
+  companyId: string | null;
+  isNew: boolean;
+  code: string;
+  set: (key: string, value: unknown) => void;
+}) {
+  useEffect(() => {
+    if (!isNew || !companyId || code.trim()) return;
+    let cancelled = false;
+    void nextCode("service_orders", companyId, "OS").then((next) => {
+      if (!cancelled) set("code", next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isNew, companyId, code, set]);
+  return null;
+}
+
 function OrdensServicoPageContent() {
   const { companyId } = useCompany();
   const searchParams = useSearchParams();
@@ -740,8 +765,16 @@ function OrdensServicoPageContent() {
               }
             };
 
+            const isNewOrder = !item?.id;
+
             return (
               <>
+                <SuggestedOsCode
+                  companyId={companyId}
+                  isNew={isNewOrder}
+                  code={String(form.code ?? "")}
+                  set={set}
+                />
                 <FormFields
                   form={form}
                   set={(key, value) => {
@@ -756,7 +789,15 @@ function OrdensServicoPageContent() {
                     set(key, value);
                   }}
                   fields={[
-                    { name: "code", label: "Código", required: true },
+                    {
+                      name: "code",
+                      label: "Código",
+                      required: !isNewOrder,
+                      placeholder: isNewOrder ? "Gerando código…" : undefined,
+                      hint: isNewOrder
+                        ? "Preenchido automaticamente (OS001, OS002…). Pode alterar se precisar."
+                        : undefined,
+                    },
                     {
                       name: "service_type",
                       label: "Tipo de operação",
