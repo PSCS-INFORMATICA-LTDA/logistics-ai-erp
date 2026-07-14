@@ -49,8 +49,8 @@ const NAV: NavItem[] = [
     children: [
       { href: "/configuracoes/integracoes", label: "Integrações" },
       { href: "/configuracoes/mensalidade", label: "Mensalidade" },
-      { href: "/configuracoes/parametros-frete", label: "Parâmetros de frete" },
       { href: "/configuracoes/parametros-patio", label: "Parâmetros do pátio" },
+      { href: "/configuracoes/parametros-frete", label: "Parâmetros de frete" },
       { href: "/configuracoes/parametros", label: "Parâmetros" },
     ],
   },

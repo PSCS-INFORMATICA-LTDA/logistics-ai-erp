@@ -103,16 +103,16 @@ export const APP_SCREENS: AppScreen[] = [
     href: "/configuracoes/mensalidade",
   },
   {
-    key: "configuracoes.parametros-frete",
-    label: "Parâmetros de frete",
-    group: "Configurações",
-    href: "/configuracoes/parametros-frete",
-  },
-  {
     key: "configuracoes.parametros-patio",
     label: "Parâmetros do pátio",
     group: "Configurações",
     href: "/configuracoes/parametros-patio",
+  },
+  {
+    key: "configuracoes.parametros-frete",
+    label: "Parâmetros de frete",
+    group: "Configurações",
+    href: "/configuracoes/parametros-frete",
   },
   {
     key: "configuracoes.parametros",
