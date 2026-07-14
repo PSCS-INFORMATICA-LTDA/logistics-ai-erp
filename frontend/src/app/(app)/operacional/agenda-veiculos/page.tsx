@@ -202,9 +202,9 @@ export default function AgendaVeiculosPage() {
                   })
                 : "/operacional/ordens-servico?new=1"
             }
-            className="inline-flex"
+            className="liquid-glass-btn liquid-glass-btn--primary relative z-0 inline-flex shrink-0 items-center justify-center rounded-xl px-4 py-2 text-sm font-medium"
           >
-            <Button type="button">+ Nova OS</Button>
+            <span className="relative z-10">+ Nova OS</span>
           </Link>
         </div>
 

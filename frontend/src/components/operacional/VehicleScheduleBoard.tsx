@@ -18,7 +18,7 @@ import {
   type ScheduleSegment,
 } from "@/lib/vehicle-schedule";
 import type { VehicleScheduleRow } from "@/lib/vehicle-schedule-api";
-import { Button } from "@/components/ui/Button";
+import { glassAction } from "@/lib/liquid-glass-styles";
 import { cn } from "@/lib/utils";
 
 type Selection = {
@@ -201,11 +201,9 @@ export function VehicleScheduleBoard({
                                   endMin: SCHEDULE_WORK_END_MIN,
                                 })}
                                 onClick={(e) => e.stopPropagation()}
-                                className="mt-1 inline-flex"
+                                className={cn(glassAction("brand", true), "mt-1")}
                               >
-                                <Button type="button" size="sm" variant="secondary">
-                                  Nova OS
-                                </Button>
+                                Nova OS
                               </Link>
                             </span>
                           ) : (
@@ -380,10 +378,8 @@ function FreeSlotRow({
       <span className="text-sm font-medium text-emerald-900">
         {formatMinutes(slot.startMin)} – {formatMinutes(slot.endMin)}
       </span>
-      <Link href={href} className="inline-flex">
-        <Button type="button" size="sm">
-          Nova OS neste horário
-        </Button>
+      <Link href={href} className={glassAction("brand", true)}>
+        Nova OS neste horário
       </Link>
     </li>
   );
