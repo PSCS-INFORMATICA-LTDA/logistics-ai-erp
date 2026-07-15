@@ -131,10 +131,10 @@ export function VehiclePhotoUpload({
   return (
     <div className={`space-y-3 sm:col-span-2 ${glassFilterPanel()}`}>
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">Foto do veículo</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Foto do veículo (obrigatória na frota)</h3>
         <p className="mt-1 text-xs text-slate-600">
-          Foto mestre da frota. Ao selecionar o veículo na OS, a imagem aparece só para
-          visualização (sem upload na ordem).
+          Envie a foto mestre aqui no cadastro. Na OS e no voucher ela aparece só para
+          visualização — sem upload na ordem.
         </p>
       </div>
 

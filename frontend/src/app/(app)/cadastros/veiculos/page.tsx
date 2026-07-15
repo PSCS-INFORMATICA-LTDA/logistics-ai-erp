@@ -32,7 +32,7 @@ export default function VeiculosPage() {
   return (
     <CrudPage<Vehicle>
       title="Veículos"
-      description="Cadastro oficial da frota — placa normalizada automaticamente"
+      description="Cadastro oficial da frota — foto mestre + placa normalizada automaticamente"
       table="vehicles"
       orderBy="plate"
       columns={[
@@ -50,7 +50,7 @@ export default function VeiculosPage() {
       ]}
       renderForm={({ item, onSave, onCancel, saving }) => (
         <VehicleForm
-          item={item}
+          item={item ?? null}
           companyId={companyId}
           partners={partners}
           saving={saving}
@@ -70,7 +70,7 @@ function VehicleForm({
   onSave,
   onCancel,
 }: {
-  item: Vehicle | null;
+  item: Partial<Vehicle> | null;
   companyId: string | null;
   partners: Partner[];
   saving: boolean;
@@ -148,6 +148,15 @@ function VehicleForm({
 
         return (
           <>
+            <VehiclePhotoUpload
+              companyId={companyId}
+              vehicleId={item?.id ?? null}
+              photoStoragePath={photoStoragePath}
+              pendingFile={pendingPhotoFile}
+              onPendingFileChange={setPendingPhotoFile}
+              onPhotoPathChange={setPhotoStoragePath}
+            />
+
             <FormFields
               form={form}
               set={setField}
@@ -202,15 +211,6 @@ function VehicleForm({
                 </label>
               </div>
             )}
-
-            <VehiclePhotoUpload
-              companyId={companyId}
-              vehicleId={item?.id ?? null}
-              photoStoragePath={photoStoragePath}
-              pendingFile={pendingPhotoFile}
-              onPendingFileChange={setPendingPhotoFile}
-              onPhotoPathChange={setPhotoStoragePath}
-            />
           </>
         );
       }}
