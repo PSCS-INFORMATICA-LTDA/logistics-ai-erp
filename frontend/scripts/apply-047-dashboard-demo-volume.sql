@@ -29,7 +29,29 @@ DECLARE
   v_start DATE := (date_trunc('month', CURRENT_DATE) - INTERVAL '3 months')::date;
   v_end DATE := CURRENT_DATE;
   v_count BIGINT;
+  v_date_col TEXT;
+  v_pct_50 NUMERIC;
+  v_pct_100 NUMERIC;
 BEGIN
+  -- Produção pode ter start_date (legado) ou effective_date (migration 004)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vehicle_ownership' AND column_name = 'effective_date'
+  ) THEN
+    v_date_col := 'effective_date';
+    v_pct_50 := 50.00;
+    v_pct_100 := 100.00;
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vehicle_ownership' AND column_name = 'start_date'
+  ) THEN
+    v_date_col := 'start_date';
+    -- Escala unitária legada (0.5 = 50%)
+    v_pct_50 := 0.50;
+    v_pct_100 := 1.00;
+  ELSE
+    RAISE EXCEPTION 'vehicle_ownership sem coluna effective_date nem start_date';
+  END IF;
   SELECT id INTO v_rec_van FROM chart_of_accounts
     WHERE company_id = p_company_id AND name = 'Receita Van' LIMIT 1;
   SELECT id INTO v_rec_cam FROM chart_of_accounts
@@ -97,26 +119,32 @@ BEGIN
     AND vehicle_id IN (v_swu, v_ghr, v_tls, v_suy);
 
   IF v_swu IS NOT NULL THEN
-    INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, effective_date, status)
-    VALUES
-      (p_company_id, v_swu, v_rafael, 50.00, v_start, 'Ativo'),
-      (p_company_id, v_swu, v_malu, 50.00, v_start, 'Ativo');
+    EXECUTE format(
+      'INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, %I, status)
+       VALUES ($1,$2,$3,$4,$5,''Ativo''), ($1,$2,$6,$4,$5,''Ativo'')',
+      v_date_col
+    ) USING p_company_id, v_swu, v_rafael, v_pct_50, v_start, v_malu;
   END IF;
   IF v_tls IS NOT NULL THEN
-    INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, effective_date, status)
-    VALUES
-      (p_company_id, v_tls, v_rafael, 50.00, v_start, 'Ativo'),
-      (p_company_id, v_tls, v_malu, 50.00, v_start, 'Ativo');
+    EXECUTE format(
+      'INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, %I, status)
+       VALUES ($1,$2,$3,$4,$5,''Ativo''), ($1,$2,$6,$4,$5,''Ativo'')',
+      v_date_col
+    ) USING p_company_id, v_tls, v_rafael, v_pct_50, v_start, v_malu;
   END IF;
   IF v_suy IS NOT NULL THEN
-    INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, effective_date, status)
-    VALUES
-      (p_company_id, v_suy, v_rafael, 50.00, v_start, 'Ativo'),
-      (p_company_id, v_suy, v_malu, 50.00, v_start, 'Ativo');
+    EXECUTE format(
+      'INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, %I, status)
+       VALUES ($1,$2,$3,$4,$5,''Ativo''), ($1,$2,$6,$4,$5,''Ativo'')',
+      v_date_col
+    ) USING p_company_id, v_suy, v_rafael, v_pct_50, v_start, v_malu;
   END IF;
   IF v_ghr IS NOT NULL THEN
-    INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, effective_date, status)
-    VALUES (p_company_id, v_ghr, v_grx, 100.00, v_start, 'Ativo');
+    EXECUTE format(
+      'INSERT INTO vehicle_ownership (company_id, vehicle_id, partner_id, ownership_percentage, %I, status)
+       VALUES ($1,$2,$3,$4,$5,''Ativo'')',
+      v_date_col
+    ) USING p_company_id, v_ghr, v_grx, v_pct_100, v_start;
   END IF;
 
   DELETE FROM financial_transactions
