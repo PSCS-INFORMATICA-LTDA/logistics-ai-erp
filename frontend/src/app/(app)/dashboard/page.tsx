@@ -401,7 +401,7 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-slate-900">
                     Participação na receita
                   </h2>
-                  <div className="rounded-2xl bg-sky-50/95 p-3 ring-1 ring-sky-100/90">
+                  <div className="rounded-2xl bg-sky-100/95 p-3 ring-1 ring-sky-200/90">
                     <PieChart3D
                       compact
                       slices={[
