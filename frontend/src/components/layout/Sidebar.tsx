@@ -17,11 +17,11 @@ const NAV: NavItem[] = [
   {
     label: "Operacional",
     children: [
+      { href: "/operacional/agenda-veiculos", label: "Agenda da Frota" },
       {
         href: "/operacional/ordens-servico",
         label: "Ordem de Serviço — Transporte e Frete",
       },
-      { href: "/operacional/agenda-veiculos", label: "Agenda da Frota" },
       { href: "/operacional/estacionamento", label: "Estacionamento" },
       { href: "/operacional/lava-rapido", label: "Lava-rápido" },
       { href: "/operacional/infracoes", label: "Infrações de Trânsito" },
@@ -147,7 +147,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </Link>
           <button
             type="button"
-            className="sidebar-close-btn lg:hidden"
+            className="sidebar-close-btn"
             aria-label="Fechar menu"
             onClick={onClose}
           >

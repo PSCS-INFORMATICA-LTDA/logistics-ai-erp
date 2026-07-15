@@ -16,16 +16,16 @@ export type AppScreen = {
 export const APP_SCREENS: AppScreen[] = [
   { key: "dashboard", label: "Dashboard", group: "Geral", href: "/dashboard" },
   {
-    key: "operacional.ordens-servico",
-    label: "Ordem de Serviço — Transporte e Frete",
-    group: "Operacional",
-    href: "/operacional/ordens-servico",
-  },
-  {
     key: "operacional.agenda-veiculos",
     label: "Agenda da Frota",
     group: "Operacional",
     href: "/operacional/agenda-veiculos",
+  },
+  {
+    key: "operacional.ordens-servico",
+    label: "Ordem de Serviço — Transporte e Frete",
+    group: "Operacional",
+    href: "/operacional/ordens-servico",
   },
   {
     key: "operacional.estacionamento",

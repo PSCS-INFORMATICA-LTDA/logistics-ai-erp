@@ -68,7 +68,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Foto veículo | Foto mestre em Cadastros → Veículos (`vehicles.photo_storage_path`, bucket `company-attachments`). Na OS/voucher Frete/Transporte: preview **somente leitura** (sem upload na OS). SQL: `apply-045-vehicle-photo.sql`. |
 | Dashboard 3D | Navegação por produto (Geral / Frete-Transporte / Estacionamento / Lava). Geral: 3 pizzas (receita, despesa, societário). Filtros: período preset + **De/Até** (data), placa/sócio/%. Base DEMO via RPC `seed_dashboard_demo` (Senha Máster). SQL: `apply-047-dashboard-demo-volume.sql` + `reset-dashboard-demo.sql`. |
 | Sócios | RG / CPF / CNPJ + validações BR. |
-| Menu / nomes | OS = **Ordem de Serviço — Transporte e Frete**; **Agenda da Frota** logo abaixo. DRE com iniciais maiúsculas (Empresa, Motorista/Ajudante, Veículo). Ordem dos blocos: Cadastros → **Parâmetros** → **Configurações** (Integrações + Mensalidade). |
+| Menu / nomes | Operacional: **Agenda da Frota** acima de **Ordem de Serviço — Transporte e Frete**. DRE com iniciais maiúsculas (Empresa, Motorista/Ajudante, Veículo). Ordem dos blocos: Cadastros → **Parâmetros** → **Configurações** (Integrações + Mensalidade). Sem ✕ ao lado do logo no desktop (só no menu mobile). |
 | Parâmetros | **Senha Máster - Concessão de Acessos** (frase de recuperação + permissões por tela/sócio). |
 | Auth | Cadastro/login e-mail + reset de senha. |
 | DRE motorista | Pagamentos + lançamento automático Motorista/Ajudante. |
