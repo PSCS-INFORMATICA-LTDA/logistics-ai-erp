@@ -48,13 +48,12 @@ function makeSliceGeometry(startDeg: number, endDeg: number, radius: number) {
   shape.lineTo(0, 0);
 
   return new THREE.ExtrudeGeometry(shape, {
-    // Espessura discreta — como na foto de referência (não um “bloco”).
-    depth: 0.2,
+    depth: 0.16,
     bevelEnabled: true,
-    bevelThickness: 0.018,
-    bevelSize: 0.016,
+    bevelThickness: 0.012,
+    bevelSize: 0.01,
     bevelOffset: 0,
-    bevelSegments: 3,
+    bevelSegments: 2,
     curveSegments: 28,
   });
 }
@@ -89,8 +88,8 @@ function buildArcs(slices: PieSlice[]): Arc[] {
 }
 
 /**
- * Pizza 3D WebGL no estilo da referência anexada:
- * fatias explodidas, extrusão com bisel, material mate, luz suave.
+ * Pizza 3D WebGL mate (sem liquid glass), container quadrado (sem ovalar),
+ * tamanho contido no dashboard.
  */
 export function PieChart3D({ slices, compact = false }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -105,15 +104,28 @@ export function PieChart3D({ slices, compact = false }: Props) {
     const host = hostRef.current;
     if (!host || arcs.length === 0) return;
 
-    const width = host.clientWidth || (compact ? 320 : 360);
-    const height = host.clientHeight || (compact ? 320 : 360);
+    const sizePx = () => {
+      const side = Math.min(host.clientWidth || 240, host.clientHeight || 240, 260);
+      return Math.max(180, side);
+    };
 
+    let side = sizePx();
     const scene = new THREE.Scene();
 
-    // Câmera alta, como na foto — pouco “lado”, espessura só sutil.
-    const camera = new THREE.PerspectiveCamera(28, width / height, 0.1, 100);
-    camera.position.set(0, 4.8, 3.0);
-    camera.lookAt(0, 0.08, 0);
+    // Ortográfica + visão alta: círculo redondo, sem “esticar” nem brilho de perspectiva.
+    const frustum = 2.35;
+    const camera = new THREE.OrthographicCamera(
+      -frustum,
+      frustum,
+      frustum,
+      -frustum,
+      0.1,
+      40
+    );
+    camera.position.set(0, 5.2, 3.2);
+    camera.lookAt(0, 0.05, 0);
+    camera.zoom = 1;
+    camera.updateProjectionMatrix();
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -121,39 +133,40 @@ export function PieChart3D({ slices, compact = false }: Props) {
       powerPreference: "high-performance",
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(width, height, false);
+    renderer.setSize(side, side, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    // Sem ACES/filmic — evita “vidro” brilhante nas fatias.
+    renderer.toneMapping = THREE.NoToneMapping;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.replaceChildren(renderer.domElement);
     Object.assign(renderer.domElement.style, {
-      width: "100%",
-      height: "100%",
+      width: `${side}px`,
+      height: `${side}px`,
       display: "block",
+      margin: "0 auto",
     });
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.88));
-    const key = new THREE.DirectionalLight(0xffffff, 0.85);
-    key.position.set(2.2, 5.5, 1.6);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+    const key = new THREE.DirectionalLight(0xffffff, 0.55);
+    key.position.set(1.8, 5.5, 2.0);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(512, 512);
     key.shadow.camera.near = 0.5;
-    key.shadow.camera.far = 18;
-    key.shadow.camera.left = -4;
-    key.shadow.camera.right = 4;
-    key.shadow.camera.top = 4;
-    key.shadow.camera.bottom = -4;
-    key.shadow.radius = 3;
+    key.shadow.camera.far = 16;
+    key.shadow.camera.left = -3;
+    key.shadow.camera.right = 3;
+    key.shadow.camera.top = 3;
+    key.shadow.camera.bottom = -3;
+    key.shadow.radius = 4;
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0xf1f5f9, 0.35);
-    fill.position.set(-3.0, 2.2, -2.0);
+    const fill = new THREE.DirectionalLight(0xf8fafc, 0.25);
+    fill.position.set(-2.4, 2.0, -1.6);
     scene.add(fill);
 
     const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(2.4, 64),
-      new THREE.ShadowMaterial({ opacity: 0.14 })
+      new THREE.CircleGeometry(2.2, 48),
+      new THREE.ShadowMaterial({ opacity: 0.12 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
@@ -163,8 +176,8 @@ export function PieChart3D({ slices, compact = false }: Props) {
     const pie = new THREE.Group();
     scene.add(pie);
 
-    const radius = 1.42;
-    const explode = 0.1;
+    const radius = 1.35;
+    const explode = 0.09;
     const disposables: Array<THREE.BufferGeometry | THREE.Material> = [
       ground.geometry,
       ground.material,
@@ -172,15 +185,12 @@ export function PieChart3D({ slices, compact = false }: Props) {
 
     for (const arc of arcs) {
       const geom = makeSliceGeometry(arc.start, arc.end, radius);
-      const mat = new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshLambertMaterial({
         color: new THREE.Color(arc.color),
-        roughness: 0.55,
-        metalness: 0.02,
       });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      // Shape em XY, extrude em +Z → deita no chão (XZ)
       mesh.rotation.x = -Math.PI / 2;
       const midRad = degToRad(arc.mid - 90);
       mesh.position.x = Math.cos(midRad) * explode;
@@ -190,23 +200,26 @@ export function PieChart3D({ slices, compact = false }: Props) {
       disposables.push(geom, mat);
     }
 
-    // Estático como a foto — sem girar (isso “engrossava” o efeito).
-    renderer.render(scene, camera);
+    const paint = () => renderer.render(scene, camera);
+    paint();
+
     let frame = 0;
     let alive = true;
     const tick = () => {
       if (!alive) return;
       frame = requestAnimationFrame(tick);
-      renderer.render(scene, camera);
+      paint();
     };
     tick();
 
     const onResize = () => {
-      const w = host.clientWidth || width;
-      const h = host.clientHeight || height;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
+      side = sizePx();
+      renderer.setSize(side, side, false);
+      Object.assign(renderer.domElement.style, {
+        width: `${side}px`,
+        height: `${side}px`,
+      });
+      paint();
     };
     const ro = new ResizeObserver(onResize);
     ro.observe(host);
@@ -219,17 +232,12 @@ export function PieChart3D({ slices, compact = false }: Props) {
       renderer.dispose();
       host.replaceChildren();
     };
-    // sceneKey cobre mudanças de fatias; arcs é derivado estável via sceneKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneKey, compact]);
 
   if (total <= 0) {
     return (
-      <div
-        className={`flex items-center justify-center text-sm text-slate-500 ${
-          compact ? "h-80" : "h-72"
-        }`}
-      >
+      <div className="flex h-52 items-center justify-center text-sm text-slate-500">
         Sem resultado atribuído no período.
       </div>
     );
@@ -239,17 +247,13 @@ export function PieChart3D({ slices, compact = false }: Props) {
     <div
       className={
         compact
-          ? "flex flex-col items-stretch gap-3"
-          : "flex flex-col gap-4 sm:flex-row sm:items-center"
+          ? "flex flex-col items-stretch gap-2"
+          : "flex flex-col gap-3 sm:flex-row sm:items-center"
       }
     >
       <div
         ref={hostRef}
-        className={
-          compact
-            ? "mx-auto h-80 w-full max-w-[22rem]"
-            : "mx-auto h-[22rem] w-full max-w-[24rem]"
-        }
+        className="mx-auto aspect-square h-52 w-52 shrink-0 sm:h-56 sm:w-56"
         role="img"
         aria-label="Gráfico de pizza 3D explodida"
       />
@@ -266,7 +270,7 @@ export function PieChart3D({ slices, compact = false }: Props) {
             <li key={a.key} className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-1.5">
                 <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-sm shadow-sm ring-1 ring-black/5"
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/5"
                   style={{ background: a.color }}
                 />
                 <span className="truncate font-medium text-slate-800">{a.label}</span>
