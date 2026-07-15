@@ -104,7 +104,7 @@ export const APP_SCREENS: AppScreen[] = [
   },
   {
     key: "configuracoes.parametros",
-    label: "Senha Master com sessão de acesso",
+    label: "Senha Máster - Concessão de Acessos",
     group: "Parâmetros",
     href: "/configuracoes/parametros",
   },

@@ -54,7 +54,7 @@ const NAV: NavItem[] = [
       { href: "/configuracoes/parametros-frete", label: "Parâmetros de frete" },
       {
         href: "/configuracoes/parametros",
-        label: "Senha Master com sessão de acesso",
+        label: "Senha Máster - Concessão de Acessos",
       },
     ],
   },
