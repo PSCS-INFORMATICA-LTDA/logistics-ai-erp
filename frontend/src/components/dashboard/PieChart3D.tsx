@@ -16,7 +16,7 @@ type Props = {
 };
 
 /** Paleta da referência: azul / laranja (no lugar do branco) / vermelho. */
-const PALETTE = ["#3b82f6", "#f97316", "#ef4444", "#22c55e", "#eab308", "#a855f7"];
+const PALETTE = ["#1e3a8a", "#f97316", "#ef4444", "#22c55e", "#eab308", "#a855f7"];
 
 function shade(hex: string, amount: number): string {
   const raw = hex.replace("#", "");

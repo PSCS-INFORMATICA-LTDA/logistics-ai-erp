@@ -44,12 +44,12 @@ const EMPTY_FILTERS: DashboardFilters = {
 
 /** Cores sólidas no estilo pizza 3D explodida (azul / branco / vermelho…). */
 const PRODUCT_COLORS = {
-  frete: "#3b82f6",
+  frete: "#1e3a8a",
   estacionamento: "#f97316",
   lava: "#ef4444",
 } as const;
 
-const PARTNER_COLORS = ["#3b82f6", "#f97316", "#ef4444", "#22c55e", "#eab308"] as const;
+const PARTNER_COLORS = ["#1e3a8a", "#f97316", "#ef4444", "#22c55e", "#eab308"] as const;
 
 function KpiStrip({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
@@ -401,7 +401,7 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-slate-900">
                     Participação na receita
                   </h2>
-                  <div className="rounded-2xl bg-sky-100/95 p-3 ring-1 ring-sky-200/90">
+                  <div className="rounded-2xl bg-blue-200/90 p-3 ring-1 ring-blue-300/80">
                     <PieChart3D
                       compact
                       slices={[
