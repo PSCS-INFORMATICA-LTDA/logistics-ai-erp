@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DashboardModuleCard } from "@/components/dashboard/DashboardModuleCard";
-import { DashboardSection } from "@/components/dashboard/DashboardSection";
+import {
+  DashboardProductNav,
+  type DashboardProductTab,
+} from "@/components/dashboard/DashboardProductNav";
 import { PieChart3D } from "@/components/dashboard/PieChart3D";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -37,10 +40,120 @@ const EMPTY_FILTERS: DashboardFilters = {
   ownershipPct: "",
 };
 
+const PRODUCT_COLORS = {
+  frete: "#0369a1",
+  estacionamento: "#d97706",
+  lava: "#0d9488",
+} as const;
+
+function KpiStrip({ snapshot }: { snapshot: DashboardSnapshot }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {[
+        { label: "Receita", value: snapshot.kpis.revenue, tone: "text-emerald-700" },
+        { label: "Despesa", value: snapshot.kpis.expense, tone: "text-red-700" },
+        {
+          label: "Resultado",
+          value: snapshot.kpis.result,
+          tone: snapshot.kpis.result >= 0 ? "text-sky-700" : "text-red-700",
+        },
+        {
+          label: "Margem",
+          value: snapshot.kpis.marginPct,
+          tone: "text-slate-800",
+          isPct: true,
+        },
+      ].map((kpi) => (
+        <div key={kpi.label} className={`rounded-xl px-3 py-2 ${glassFilterPanel()}`}>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            {kpi.label}
+          </p>
+          <p className={`mt-1 text-xl font-bold tabular-nums ${kpi.tone}`}>
+            {"isPct" in kpi && kpi.isPct
+              ? `${kpi.value.toFixed(1)}%`
+              : formatCurrency(kpi.value)}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            {snapshot.from} → {snapshot.to}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OwnershipBlock({ snapshot }: { snapshot: DashboardSnapshot }) {
+  return (
+    <div className={`space-y-4 ${glassFilterPanel()}`}>
+      <div>
+        <h3 className="text-sm font-semibold text-slate-900">Participações societárias</h3>
+        <p className="text-xs text-slate-500">
+          Rateio do frete por placa × % (use os filtros de placa/sócio/%).
+        </p>
+      </div>
+      <PieChart3D
+        slices={snapshot.participationByPartner.map((p) => ({
+          key: p.partnerId,
+          label: p.partnerName,
+          value: Math.max(0, p.result),
+        }))}
+      />
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-2 py-2">Sócio</th>
+              <th className="px-2 py-2">Placa</th>
+              <th className="px-2 py-2">%</th>
+              <th className="px-2 py-2">Receita</th>
+              <th className="px-2 py-2">Despesa</th>
+              <th className="px-2 py-2">Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {snapshot.participationRows.map((row) => (
+              <tr
+                key={`${row.partnerId}-${row.vehicleId}`}
+                className="border-t border-slate-100"
+              >
+                <td className="px-2 py-2 font-medium">
+                  {row.partnerName}
+                  {row.isFullOwner ? (
+                    <span className="ml-2 inline-block">
+                      <Badge variant="success">100%</Badge>
+                    </span>
+                  ) : Math.abs(row.ownershipPct - 50) < 0.51 ? (
+                    <span className="ml-2 inline-block">
+                      <Badge variant="default">50%</Badge>
+                    </span>
+                  ) : null}
+                </td>
+                <td className="px-2 py-2">{row.plate}</td>
+                <td className="px-2 py-2">{row.ownershipPct.toFixed(0)}%</td>
+                <td className="px-2 py-2">{formatCurrency(row.revenue)}</td>
+                <td className="px-2 py-2">{formatCurrency(row.expense)}</td>
+                <td className="px-2 py-2 font-medium">{formatCurrency(row.result)}</td>
+              </tr>
+            ))}
+            {snapshot.participationRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
+                  Nenhum rateio para os filtros selecionados.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { companyId } = useCompany();
   const supabase = useMemo(() => createClient(), []);
   const [period, setPeriod] = useState<DashboardPeriodKey>("last_4_months");
+  const [product, setProduct] = useState<DashboardProductTab>("geral");
   const [filters, setFilters] = useState<DashboardFilters>(EMPTY_FILTERS);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +203,7 @@ export default function DashboardPage() {
       );
       return;
     }
-    setMsg("Base DEMO volumosa carregada. Use os filtros por placa, sócio e participação.");
+    setMsg("Base DEMO volumosa carregada. Navegue pelos produtos do dashboard.");
     await load();
   };
 
@@ -131,14 +244,15 @@ export default function DashboardPage() {
     })),
   ];
 
+  const showFleetFilters = product === "geral" || product === "frete";
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Acompanhamento de Frete/Transporte, Estacionamento, Lava-rápido e rateio por
-            participação.
+            Navegue por produto: visão geral, Frete/Transporte, Estacionamento e Lava-rápido.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -174,39 +288,41 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-4 ${glassFilterPanel()}`}>
-        <GlassSelect
-          label="Placa"
-          value={filters.plate}
-          onChange={(plate) => setFilters((f) => ({ ...f, plate }))}
-          options={plateOptions}
-        />
-        <GlassSelect
-          label="Sócio"
-          value={filters.partnerId}
-          onChange={(partnerId) => setFilters((f) => ({ ...f, partnerId }))}
-          options={partnerOptions}
-        />
-        <GlassSelect
-          label="Participação"
-          value={filters.ownershipPct}
-          onChange={(ownershipPct) => setFilters((f) => ({ ...f, ownershipPct }))}
-          options={pctOptions}
-        />
-        <div className="flex items-end">
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            disabled={
-              !filters.plate && !filters.partnerId && !filters.ownershipPct
-            }
-            onClick={() => setFilters(EMPTY_FILTERS)}
-          >
-            Limpar filtros
-          </Button>
+      <DashboardProductNav value={product} onChange={setProduct} />
+
+      {showFleetFilters ? (
+        <div className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-4 ${glassFilterPanel()}`}>
+          <GlassSelect
+            label="Placa"
+            value={filters.plate}
+            onChange={(plate) => setFilters((f) => ({ ...f, plate }))}
+            options={plateOptions}
+          />
+          <GlassSelect
+            label="Sócio"
+            value={filters.partnerId}
+            onChange={(partnerId) => setFilters((f) => ({ ...f, partnerId }))}
+            options={partnerOptions}
+          />
+          <GlassSelect
+            label="Participação"
+            value={filters.ownershipPct}
+            onChange={(ownershipPct) => setFilters((f) => ({ ...f, ownershipPct }))}
+            options={pctOptions}
+          />
+          <div className="flex items-end">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={!filters.plate && !filters.partnerId && !filters.ownershipPct}
+              onClick={() => setFilters(EMPTY_FILTERS)}
+            >
+              Limpar filtros
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {error ? <Alert variant="error">{error}</Alert> : null}
       {msg ? <Alert variant="info">{msg}</Alert> : null}
@@ -221,130 +337,157 @@ export default function DashboardPage() {
         <Loading />
       ) : (
         <>
-          <DashboardSection
-            id="dash-visao-geral"
-            title="Visão geral"
-            subtitle={`${snapshot.from} → ${snapshot.to}`}
-          >
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                { label: "Receita", value: snapshot.kpis.revenue, tone: "text-emerald-700" },
-                { label: "Despesa", value: snapshot.kpis.expense, tone: "text-red-700" },
-                {
-                  label: "Resultado",
-                  value: snapshot.kpis.result,
-                  tone: snapshot.kpis.result >= 0 ? "text-sky-700" : "text-red-700",
-                },
-                {
-                  label: "Margem",
-                  value: snapshot.kpis.marginPct,
-                  tone: "text-slate-800",
-                  isPct: true,
-                },
-              ].map((kpi) => (
-                <div key={kpi.label} className="rounded-xl bg-white/50 px-3 py-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    {kpi.label}
-                  </p>
-                  <p className={`mt-1 text-xl font-bold tabular-nums ${kpi.tone}`}>
-                    {"isPct" in kpi && kpi.isPct
-                      ? `${kpi.value.toFixed(1)}%`
-                      : formatCurrency(kpi.value)}
-                  </p>
+          {product === "geral" ? (
+            <div className="space-y-5">
+              <KpiStrip snapshot={snapshot} />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className={`space-y-3 ${glassFilterPanel()}`}>
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Participação na receita
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Quanto cada produto contribui no faturamento do período.
+                    </p>
+                  </div>
+                  <PieChart3D
+                    slices={[
+                      {
+                        key: "frete",
+                        label: "Frete / Transporte",
+                        value: snapshot.frete.revenue,
+                        color: PRODUCT_COLORS.frete,
+                      },
+                      {
+                        key: "estac",
+                        label: "Estacionamento",
+                        value: snapshot.estacionamento.revenue,
+                        color: PRODUCT_COLORS.estacionamento,
+                      },
+                      {
+                        key: "lava",
+                        label: "Lava-rápido",
+                        value: snapshot.lava.revenue,
+                        color: PRODUCT_COLORS.lava,
+                      },
+                    ]}
+                  />
                 </div>
-              ))}
-            </div>
-          </DashboardSection>
-
-          <DashboardSection
-            id="dash-frete"
-            title="Frete / Transporte"
-            subtitle="Receita Van/Caminhão e despesas da frota (manhã e tarde)"
-          >
-            <DashboardModuleCard totals={snapshot.frete} trend={snapshot.freteTrend} />
-          </DashboardSection>
-
-          <DashboardSection
-            id="dash-estacionamento"
-            title="Estacionamento"
-            subtitle="Receita Estacionamento e custos do pátio"
-          >
-            <DashboardModuleCard
-              totals={snapshot.estacionamento}
-              trend={snapshot.estacionamentoTrend}
-            />
-          </DashboardSection>
-
-          <DashboardSection
-            id="dash-lava"
-            title="Lava-rápido"
-            subtitle="Receita Lava Rápido e materiais"
-          >
-            <DashboardModuleCard totals={snapshot.lava} trend={snapshot.lavaTrend} />
-          </DashboardSection>
-
-          <DashboardSection
-            id="dash-participacoes"
-            title="Participações societárias"
-            subtitle="Rateio por placa × % — filtre 50% ou 100% para comparar grupos"
-          >
-            <PieChart3D
-              slices={snapshot.participationByPartner.map((p) => ({
-                key: p.partnerId,
-                label: p.partnerName,
-                value: Math.max(0, p.result),
-              }))}
-            />
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-2 py-2">Sócio</th>
-                    <th className="px-2 py-2">Placa</th>
-                    <th className="px-2 py-2">%</th>
-                    <th className="px-2 py-2">Receita</th>
-                    <th className="px-2 py-2">Despesa</th>
-                    <th className="px-2 py-2">Resultado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {snapshot.participationRows.map((row) => (
-                    <tr
-                      key={`${row.partnerId}-${row.vehicleId}`}
-                      className="border-t border-slate-100"
-                    >
-                      <td className="px-2 py-2 font-medium">
-                        {row.partnerName}
-                        {row.isFullOwner ? (
-                          <span className="ml-2 inline-block">
-                            <Badge variant="success">100%</Badge>
-                          </span>
-                        ) : Math.abs(row.ownershipPct - 50) < 0.51 ? (
-                          <span className="ml-2 inline-block">
-                            <Badge variant="default">50%</Badge>
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-2 py-2">{row.plate}</td>
-                      <td className="px-2 py-2">{row.ownershipPct.toFixed(0)}%</td>
-                      <td className="px-2 py-2">{formatCurrency(row.revenue)}</td>
-                      <td className="px-2 py-2">{formatCurrency(row.expense)}</td>
-                      <td className="px-2 py-2 font-medium">
-                        {formatCurrency(row.result)}
-                      </td>
-                    </tr>
-                  ))}
-                  {snapshot.participationRows.length === 0 ? (
+                <div className={`space-y-3 ${glassFilterPanel()}`}>
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Participação nas despesas
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Distribuição dos custos por produto no período.
+                    </p>
+                  </div>
+                  <PieChart3D
+                    slices={[
+                      {
+                        key: "frete-d",
+                        label: "Frete / Transporte",
+                        value: snapshot.frete.expense,
+                        color: PRODUCT_COLORS.frete,
+                      },
+                      {
+                        key: "estac-d",
+                        label: "Estacionamento",
+                        value: snapshot.estacionamento.expense,
+                        color: PRODUCT_COLORS.estacionamento,
+                      },
+                      {
+                        key: "lava-d",
+                        label: "Lava-rápido",
+                        value: snapshot.lava.expense,
+                        color: PRODUCT_COLORS.lava,
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className={`overflow-x-auto ${glassFilterPanel()}`}>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">
+                  Resumo por produto
+                </h3>
+                <table className="min-w-full text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-500">
                     <tr>
-                      <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                        Nenhum rateio para os filtros selecionados.
-                      </td>
+                      <th className="px-2 py-2">Produto</th>
+                      <th className="px-2 py-2">Receita</th>
+                      <th className="px-2 py-2">Despesa</th>
+                      <th className="px-2 py-2">Resultado</th>
+                      <th className="px-2 py-2">% receita</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        ["Frete / Transporte", snapshot.frete],
+                        ["Estacionamento", snapshot.estacionamento],
+                        ["Lava-rápido", snapshot.lava],
+                      ] as const
+                    ).map(([label, totals]) => {
+                      const share =
+                        snapshot.kpis.revenue > 0
+                          ? (totals.revenue / snapshot.kpis.revenue) * 100
+                          : 0;
+                      return (
+                        <tr key={label} className="border-t border-slate-100">
+                          <td className="px-2 py-2 font-medium">{label}</td>
+                          <td className="px-2 py-2">{formatCurrency(totals.revenue)}</td>
+                          <td className="px-2 py-2">{formatCurrency(totals.expense)}</td>
+                          <td className="px-2 py-2 font-medium">
+                            {formatCurrency(totals.result)}
+                          </td>
+                          <td className="px-2 py-2">{share.toFixed(1)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <OwnershipBlock snapshot={snapshot} />
             </div>
-          </DashboardSection>
+          ) : null}
+
+          {product === "frete" ? (
+            <div className="space-y-5">
+              <div className={glassFilterPanel()}>
+                <h2 className="mb-3 text-base font-semibold text-slate-900">
+                  Frete / Transporte
+                </h2>
+                <DashboardModuleCard
+                  subtitle="Receita Van/Caminhão e despesas da frota (manhã e tarde)"
+                  totals={snapshot.frete}
+                  trend={snapshot.freteTrend}
+                />
+              </div>
+              <OwnershipBlock snapshot={snapshot} />
+            </div>
+          ) : null}
+
+          {product === "estacionamento" ? (
+            <div className={glassFilterPanel()}>
+              <h2 className="mb-3 text-base font-semibold text-slate-900">Estacionamento</h2>
+              <DashboardModuleCard
+                subtitle="Receita Estacionamento e custos do pátio"
+                totals={snapshot.estacionamento}
+                trend={snapshot.estacionamentoTrend}
+              />
+            </div>
+          ) : null}
+
+          {product === "lava" ? (
+            <div className={glassFilterPanel()}>
+              <h2 className="mb-3 text-base font-semibold text-slate-900">Lava-rápido</h2>
+              <DashboardModuleCard
+                subtitle="Receita Lava Rápido e materiais"
+                totals={snapshot.lava}
+                trend={snapshot.lavaTrend}
+              />
+            </div>
+          ) : null}
         </>
       )}
     </div>
