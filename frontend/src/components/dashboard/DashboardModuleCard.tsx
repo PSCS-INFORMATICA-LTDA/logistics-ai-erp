@@ -1,13 +1,12 @@
 "use client";
 
 import { IsoBarChart3D, GRX_BAR_COLORS } from "@/components/dashboard/IsoBarChart3D";
-import { glassFilterPanel } from "@/lib/liquid-glass-styles";
 import type { BucketTotals, MonthlyPoint } from "@/lib/dashboard-metrics";
 import { formatCurrency } from "@/lib/utils";
 
 type Props = {
-  title: string;
-  subtitle: string;
+  title?: string;
+  subtitle?: string;
   totals: BucketTotals;
   trend: MonthlyPoint[];
 };
@@ -22,11 +21,13 @@ export function DashboardModuleCard({ title, subtitle, totals, trend }: Props) {
   const sparkMax = Math.max(1, ...trend.map((t) => Math.abs(t.result)));
 
   return (
-    <section className={`space-y-3 ${glassFilterPanel()}`}>
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <p className="text-xs text-slate-500">{subtitle}</p>
-      </div>
+    <div className="space-y-3">
+      {title || subtitle ? (
+        <div>
+          {title ? <h3 className="text-sm font-semibold text-slate-900">{title}</h3> : null}
+          {subtitle ? <p className="text-xs text-slate-500">{subtitle}</p> : null}
+        </div>
+      ) : null}
       <IsoBarChart3D items={items} />
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
         <div>
@@ -71,6 +72,6 @@ export function DashboardModuleCard({ title, subtitle, totals, trend }: Props) {
           </svg>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

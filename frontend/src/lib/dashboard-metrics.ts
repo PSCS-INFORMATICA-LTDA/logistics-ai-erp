@@ -5,7 +5,17 @@ export const DASHBOARD_DEMO_ENTRY_SOURCE = "dashboard_demo";
 
 export type DashboardBucket = "frete" | "estacionamento" | "lava" | "outros";
 
-export type DashboardPeriodKey = "current_month" | "previous_month" | "last_3_months";
+export type DashboardPeriodKey =
+  | "current_month"
+  | "previous_month"
+  | "last_3_months"
+  | "last_4_months";
+
+export type DashboardFilters = {
+  plate: string; // "" = todas
+  partnerId: string; // "" = todos
+  ownershipPct: string; // "" | "50" | "100"
+};
 
 export type BucketTotals = {
   revenue: number;
@@ -25,6 +35,7 @@ export type PartnerShareRow = {
   partnerId: string;
   partnerName: string;
   plate: string;
+  vehicleId: string;
   ownershipPct: number;
   revenue: number;
   expense: number;
@@ -41,6 +52,12 @@ export type PartnerConsolidated = {
   resultSharePct: number;
 };
 
+export type DashboardFilterOptions = {
+  plates: string[];
+  partners: Array<{ id: string; name: string }>;
+  ownershipPcts: number[];
+};
+
 export type DashboardSnapshot = {
   periodKey: DashboardPeriodKey;
   from: string;
@@ -49,10 +66,13 @@ export type DashboardSnapshot = {
   frete: BucketTotals;
   estacionamento: BucketTotals;
   lava: BucketTotals;
-  trend: MonthlyPoint[];
+  freteTrend: MonthlyPoint[];
+  estacionamentoTrend: MonthlyPoint[];
+  lavaTrend: MonthlyPoint[];
   participationRows: PartnerShareRow[];
   participationByPartner: PartnerConsolidated[];
   demoRows: number;
+  filterOptions: DashboardFilterOptions;
 };
 
 export type FtRow = {
@@ -66,6 +86,14 @@ export type FtRow = {
   allocation_vehicle_id: string | null;
   chart_of_account_id: string;
   account_name?: string | null;
+};
+
+export type OwnershipRow = {
+  vehicle_id: string;
+  partner_id: string;
+  partner_name: string;
+  plate: string;
+  ownership_percentage: number;
 };
 
 const FRETE_REVENUE = new Set(["Receita Caminhão", "Receita Van"]);
@@ -165,6 +193,12 @@ export function periodRange(
     return { from: iso(start), to: iso(end) };
   }
 
+  if (key === "last_4_months") {
+    const start = new Date(y, m - 3, 1);
+    const end = new Date(y, m + 1, 0);
+    return { from: iso(start), to: iso(end) };
+  }
+
   const start = new Date(y, m, 1);
   const end = new Date(y, m + 1, 0);
   return { from: iso(start), to: iso(end) };
@@ -211,34 +245,119 @@ export function buildTrend(rows: FtRow[], from: string, to: string): MonthlyPoin
   return [...map.values()];
 }
 
+function normalizeOwnershipPct(raw: number): number {
+  // Corrige escala unitária legada (0.5 → 50) e valores já em 0–100.
+  if (!Number.isFinite(raw)) return 0;
+  if (raw > 0 && raw <= 1) return Number((raw * 100).toFixed(2));
+  return Number(raw);
+}
+
 export function buildSnapshot(params: {
   periodKey: DashboardPeriodKey;
   from: string;
   to: string;
   rows: FtRow[];
-  ownership: Array<{
-    vehicle_id: string;
-    partner_id: string;
-    partner_name: string;
-    plate: string;
-    ownership_percentage: number;
-  }>;
+  ownership: OwnershipRow[];
+  filters?: DashboardFilters;
 }): DashboardSnapshot {
+  const filters: DashboardFilters = params.filters ?? {
+    plate: "",
+    partnerId: "",
+    ownershipPct: "",
+  };
+
+  const ownershipNormalized = params.ownership.map((o) => ({
+    ...o,
+    ownership_percentage: normalizeOwnershipPct(o.ownership_percentage),
+  }));
+
+  const filterOptions: DashboardFilterOptions = {
+    plates: [...new Set(ownershipNormalized.map((o) => o.plate).filter(Boolean))].sort(),
+    partners: [
+      ...new Map(
+        ownershipNormalized.map((o) => [o.partner_id, { id: o.partner_id, name: o.partner_name }])
+      ).values(),
+    ].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    ownershipPcts: [
+      ...new Set(
+        ownershipNormalized.map((o) => Math.round(o.ownership_percentage)).filter((n) => n > 0)
+      ),
+    ].sort((a, b) => a - b),
+  };
+
+  let ownership = ownershipNormalized;
+  if (filters.plate) {
+    ownership = ownership.filter((o) => o.plate === filters.plate);
+  }
+  if (filters.partnerId) {
+    ownership = ownership.filter((o) => o.partner_id === filters.partnerId);
+  }
+  if (filters.ownershipPct) {
+    const target = Number(filters.ownershipPct);
+    ownership = ownership.filter((o) => Math.abs(o.ownership_percentage - target) < 0.51);
+  }
+
+  const vehicleIds = new Set(ownership.map((o) => o.vehicle_id));
+  const plateVehicleIds = filters.plate
+    ? new Set(
+        ownershipNormalized.filter((o) => o.plate === filters.plate).map((o) => o.vehicle_id)
+      )
+    : null;
+  const partnerVehicleIds = filters.partnerId
+    ? new Set(
+        ownershipNormalized
+          .filter((o) => o.partner_id === filters.partnerId)
+          .map((o) => o.vehicle_id)
+      )
+    : null;
+
   const frete = emptyTotals();
   const estacionamento = emptyTotals();
   const lava = emptyTotals();
   const kpis = emptyTotals();
+  const freteRows: FtRow[] = [];
+  const estacRows: FtRow[] = [];
+  const lavaRows: FtRow[] = [];
 
   for (const row of params.rows) {
-    addToTotals(kpis, row);
     const bucket = classifyBucket(row);
-    if (bucket === "frete") addToTotals(frete, row);
-    else if (bucket === "estacionamento") addToTotals(estacionamento, row);
-    else if (bucket === "lava") addToTotals(lava, row);
+
+    if (bucket === "frete") {
+      if (row.allocation_vehicle_id) {
+        if (plateVehicleIds && !plateVehicleIds.has(row.allocation_vehicle_id)) continue;
+        if (partnerVehicleIds && !partnerVehicleIds.has(row.allocation_vehicle_id)) continue;
+        if (
+          filters.ownershipPct &&
+          vehicleIds.size > 0 &&
+          !vehicleIds.has(row.allocation_vehicle_id)
+        ) {
+          continue;
+        }
+      } else if (filters.plate || filters.partnerId || filters.ownershipPct) {
+        continue;
+      }
+      addToTotals(frete, row);
+      freteRows.push(row);
+      addToTotals(kpis, row);
+      continue;
+    }
+
+    // Estacionamento / lava são da empresa (sem placa) — sempre entram nos painéis.
+    if (bucket === "estacionamento") {
+      addToTotals(estacionamento, row);
+      estacRows.push(row);
+      addToTotals(kpis, row);
+    } else if (bucket === "lava") {
+      addToTotals(lava, row);
+      lavaRows.push(row);
+      addToTotals(kpis, row);
+    } else if (!filters.plate && !filters.partnerId && !filters.ownershipPct) {
+      addToTotals(kpis, row);
+    }
   }
 
   const byVehicle = new Map<string, BucketTotals>();
-  for (const row of params.rows) {
+  for (const row of freteRows) {
     if (!row.allocation_vehicle_id) continue;
     const t = byVehicle.get(row.allocation_vehicle_id) ?? emptyTotals();
     addToTotals(t, row);
@@ -248,7 +367,7 @@ export function buildSnapshot(params: {
   const participationRows: PartnerShareRow[] = [];
   const partnerMap = new Map<string, PartnerConsolidated>();
 
-  for (const own of params.ownership) {
+  for (const own of ownership) {
     const vehicleTotals = byVehicle.get(own.vehicle_id) ?? emptyTotals();
     const pct = Number(own.ownership_percentage) / 100;
     const revenue = vehicleTotals.revenue * pct;
@@ -258,6 +377,7 @@ export function buildSnapshot(params: {
       partnerId: own.partner_id,
       partnerName: own.partner_name,
       plate: own.plate,
+      vehicleId: own.vehicle_id,
       ownershipPct: Number(own.ownership_percentage),
       revenue,
       expense,
@@ -300,9 +420,12 @@ export function buildSnapshot(params: {
     frete,
     estacionamento,
     lava,
-    trend: buildTrend(params.rows, params.from, params.to),
+    freteTrend: buildTrend(freteRows, params.from, params.to),
+    estacionamentoTrend: buildTrend(estacRows, params.from, params.to),
+    lavaTrend: buildTrend(lavaRows, params.from, params.to),
     participationRows: participationRows.sort((a, b) => b.result - a.result),
     participationByPartner,
     demoRows,
+    filterOptions,
   };
 }
