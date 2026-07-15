@@ -82,22 +82,32 @@ function KpiStrip({ snapshot }: { snapshot: DashboardSnapshot }) {
   );
 }
 
-function OwnershipBlock({ snapshot }: { snapshot: DashboardSnapshot }) {
+function OwnershipBlock({
+  snapshot,
+  hideChart = false,
+}: {
+  snapshot: DashboardSnapshot;
+  hideChart?: boolean;
+}) {
   return (
-    <div className={`space-y-4 ${glassFilterPanel()}`}>
+    <div className={`space-y-3 ${glassFilterPanel()}`}>
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">Participações societárias</h3>
+        <h3 className="text-sm font-semibold text-slate-900">
+          {hideChart ? "Detalhe do rateio por placa" : "Participações societárias"}
+        </h3>
         <p className="text-xs text-slate-500">
           Rateio do frete por placa × % (use os filtros de placa/sócio/%).
         </p>
       </div>
-      <PieChart3D
-        slices={snapshot.participationByPartner.map((p) => ({
-          key: p.partnerId,
-          label: p.partnerName,
-          value: Math.max(0, p.result),
-        }))}
-      />
+      {!hideChart ? (
+        <PieChart3D
+          slices={snapshot.participationByPartner.map((p) => ({
+            key: p.partnerId,
+            label: p.partnerName,
+            value: Math.max(0, p.result),
+          }))}
+        />
+      ) : null}
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead className="text-xs uppercase text-slate-500">
@@ -338,19 +348,15 @@ export default function DashboardPage() {
       ) : (
         <>
           {product === "geral" ? (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <KpiStrip snapshot={snapshot} />
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div className={`space-y-3 ${glassFilterPanel()}`}>
-                  <div>
-                    <h2 className="text-base font-semibold text-slate-900">
-                      Participação na receita
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Quanto cada produto contribui no faturamento do período.
-                    </p>
-                  </div>
+              <div className="grid gap-3 lg:grid-cols-3">
+                <div className={`space-y-2 ${glassFilterPanel()}`}>
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Participação na receita
+                  </h2>
                   <PieChart3D
+                    compact
                     slices={[
                       {
                         key: "frete",
@@ -373,16 +379,12 @@ export default function DashboardPage() {
                     ]}
                   />
                 </div>
-                <div className={`space-y-3 ${glassFilterPanel()}`}>
-                  <div>
-                    <h2 className="text-base font-semibold text-slate-900">
-                      Participação nas despesas
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Distribuição dos custos por produto no período.
-                    </p>
-                  </div>
+                <div className={`space-y-2 ${glassFilterPanel()}`}>
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Participação nas despesas
+                  </h2>
                   <PieChart3D
+                    compact
                     slices={[
                       {
                         key: "frete-d",
@@ -403,6 +405,19 @@ export default function DashboardPage() {
                         color: PRODUCT_COLORS.lava,
                       },
                     ]}
+                  />
+                </div>
+                <div className={`space-y-2 ${glassFilterPanel()}`}>
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Participações societárias
+                  </h2>
+                  <PieChart3D
+                    compact
+                    slices={snapshot.participationByPartner.map((p) => ({
+                      key: p.partnerId,
+                      label: p.partnerName,
+                      value: Math.max(0, p.result),
+                    }))}
                   />
                 </div>
               </div>
@@ -447,7 +462,7 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               </div>
-              <OwnershipBlock snapshot={snapshot} />
+              <OwnershipBlock snapshot={snapshot} hideChart />
             </div>
           ) : null}
 
