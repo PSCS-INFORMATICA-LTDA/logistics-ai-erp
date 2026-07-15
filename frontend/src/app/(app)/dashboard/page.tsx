@@ -42,14 +42,14 @@ const EMPTY_FILTERS: DashboardFilters = {
   ownershipPct: "",
 };
 
-/** Cores vivas pedidas no vídeo Correção Dash 2. */
+/** Cores do estilo pizza 3D de referência (azul / laranja / verde). */
 const PRODUCT_COLORS = {
-  frete: "#2563eb", // azul royal brilhante
-  estacionamento: "#f97316", // laranja brilhante
-  lava: "#22c55e", // verde brilhante
+  frete: "#2f6bff",
+  estacionamento: "#ff8a1f",
+  lava: "#22c55e",
 } as const;
 
-const PARTNER_COLORS = ["#2563eb", "#22c55e", "#f97316", "#a855f7", "#06b6d4"] as const;
+const PARTNER_COLORS = ["#2f6bff", "#ff8a1f", "#22c55e", "#a855f7", "#06b6d4"] as const;
 
 function KpiStrip({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (

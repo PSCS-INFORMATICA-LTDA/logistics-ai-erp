@@ -1,7 +1,7 @@
 "use client";
 
+import { useId } from "react";
 import { formatCurrency } from "@/lib/utils";
-import { shade, voxelCube } from "@/components/dashboard/pixel-3d";
 
 export type PieSlice = {
   key: string;
@@ -16,27 +16,67 @@ type Props = {
   compact?: boolean;
 };
 
-const PALETTE = ["#2563eb", "#22c55e", "#f97316", "#a855f7", "#06b6d4", "#ef4444"];
+const PALETTE = ["#2f6bff", "#ff8a1f", "#22c55e", "#a855f7", "#06b6d4", "#ef4444"];
 
-type Voxel = {
-  key: string;
-  x: number;
-  y: number;
-  z: number;
-  color: string;
-  sort: number;
-};
+function shade(hex: string, amount: number): string {
+  const raw = hex.replace("#", "");
+  if (raw.length !== 6) return hex;
+  const n = parseInt(raw, 16);
+  const r = Math.min(255, Math.max(0, ((n >> 16) & 255) + amount));
+  const g = Math.min(255, Math.max(0, ((n >> 8) & 255) + amount));
+  const b = Math.min(255, Math.max(0, (n & 255) + amount));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
 
-/** Rosca 3D em voxels (pixel art) — fatias por ângulo. */
-export function PieChart3D({ slices, size = 220, compact = false }: Props) {
-  const chartSize = compact ? Math.max(size, 240) : size;
+function polar(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+/** Face superior do setor (pizza plana). */
+function sectorPath(cx: number, cy: number, r: number, start: number, end: number) {
+  const s = polar(cx, cy, r, end);
+  const e = polar(cx, cy, r, start);
+  const large = end - start > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${e.x} ${e.y} A ${r} ${r} 0 ${large} 1 ${s.x} ${s.y} Z`;
+}
+
+/** Parede lateral curva do setor (extrusão 3D). */
+function wallPath(
+  cx: number,
+  cy: number,
+  r: number,
+  start: number,
+  end: number,
+  depth: number
+) {
+  const outerTopA = polar(cx, cy, r, start);
+  const outerTopB = polar(cx, cy, r, end);
+  const outerBotA = { x: outerTopA.x, y: outerTopA.y + depth };
+  const outerBotB = { x: outerTopB.x, y: outerTopB.y + depth };
+  const large = end - start > 180 ? 1 : 0;
+  return [
+    `M ${outerTopA.x} ${outerTopA.y}`,
+    `A ${r} ${r} 0 ${large} 1 ${outerTopB.x} ${outerTopB.y}`,
+    `L ${outerBotB.x} ${outerBotB.y}`,
+    `A ${r} ${r} 0 ${large} 0 ${outerBotA.x} ${outerBotA.y}`,
+    "Z",
+  ].join(" ");
+}
+
+/**
+ * Pizza 3D estilo referência: disco espesso, gradiente suave, sombra e fatia “explodida”.
+ */
+export function PieChart3D({ slices, size = 260, compact = false }: Props) {
+  const uid = useId().replace(/:/g, "");
+  const chartSize = compact ? Math.max(size, 260) : size;
   const total = slices.reduce((s, x) => s + Math.max(0, x.value), 0);
 
   if (total <= 0) {
     return (
       <div
         className={`flex items-center justify-center text-sm text-slate-500 ${
-          compact ? "h-52" : "h-48"
+          compact ? "h-56" : "h-52"
         }`}
       >
         Sem resultado atribuído no período.
@@ -44,54 +84,43 @@ export function PieChart3D({ slices, size = 220, compact = false }: Props) {
     );
   }
 
-  let cursor = 0;
+  const cx = chartSize / 2;
+  const cy = chartSize / 2 - 6;
+  const r = chartSize * 0.34;
+  const depth = Math.max(22, chartSize * 0.1);
+
+  let angle = -20; // leve rotação para combinar com o exemplo
   const arcs = slices
     .map((slice, i) => {
       const value = Math.max(0, slice.value);
-      const start = cursor;
-      const portion = value / total;
-      cursor += portion;
+      const portion = (value / total) * 360;
+      const start = angle;
+      const end = angle + portion;
+      angle = end;
       return {
         ...slice,
-        start,
-        end: cursor,
-        color: slice.color || PALETTE[i % PALETTE.length],
         value,
+        start,
+        end,
+        portion,
+        color: slice.color || PALETTE[i % PALETTE.length],
+        idx: i,
       };
     })
-    .filter((a) => a.end - a.start > 0.001);
+    .filter((a) => a.portion > 0.2);
 
-  const cx = chartSize / 2;
-  const cy = chartSize / 2 + 10;
-  const outerR = chartSize * 0.34;
-  const innerR = outerR * 0.42;
-  const voxel = compact ? 11 : 12;
-  const layers = 3;
-  const steps = 56;
+  // Explode a 2ª fatia (ou a menor relevante), como no exemplo
+  const explodeIdx =
+    arcs.length >= 2
+      ? arcs.slice().sort((a, b) => a.portion - b.portion)[0]?.idx ?? 1
+      : -1;
 
-  const voxels: Voxel[] = [];
-  for (let i = 0; i < steps; i++) {
-    const t = (i + 0.5) / steps;
-    const arc = arcs.find((a) => t >= a.start && t < a.end) ?? arcs[arcs.length - 1];
-    const angle = t * Math.PI * 2 - Math.PI / 2;
-    for (let ring = 0; ring < 2; ring++) {
-      const rr = innerR + (outerR - innerR) * (0.35 + ring * 0.45);
-      const px = cx + Math.cos(angle) * rr;
-      const py = cy + Math.sin(angle) * rr * 0.55;
-      for (let z = 0; z < layers; z++) {
-        voxels.push({
-          key: `${i}-${ring}-${z}`,
-          x: px - voxel / 2,
-          y: py - z * (voxel * 0.55),
-          z,
-          color: arc.color,
-          sort: py + z * 0.01 + Math.sin(angle) * 0.001,
-        });
-      }
-    }
-  }
-
-  voxels.sort((a, b) => a.sort - b.sort);
+  const offsetFor = (start: number, end: number, idx: number) => {
+    if (idx !== explodeIdx) return { ox: 0, oy: 0 };
+    const mid = (start + end) / 2;
+    const p = polar(0, 0, r * 0.16, mid);
+    return { ox: p.x, oy: p.y * 0.85 };
+  };
 
   return (
     <div
@@ -101,56 +130,92 @@ export function PieChart3D({ slices, size = 220, compact = false }: Props) {
           : "flex flex-col gap-4 sm:flex-row sm:items-center"
       }
     >
-      <div className="relative mx-auto">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-3 rounded-[28px] bg-[repeating-linear-gradient(0deg,rgba(15,23,42,0.03)_0_2px,transparent_2px_4px)]"
+      <svg
+        viewBox={`0 0 ${chartSize} ${chartSize + depth}`}
+        className={compact ? "mx-auto h-56 w-56" : "mx-auto h-60 w-60"}
+        role="img"
+        aria-label="Gráfico de pizza 3D"
+      >
+        <defs>
+          <filter id={`${uid}-shadow`} x="-30%" y="-20%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor="#64748b" floodOpacity="0.28" />
+          </filter>
+          {arcs.map((a) => (
+            <radialGradient
+              key={`g-${a.key}`}
+              id={`${uid}-top-${a.idx}`}
+              cx="38%"
+              cy="32%"
+              r="78%"
+            >
+              <stop offset="0%" stopColor={shade(a.color, 70)} />
+              <stop offset="55%" stopColor={a.color} />
+              <stop offset="100%" stopColor={shade(a.color, -35)} />
+            </radialGradient>
+          ))}
+          <linearGradient id={`${uid}-floor`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(148,163,184,0.18)" />
+            <stop offset="100%" stopColor="rgba(148,163,184,0.02)" />
+          </linearGradient>
+        </defs>
+
+        {/* sombra difusa no chão */}
+        <ellipse
+          cx={cx}
+          cy={cy + depth + 14}
+          rx={r * 0.95}
+          ry={r * 0.22}
+          fill={`url(#${uid}-floor)`}
+          filter={`url(#${uid}-shadow)`}
         />
-        <svg
-          viewBox={`0 0 ${chartSize} ${chartSize}`}
-          className="relative mx-auto h-56 w-56 [image-rendering:pixelated]"
-          role="img"
-          aria-label="Gráfico pixel 3D"
-          shapeRendering="crispEdges"
-        >
-          {/* sombra do chão */}
-          <ellipse
-            cx={cx}
-            cy={cy + 18}
-            rx={outerR * 1.05}
-            ry={outerR * 0.28}
-            fill="rgba(15,23,42,0.12)"
-          />
-          {voxels.map((v) => {
-            const cube = voxelCube(v.x, v.y, voxel, v.color);
-            return (
-              <g key={v.key}>
-                <polygon points={cube.side} fill={cube.colors.side} />
-                <polygon points={cube.front} fill={cube.colors.front} />
-                <polygon points={cube.top} fill={cube.colors.top} />
-                {/* pixel highlight */}
-                <rect
-                  x={v.x + 1}
-                  y={v.y + 1}
-                  width={Math.max(2, voxel * 0.28)}
-                  height={Math.max(2, voxel * 0.22)}
-                  fill="rgba(255,255,255,0.35)"
-                />
-              </g>
-            );
-          })}
-          {/* núcleo pixel */}
-          <rect
-            x={cx - 14}
-            y={cy - 10}
-            width={28}
-            height={20}
-            fill="#f8fafc"
-            stroke={shade("#94a3b8", 0)}
-            strokeWidth={2}
-          />
-        </svg>
-      </div>
+
+        {/* paredes laterais (atrás) — desenha primeiro para profundidade */}
+        {arcs.map((a) => {
+          const { ox, oy } = offsetFor(a.start, a.end, a.idx);
+          return (
+            <path
+              key={`w-${a.key}`}
+              d={wallPath(cx + ox, cy + oy, r, a.start, a.end, depth)}
+              fill={shade(a.color, -55)}
+            />
+          );
+        })}
+
+        {/* faces radiais internas da fatia explodida */}
+        {arcs.map((a) => {
+          if (a.idx !== explodeIdx) return null;
+          const { ox, oy } = offsetFor(a.start, a.end, a.idx);
+          const p1 = polar(cx + ox, cy + oy, r, a.start);
+          const p2 = polar(cx + ox, cy + oy, r, a.end);
+          const c = { x: cx + ox, y: cy + oy };
+          return (
+            <g key={`cut-${a.key}`}>
+              <polygon
+                points={`${c.x},${c.y} ${p1.x},${p1.y} ${p1.x},${p1.y + depth} ${c.x},${c.y + depth}`}
+                fill={shade(a.color, -40)}
+              />
+              <polygon
+                points={`${c.x},${c.y} ${p2.x},${p2.y} ${p2.x},${p2.y + depth} ${c.x},${c.y + depth}`}
+                fill={shade(a.color, -30)}
+              />
+            </g>
+          );
+        })}
+
+        {/* topo suave */}
+        {arcs.map((a) => {
+          const { ox, oy } = offsetFor(a.start, a.end, a.idx);
+          return (
+            <path
+              key={`t-${a.key}`}
+              d={sectorPath(cx + ox, cy + oy, r, a.start, a.end)}
+              fill={`url(#${uid}-top-${a.idx})`}
+              stroke="rgba(255,255,255,0.35)"
+              strokeWidth={0.8}
+            />
+          );
+        })}
+      </svg>
 
       <ul
         className={
@@ -165,7 +230,7 @@ export function PieChart3D({ slices, size = 220, compact = false }: Props) {
             <li key={a.key} className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-1.5">
                 <span
-                  className="h-3 w-3 shrink-0 border border-slate-900/20 shadow-[2px_2px_0_rgba(15,23,42,0.15)]"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-1 ring-black/5"
                   style={{ background: a.color }}
                 />
                 <span className="truncate font-medium text-slate-800">{a.label}</span>

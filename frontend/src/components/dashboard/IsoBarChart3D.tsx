@@ -1,7 +1,7 @@
 "use client";
 
+import { useId } from "react";
 import { formatCurrency } from "@/lib/utils";
-import { voxelCube } from "@/components/dashboard/pixel-3d";
 
 export type IsoBarItem = {
   key: string;
@@ -17,80 +17,87 @@ type Props = {
   height?: number;
 };
 
-/** Torres voxel / pixel 3D (empilhamento de cubos). */
+function shade(hex: string, amount: number): string {
+  const raw = hex.replace("#", "");
+  if (raw.length !== 6) return hex;
+  const n = parseInt(raw, 16);
+  const r = Math.min(255, Math.max(0, ((n >> 16) & 255) + amount));
+  const g = Math.min(255, Math.max(0, ((n >> 8) & 255) + amount));
+  const b = Math.min(255, Math.max(0, (n & 255) + amount));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
+/** Barras 3D lisas (mesmo idioma visual da pizza de referência). */
 export function IsoBarChart3D({ items, height = 200 }: Props) {
+  const uid = useId().replace(/:/g, "");
   const max = Math.max(1, ...items.map((i) => Math.abs(i.value)));
-  const voxel = 14;
-  const gap = 22;
-  const maxStacks = 8;
-  const baseY = height - 36;
-  const chartW = Math.max(240, items.length * (voxel + gap + 18) + 48);
+  const barW = 40;
+  const gap = 30;
+  const depth = 16;
+  const baseY = height - 32;
+  const chartW = Math.max(240, items.length * (barW + gap) + 48);
 
   return (
-    <div className="relative w-full overflow-x-auto rounded-xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(226,232,240,0.35))] p-2">
+    <div className="w-full overflow-x-auto">
       <svg
         viewBox={`0 0 ${chartW} ${height}`}
-        className="mx-auto block h-auto w-full max-w-md [image-rendering:pixelated]"
+        className="mx-auto block h-auto w-full max-w-md"
         role="img"
-        aria-label="Gráfico de barras pixel 3D"
-        shapeRendering="crispEdges"
+        aria-label="Gráfico de barras 3D"
       >
-        {/* chão pixel */}
-        {Array.from({ length: Math.floor(chartW / 8) }).map((_, i) => (
-          <rect
-            key={`g-${i}`}
-            x={i * 8}
-            y={baseY + 6}
-            width={8}
-            height={8}
-            fill={i % 2 === 0 ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.08)"}
-          />
-        ))}
+        <defs>
+          <filter id={`${uid}-shadow`} x="-20%" y="-10%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#64748b" floodOpacity="0.22" />
+          </filter>
+          <linearGradient id={`${uid}-floor`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(148,163,184,0.16)" />
+            <stop offset="100%" stopColor="rgba(148,163,184,0.02)" />
+          </linearGradient>
+          {items.map((item, i) => (
+            <linearGradient key={item.key} id={`${uid}-bar-${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={shade(item.color, 55)} />
+              <stop offset="45%" stopColor={item.color} />
+              <stop offset="100%" stopColor={shade(item.color, -25)} />
+            </linearGradient>
+          ))}
+        </defs>
+
+        <ellipse
+          cx={chartW / 2}
+          cy={baseY + 10}
+          rx={chartW * 0.4}
+          ry={14}
+          fill={`url(#${uid}-floor)`}
+        />
 
         {items.map((item, index) => {
-          const stacks = Math.max(
-            1,
-            Math.round((Math.abs(item.value) / max) * maxStacks)
-          );
-          const x0 = 36 + index * (voxel + gap + 16);
-          const cubes = [];
-          for (let s = 0; s < stacks; s++) {
-            const y = baseY - s * (voxel * 0.92);
-            const cube = voxelCube(x0, y, voxel, item.color);
-            cubes.push(
-              <g key={`${item.key}-${s}`}>
-                <polygon points={cube.side} fill={cube.colors.side} />
-                <polygon points={cube.front} fill={cube.colors.front} />
-                <polygon points={cube.top} fill={cube.colors.top} />
-                <rect
-                  x={x0 + 2}
-                  y={y + 2}
-                  width={4}
-                  height={3}
-                  fill="rgba(255,255,255,0.4)"
-                />
-              </g>
-            );
-          }
+          const h = Math.max(16, (Math.abs(item.value) / max) * (height - 78));
+          const x = 32 + index * (barW + gap);
+          const y = baseY - h;
+          const front = `${x},${y} ${x + barW},${y} ${x + barW},${baseY} ${x},${baseY}`;
+          const top = `${x},${y} ${x + depth},${y - depth} ${x + barW + depth},${y - depth} ${x + barW},${y}`;
+          const side = `${x + barW},${y} ${x + barW + depth},${y - depth} ${x + barW + depth},${baseY - depth} ${x + barW},${baseY}`;
 
           return (
-            <g key={item.key}>
-              {cubes}
+            <g key={item.key} filter={`url(#${uid}-shadow)`}>
+              <polygon points={side} fill={shade(item.color, -45)} />
+              <polygon points={front} fill={`url(#${uid}-bar-${index})`} />
+              <polygon points={top} fill={shade(item.topColor || item.color, 40)} />
               <text
-                x={x0 + voxel * 0.7}
-                y={baseY - stacks * (voxel * 0.92) - 10}
+                x={x + barW / 2 + depth / 4}
+                y={y - depth - 8}
                 textAnchor="middle"
-                className="fill-slate-800"
-                style={{ fontSize: 10, fontWeight: 700 }}
+                className="fill-slate-700"
+                style={{ fontSize: 10, fontWeight: 600 }}
               >
                 {formatCurrency(item.value)}
               </text>
               <text
-                x={x0 + voxel * 0.55}
-                y={baseY + 22}
+                x={x + barW / 2}
+                y={baseY + 20}
                 textAnchor="middle"
                 className="fill-slate-500"
-                style={{ fontSize: 10, fontWeight: 600 }}
+                style={{ fontSize: 10 }}
               >
                 {item.label}
               </text>
@@ -103,7 +110,7 @@ export function IsoBarChart3D({ items, height = 200 }: Props) {
 }
 
 export const GRX_BAR_COLORS = {
-  revenue: { color: "#22c55e", topColor: "#4ade80", sideColor: "#15803d" },
-  expense: { color: "#ef4444", topColor: "#f87171", sideColor: "#b91c1c" },
-  result: { color: "#2563eb", topColor: "#60a5fa", sideColor: "#1d4ed8" },
+  revenue: { color: "#22c55e", topColor: "#86efac", sideColor: "#15803d" },
+  expense: { color: "#ef4444", topColor: "#fca5a5", sideColor: "#b91c1c" },
+  result: { color: "#2f6bff", topColor: "#93c5fd", sideColor: "#1d4ed8" },
 } as const;
