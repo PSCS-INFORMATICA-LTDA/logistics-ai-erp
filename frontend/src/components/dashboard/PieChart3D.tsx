@@ -16,7 +16,8 @@ type Props = {
   compact?: boolean;
 };
 
-const PALETTE = ["#2563eb", "#f97316", "#ef4444", "#22c55e", "#eab308", "#a855f7"];
+/** Azul / laranja / vermelho (laranja no lugar do branco da referência). */
+const PALETTE = ["#2f6bff", "#f97316", "#ef4444", "#22c55e", "#eab308", "#a855f7"];
 
 function shade(hex: string, amount: number): string {
   const raw = hex.replace("#", "");
@@ -40,6 +41,29 @@ function sectorPath(cx: number, cy: number, r: number, start: number, end: numbe
   return `M ${cx} ${cy} L ${e.x} ${e.y} A ${r} ${r} 0 ${large} 1 ${s.x} ${s.y} Z`;
 }
 
+/** Anel externo do topo (efeito bisel / borda arredondada). */
+function rimPath(
+  cx: number,
+  cy: number,
+  rOuter: number,
+  rInner: number,
+  start: number,
+  end: number
+) {
+  const o1 = polar(cx, cy, rOuter, start);
+  const o2 = polar(cx, cy, rOuter, end);
+  const i2 = polar(cx, cy, rInner, end);
+  const i1 = polar(cx, cy, rInner, start);
+  const large = end - start > 180 ? 1 : 0;
+  return [
+    `M ${o1.x} ${o1.y}`,
+    `A ${rOuter} ${rOuter} 0 ${large} 1 ${o2.x} ${o2.y}`,
+    `L ${i2.x} ${i2.y}`,
+    `A ${rInner} ${rInner} 0 ${large} 0 ${i1.x} ${i1.y}`,
+    "Z",
+  ].join(" ");
+}
+
 function wallPath(
   cx: number,
   cy: number,
@@ -61,19 +85,20 @@ function wallPath(
 }
 
 /**
- * Pizza 3D explodida (referência escolhida): espessura uniforme,
- * fatias separadas, mate opaco, sombra suave. Sem branco (laranja no lugar).
+ * Gráfico 3D explodido — referência confirmada:
+ * espessura uniforme, gaps entre fatias, mate, bisel suave, sombra no chão.
+ * Branco da referência → laranja.
  */
-export function PieChart3D({ slices, size = 340, compact = false }: Props) {
+export function PieChart3D({ slices, size = 360, compact = false }: Props) {
   const uid = useId().replace(/:/g, "");
-  const chartSize = compact ? Math.max(size, 340) : size;
+  const chartSize = compact ? Math.max(size, 360) : size;
   const total = slices.reduce((s, x) => s + Math.max(0, x.value), 0);
 
   if (total <= 0) {
     return (
       <div
         className={`flex items-center justify-center text-sm text-slate-500 ${
-          compact ? "h-80" : "h-72"
+          compact ? "h-[22rem]" : "h-80"
         }`}
       >
         Sem resultado atribuído no período.
@@ -82,13 +107,14 @@ export function PieChart3D({ slices, size = 340, compact = false }: Props) {
   }
 
   const cx = chartSize / 2;
-  const cy = chartSize * 0.46;
-  const r = chartSize * 0.3;
-  const depth = Math.max(34, chartSize * 0.125);
-  const explode = r * 0.18;
-  const gapDeg = Math.min(4.5, 14 / Math.max(slices.length, 1));
+  const cy = chartSize * 0.44;
+  const r = chartSize * 0.31;
+  const depth = Math.max(40, chartSize * 0.14);
+  const explode = r * 0.22;
+  const gapDeg = Math.min(5.5, 16 / Math.max(slices.length, 1));
+  const bevel = Math.max(5, r * 0.055);
 
-  let angle = -25;
+  let angle = -28;
   const arcs = slices
     .map((slice, i) => {
       const value = Math.max(0, slice.value);
@@ -109,7 +135,7 @@ export function PieChart3D({ slices, size = 340, compact = false }: Props) {
         portion,
         mid,
         ox: off.x,
-        oy: off.y * 0.7,
+        oy: off.y * 0.68,
         color: slice.color || PALETTE[i % PALETTE.length],
         idx: i,
       };
@@ -122,7 +148,10 @@ export function PieChart3D({ slices, size = 340, compact = false }: Props) {
     return ay - by;
   });
 
-  const viewH = chartSize + depth + 20;
+  const viewH = chartSize + depth + 28;
+  const svgClass = compact
+    ? "mx-auto h-[22rem] w-[22rem]"
+    : "mx-auto h-[24rem] w-[24rem]";
 
   return (
     <div
@@ -134,13 +163,16 @@ export function PieChart3D({ slices, size = 340, compact = false }: Props) {
     >
       <svg
         viewBox={`0 0 ${chartSize} ${viewH}`}
-        className={compact ? "mx-auto h-80 w-80" : "mx-auto h-[22rem] w-[22rem]"}
+        className={svgClass}
         role="img"
         aria-label="Gráfico de pizza 3D explodida"
       >
         <defs>
-          <filter id={`${uid}-soft`} x="-45%" y="-35%" width="190%" height="190%">
-            <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#94a3b8" floodOpacity="0.32" />
+          <filter id={`${uid}-floor`} x="-50%" y="-40%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+          <filter id={`${uid}-soft`} x="-40%" y="-30%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="5" stdDeviation="5" floodColor="#64748b" floodOpacity="0.28" />
           </filter>
           {arcs.map((a) => (
             <linearGradient
@@ -151,19 +183,34 @@ export function PieChart3D({ slices, size = 340, compact = false }: Props) {
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor={shade(a.color, -14)} />
-              <stop offset="100%" stopColor={shade(a.color, -52)} />
+              <stop offset="0%" stopColor={shade(a.color, -8)} />
+              <stop offset="45%" stopColor={shade(a.color, -28)} />
+              <stop offset="100%" stopColor={shade(a.color, -58)} />
             </linearGradient>
+          ))}
+          {arcs.map((a) => (
+            <radialGradient
+              key={`top-${a.key}`}
+              id={`${uid}-top-${a.idx}`}
+              cx="32%"
+              cy="28%"
+              r="78%"
+            >
+              <stop offset="0%" stopColor={shade(a.color, 28)} />
+              <stop offset="55%" stopColor={a.color} />
+              <stop offset="100%" stopColor={shade(a.color, -8)} />
+            </radialGradient>
           ))}
         </defs>
 
+        {/* sombra coletiva no chão */}
         <ellipse
           cx={cx}
-          cy={cy + depth + 16}
-          rx={r * 1.12}
-          ry={r * 0.24}
-          fill="rgba(148,163,184,0.24)"
-          filter={`url(#${uid}-soft)`}
+          cy={cy + depth + 18}
+          rx={r * 1.18}
+          ry={r * 0.26}
+          fill="rgba(100,116,139,0.22)"
+          filter={`url(#${uid}-floor)`}
         />
 
         {drawOrder.map((a) => {
@@ -172,36 +219,55 @@ export function PieChart3D({ slices, size = 340, compact = false }: Props) {
           const pStart = polar(scx, scy, r, a.start);
           const pEnd = polar(scx, scy, r, a.end);
           const center = { x: scx, y: scy };
+          const sliceMid = polar(scx, scy, r * 0.45, a.mid);
 
           return (
-            <g key={a.key} filter={`url(#${uid}-soft)`}>
-              <path
-                d={wallPath(scx, scy, r, a.start, a.end, depth)}
-                fill={`url(#${uid}-side-${a.idx})`}
+            <g key={a.key}>
+              {/* sombra individual sob a fatia */}
+              <ellipse
+                cx={sliceMid.x}
+                cy={scy + depth + 10}
+                rx={r * 0.42}
+                ry={r * 0.12}
+                fill="rgba(100,116,139,0.18)"
+                filter={`url(#${uid}-floor)`}
               />
-              <polygon
-                points={`${center.x},${center.y} ${pStart.x},${pStart.y} ${pStart.x},${
-                  pStart.y + depth
-                } ${center.x},${center.y + depth}`}
-                fill={shade(a.color, -32)}
-              />
-              <polygon
-                points={`${center.x},${center.y} ${pEnd.x},${pEnd.y} ${pEnd.x},${
-                  pEnd.y + depth
-                } ${center.x},${center.y + depth}`}
-                fill={shade(a.color, -42)}
-              />
-              <path
-                d={sectorPath(scx, scy, r, a.start, a.end)}
-                fill={a.color}
-                stroke="rgba(15,23,42,0.06)"
-                strokeWidth={0.6}
-              />
-              <path
-                d={sectorPath(scx, scy, r, a.start, a.end)}
-                fill="rgba(255,255,255,0.16)"
-                style={{ mixBlendMode: "soft-light" }}
-              />
+
+              <g filter={`url(#${uid}-soft)`}>
+                <path
+                  d={wallPath(scx, scy, r, a.start, a.end, depth)}
+                  fill={`url(#${uid}-side-${a.idx})`}
+                />
+                <polygon
+                  points={`${center.x},${center.y} ${pStart.x},${pStart.y} ${pStart.x},${
+                    pStart.y + depth
+                  } ${center.x},${center.y + depth}`}
+                  fill={shade(a.color, -30)}
+                />
+                <polygon
+                  points={`${center.x},${center.y} ${pEnd.x},${pEnd.y} ${pEnd.x},${
+                    pEnd.y + depth
+                  } ${center.x},${center.y + depth}`}
+                  fill={shade(a.color, -45)}
+                />
+                {/* topo mate com luz suave */}
+                <path
+                  d={sectorPath(scx, scy, r, a.start, a.end)}
+                  fill={`url(#${uid}-top-${a.idx})`}
+                />
+                {/* bisel claro na borda externa */}
+                <path
+                  d={rimPath(scx, scy, r, r - bevel, a.start, a.end)}
+                  fill="rgba(255,255,255,0.22)"
+                  style={{ mixBlendMode: "soft-light" }}
+                />
+                {/* bisel interno (corte da fatia) */}
+                <path
+                  d={rimPath(scx, scy, bevel * 1.6, 0.01, a.start, a.end)}
+                  fill="rgba(255,255,255,0.1)"
+                  style={{ mixBlendMode: "soft-light" }}
+                />
+              </g>
             </g>
           );
         })}

@@ -44,12 +44,12 @@ const EMPTY_FILTERS: DashboardFilters = {
 
 /** Cores sólidas no estilo pizza 3D explodida (azul / branco / vermelho…). */
 const PRODUCT_COLORS = {
-  frete: "#2563eb",
+  frete: "#2f6bff",
   estacionamento: "#f97316",
   lava: "#ef4444",
 } as const;
 
-const PARTNER_COLORS = ["#2563eb", "#f97316", "#ef4444", "#22c55e", "#eab308"] as const;
+const PARTNER_COLORS = ["#2f6bff", "#f97316", "#ef4444", "#22c55e", "#eab308"] as const;
 
 function KpiStrip({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
