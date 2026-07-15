@@ -46,10 +46,10 @@ const EMPTY_FILTERS: DashboardFilters = {
 const PRODUCT_COLORS = {
   frete: "#2563eb",
   estacionamento: "#f97316",
-  lava: "#22c55e",
+  lava: "#ef4444",
 } as const;
 
-const PARTNER_COLORS = ["#ef4444", "#f97316", "#eab308", "#2563eb", "#22c55e"] as const;
+const PARTNER_COLORS = ["#2563eb", "#f97316", "#ef4444", "#22c55e", "#eab308"] as const;
 
 function KpiStrip({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (

@@ -16,7 +16,7 @@ type Props = {
   compact?: boolean;
 };
 
-const PALETTE = ["#ef4444", "#f97316", "#eab308", "#2563eb", "#22c55e", "#a855f7"];
+const PALETTE = ["#2563eb", "#f97316", "#ef4444", "#22c55e", "#eab308", "#a855f7"];
 
 function shade(hex: string, amount: number): string {
   const raw = hex.replace("#", "");
@@ -61,20 +61,19 @@ function wallPath(
 }
 
 /**
- * Pizza 3D com extrusão variável (referência “alturas diferentes”):
- * ângulo = participação; altura = magnitude relativa do valor.
- * Cores sólidas mate, laterais sombreadas, sombra circular no chão.
+ * Pizza 3D explodida (referência escolhida): espessura uniforme,
+ * fatias separadas, mate opaco, sombra suave. Sem branco (laranja no lugar).
  */
-export function PieChart3D({ slices, size = 320, compact = false }: Props) {
+export function PieChart3D({ slices, size = 340, compact = false }: Props) {
   const uid = useId().replace(/:/g, "");
-  const chartSize = compact ? Math.max(size, 320) : size;
+  const chartSize = compact ? Math.max(size, 340) : size;
   const total = slices.reduce((s, x) => s + Math.max(0, x.value), 0);
 
   if (total <= 0) {
     return (
       <div
         className={`flex items-center justify-center text-sm text-slate-500 ${
-          compact ? "h-72" : "h-64"
+          compact ? "h-80" : "h-72"
         }`}
       >
         Sem resultado atribuído no período.
@@ -82,26 +81,26 @@ export function PieChart3D({ slices, size = 320, compact = false }: Props) {
     );
   }
 
-  const maxDepth = Math.max(52, chartSize * 0.2);
-  const minDepth = Math.max(14, chartSize * 0.055);
-  const maxValue = Math.max(...slices.map((s) => Math.max(0, s.value)), 1);
-
   const cx = chartSize / 2;
-  const baseCy = chartSize * 0.42;
-  const r = chartSize * 0.34;
+  const cy = chartSize * 0.46;
+  const r = chartSize * 0.3;
+  const depth = Math.max(34, chartSize * 0.125);
+  const explode = r * 0.18;
+  const gapDeg = Math.min(4.5, 14 / Math.max(slices.length, 1));
 
-  let angle = -20;
+  let angle = -25;
   const arcs = slices
     .map((slice, i) => {
       const value = Math.max(0, slice.value);
       const portion = (value / total) * 360;
-      const start = angle;
-      const end = angle + portion;
-      angle = end;
+      const rawStart = angle;
+      const rawEnd = angle + portion;
+      angle = rawEnd;
+      const start = rawStart + gapDeg / 2;
+      const end = rawEnd - gapDeg / 2;
+      if (end - start < 0.4) return null;
       const mid = (start + end) / 2;
-      const t = Math.sqrt(value / maxValue);
-      const depth = minDepth + t * (maxDepth - minDepth);
-      const topCy = baseCy + (maxDepth - depth);
+      const off = polar(0, 0, explode, mid);
       return {
         ...slice,
         value,
@@ -109,23 +108,21 @@ export function PieChart3D({ slices, size = 320, compact = false }: Props) {
         end,
         portion,
         mid,
-        depth,
-        topCy,
+        ox: off.x,
+        oy: off.y * 0.7,
         color: slice.color || PALETTE[i % PALETTE.length],
         idx: i,
       };
     })
-    .filter((a) => a.portion > 0.35);
+    .filter((a): a is NonNullable<typeof a> => a != null && a.portion > 0.35);
 
-  // Trás → frente; em empate, fatia mais baixa primeiro (topo por cima)
   const drawOrder = [...arcs].sort((a, b) => {
     const ay = Math.sin(((a.mid - 90) * Math.PI) / 180);
     const by = Math.sin(((b.mid - 90) * Math.PI) / 180);
-    if (Math.abs(ay - by) > 0.02) return ay - by;
-    return a.depth - b.depth;
+    return ay - by;
   });
 
-  const viewH = chartSize + maxDepth * 0.55;
+  const viewH = chartSize + depth + 20;
 
   return (
     <div
@@ -137,13 +134,13 @@ export function PieChart3D({ slices, size = 320, compact = false }: Props) {
     >
       <svg
         viewBox={`0 0 ${chartSize} ${viewH}`}
-        className={compact ? "mx-auto h-72 w-72" : "mx-auto h-80 w-80"}
+        className={compact ? "mx-auto h-80 w-80" : "mx-auto h-[22rem] w-[22rem]"}
         role="img"
-        aria-label="Gráfico de pizza 3D com alturas variáveis"
+        aria-label="Gráfico de pizza 3D explodida"
       >
         <defs>
-          <filter id={`${uid}-soft`} x="-50%" y="-40%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#94a3b8" floodOpacity="0.28" />
+          <filter id={`${uid}-soft`} x="-45%" y="-35%" width="190%" height="190%">
+            <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#94a3b8" floodOpacity="0.32" />
           </filter>
           {arcs.map((a) => (
             <linearGradient
@@ -154,58 +151,55 @@ export function PieChart3D({ slices, size = 320, compact = false }: Props) {
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor={shade(a.color, -12)} />
-              <stop offset="55%" stopColor={shade(a.color, -32)} />
-              <stop offset="100%" stopColor={shade(a.color, -48)} />
+              <stop offset="0%" stopColor={shade(a.color, -14)} />
+              <stop offset="100%" stopColor={shade(a.color, -52)} />
             </linearGradient>
           ))}
         </defs>
 
         <ellipse
           cx={cx}
-          cy={baseCy + maxDepth + 10}
-          rx={r * 1.08}
-          ry={r * 0.22}
-          fill="rgba(148,163,184,0.28)"
+          cy={cy + depth + 16}
+          rx={r * 1.12}
+          ry={r * 0.24}
+          fill="rgba(148,163,184,0.24)"
           filter={`url(#${uid}-soft)`}
         />
 
         {drawOrder.map((a) => {
-          const scx = cx;
-          const scy = a.topCy;
+          const scx = cx + a.ox;
+          const scy = cy + a.oy;
           const pStart = polar(scx, scy, r, a.start);
           const pEnd = polar(scx, scy, r, a.end);
           const center = { x: scx, y: scy };
-          const faceA = shade(a.color, -28);
-          const faceB = shade(a.color, -38);
 
           return (
-            <g key={a.key}>
+            <g key={a.key} filter={`url(#${uid}-soft)`}>
               <path
-                d={wallPath(scx, scy, r, a.start, a.end, a.depth)}
+                d={wallPath(scx, scy, r, a.start, a.end, depth)}
                 fill={`url(#${uid}-side-${a.idx})`}
               />
               <polygon
                 points={`${center.x},${center.y} ${pStart.x},${pStart.y} ${pStart.x},${
-                  pStart.y + a.depth
-                } ${center.x},${center.y + a.depth}`}
-                fill={faceA}
+                  pStart.y + depth
+                } ${center.x},${center.y + depth}`}
+                fill={shade(a.color, -32)}
               />
               <polygon
                 points={`${center.x},${center.y} ${pEnd.x},${pEnd.y} ${pEnd.x},${
-                  pEnd.y + a.depth
-                } ${center.x},${center.y + a.depth}`}
-                fill={faceB}
+                  pEnd.y + depth
+                } ${center.x},${center.y + depth}`}
+                fill={shade(a.color, -42)}
               />
               <path
                 d={sectorPath(scx, scy, r, a.start, a.end)}
                 fill={a.color}
-                stroke="rgba(15,23,42,0.08)"
-                strokeWidth={0.5}
+                stroke="rgba(15,23,42,0.06)"
+                strokeWidth={0.6}
               />
               <path
-                d={sectorPath(scx, scy, r * 0.92, a.start, a.end)}
-                fill="rgba(255,255,255,0.12)"
+                d={sectorPath(scx, scy, r, a.start, a.end)}
+                fill="rgba(255,255,255,0.16)"
                 style={{ mixBlendMode: "soft-light" }}
               />
             </g>
