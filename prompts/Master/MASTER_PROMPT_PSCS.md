@@ -66,6 +66,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Passageiros na OS | Só no tipo **Transporte**. Frete/Estacionamento/Lava-rápido escondem o painel; natureza DRE só-Frete também alinha o tipo e esconde. |
 | Voucher motorista | Valores motorista/ajudante **em branco** no voucher; sistema/designação guardam os valores. Foto do motorista no cadastro → voucher Transporte/Frete. SQL: `apply-040-driver-photo.sql`. |
 | Foto veículo | Foto mestre em Cadastros → Veículos (`vehicles.photo_storage_path`, bucket `company-attachments`). Na OS/voucher Frete/Transporte: preview **somente leitura** (sem upload na OS). SQL: `apply-045-vehicle-photo.sql`. |
+| Dashboard 3D | KPIs + gráficos isométricos SVG (Frete/Transporte, Estacionamento, Lava-rápido) e rateio por `vehicle_ownership`. Base DEMO fictícia via RPC `seed_dashboard_demo` (Senha Máster → Carregar/Limpar DEMO). SQL: `apply-046-dashboard-demo-seed.sql` + `reset-dashboard-demo.sql`. Sem banco de desenvolvimento separado; limpeza total do sistema = update futuro. |
 | Sócios | RG / CPF / CNPJ + validações BR. |
 | Menu / nomes | OS = **Ordem de Serviço — Transporte e Frete**; **Agenda da Frota** logo abaixo. DRE com iniciais maiúsculas (Empresa, Motorista/Ajudante, Veículo). Ordem dos blocos: Cadastros → **Parâmetros** → **Configurações** (Integrações + Mensalidade). |
 | Parâmetros | **Senha Máster - Concessão de Acessos** (frase de recuperação + permissões por tela/sócio). |
@@ -98,6 +99,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 - Retomar Asaas / teste cartão Felipe → depois valor produção Rafael.
 - Onboarding white-label para segundo cliente (Comfort etc.).
 - Importação financeira / lançamentos DRE em massa (planilha do Rafael).
+- Limpeza / reset total da base da empresa (além do Limpar DEMO do Dashboard).
 - Vincular `company_members.partner_id` para permissões finas de não-admin.
 - Proposta comercial formal PSCS (texto já rascunhado; coberta sob demanda).
 
