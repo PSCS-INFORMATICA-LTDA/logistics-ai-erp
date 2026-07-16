@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { BillingParametersPanel } from "@/components/billing/BillingParametersPanel";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -129,21 +129,21 @@ export default function MensalidadePage() {
     settings && ["active", "pending", "overdue"].includes(settings.subscription_status);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Mensalidade</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Cadastre o cartão para cobrança mensal recorrente (PSCS). Valores em{" "}
-          <Link href="/configuracoes/parametros" className="text-brand-700 underline-offset-2 hover:underline">
-            Parâmetros
-          </Link>
-          .
+          Parâmetros de cobrança PSCS (valor teste/produção) e cadastro do cartão do cliente para a
+          mensalidade recorrente.
         </p>
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
       {msg ? <Alert variant="info">{msg}</Alert> : null}
 
+      <BillingParametersPanel />
+
+      <div id="cadastro-cartao">
       <Card>
         <CardHeader
           title="Situação"
@@ -291,6 +291,7 @@ export default function MensalidadePage() {
           </p>
         </CardBody>
       </Card>
+      </div>
     </div>
   );
 }

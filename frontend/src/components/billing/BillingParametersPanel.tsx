@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -251,12 +250,12 @@ export function BillingParametersPanel() {
           >
             Salvar e sincronizar valor no Asaas
           </Button>
-          <Link
-            href="/configuracoes/mensalidade"
+          <a
+            href="#cadastro-cartao"
             className="inline-flex items-center text-sm font-medium text-brand-700 underline-offset-2 hover:underline"
           >
-            Ir para cadastro do cartão →
-          </Link>
+            Ir para cadastro do cartão ↓
+          </a>
         </div>
       </CardBody>
     </Card>

@@ -1,11 +1,11 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
+import Link from "next/link";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { GlassSelect } from "@/components/ui/GlassSelect";
-import { BillingParametersPanel } from "@/components/billing/BillingParametersPanel";
 import { APP_SCREENS } from "@/lib/app-screens";
 import { useCompany } from "@/lib/company-context";
 import { glassField } from "@/lib/liquid-glass-styles";
@@ -615,18 +615,35 @@ export default function ParametrosPage() {
     {} as Record<string, typeof APP_SCREENS>
   );
 
+  const savePermissionsButton = selectedPartnerId ? (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button type="button" onClick={() => void savePermissions()} disabled={savingPerms}>
+        {savingPerms ? "Salvando…" : "Salvar permissões do sócio"}
+      </Button>
+      <p className="text-xs text-slate-500">
+        Grava no banco as telas liberadas (Análise / Alteração / Exclusão) para o sócio
+        selecionado.
+      </p>
+    </div>
+  ) : null;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <BillingParametersPanel />
-
       <Card>
         <CardHeader
           title="Senha Máster - Concessão de Acessos"
-          description="Acesso master liberado. Defina, por sócio cadastrado, o que ele pode analisar, alterar ou excluir em cada tela."
+          description="Somente parametrização de acessos por sócio. Valores e cartão de mensalidade ficam em Configurações → Mensalidade."
         />
         <CardBody className="space-y-4">
           {error && <Alert variant="error">{error}</Alert>}
           {msg && <Alert variant="info">{msg}</Alert>}
+          <Alert variant="info">
+            Acesso master liberado nesta sessão. Esta tela não inclui cobrança Asaas — use{" "}
+            <Link href="/configuracoes/mensalidade" className="font-medium underline">
+              Mensalidade
+            </Link>
+            .
+          </Alert>
 
           {!settings?.recovery_phrase_hash ? (
             <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/70 p-4">
@@ -671,6 +688,12 @@ export default function ParametrosPage() {
             onChange={setSelectedPartnerId}
             options={partnerOptions}
           />
+
+          {selectedPartnerId ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
+              {savePermissionsButton}
+            </div>
+          ) : null}
 
           {!selectedPartnerId ? (
             <p className="text-sm text-slate-500">
@@ -739,18 +762,8 @@ export default function ParametrosPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white/95 px-1 py-3 backdrop-blur">
-                <Button
-                  type="button"
-                  onClick={() => void savePermissions()}
-                  disabled={savingPerms}
-                >
-                  {savingPerms ? "Salvando…" : "Salvar permissões do sócio"}
-                </Button>
-                <p className="text-xs text-slate-500">
-                  Este botão grava as telas liberadas no banco. O “Salvar parâmetros” do bloco
-                  Asaas (acima) não altera permissões.
-                </p>
+              <div className="sticky bottom-0 z-10 -mx-1 border-t border-slate-200 bg-white/95 px-1 py-3 backdrop-blur">
+                {savePermissionsButton}
               </div>
             </>
           )}
