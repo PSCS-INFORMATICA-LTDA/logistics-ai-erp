@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { GlassSelect } from "@/components/ui/GlassSelect";
+import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { nextCode } from "@/lib/codes";
 import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
@@ -27,6 +28,8 @@ import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
 
 export default function LavaRapidoPage() {
   const { companyId } = useCompany();
+  const { canEditScreen } = useAccess();
+  const canEdit = canEditScreen("operacional.lava-rapido");
   const supabase = useMemo(() => createClient(), []);
   const [types, setTypes] = useState<PatioVehicleType[]>([]);
   const [rows, setRows] = useState<CarWashServiceRow[]>([]);
@@ -116,6 +119,10 @@ export default function LavaRapidoPage() {
 
   const openService = async () => {
     if (!companyId) return;
+    if (!canEdit) {
+      setError("Seu acesso é só visualização. Peça permissão de Alteração para abrir ordens.");
+      return;
+    }
     const type = washTypes.find((t) => t.id === form.vehicle_type_id);
     if (!form.plate.trim() || !type) {
       setError("Informe placa e porte.");
@@ -175,6 +182,10 @@ export default function LavaRapidoPage() {
 
   const completeService = async (row: CarWashServiceRow) => {
     if (!companyId) return;
+    if (!canEdit) {
+      setError("Seu acesso é só visualização. Peça permissão de Alteração para concluir.");
+      return;
+    }
     setSaving(true);
     setError(null);
     const { data, error: updError } = await supabase
@@ -217,8 +228,14 @@ export default function LavaRapidoPage() {
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
+      {!canEdit ? (
+        <Alert variant="info">
+          Modo visualização: você pode consultar as ordens, mas não abrir nem concluir serviços.
+        </Alert>
+      ) : null}
       {loading ? <Loading /> : null}
 
+      {canEdit ? (
       <section className={`space-y-4 ${glassFilterPanel()}`}>
         <h2 className="text-sm font-semibold text-slate-900">Nova ordem de lava</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -296,6 +313,7 @@ export default function LavaRapidoPage() {
           Abrir ordem de lava-rápido
         </Button>
       </section>
+      ) : null}
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="min-w-full text-left text-sm">
@@ -330,6 +348,7 @@ export default function LavaRapidoPage() {
                       entityType="car_wash_service"
                       entityId={row.id}
                       code={row.code}
+                      canUpload={canEdit}
                     />
                   ) : null}
                 </td>
@@ -347,7 +366,7 @@ export default function LavaRapidoPage() {
                   </Badge>
                 </td>
                 <td className="px-3 py-2">
-                  {row.status === "Aberto" ? (
+                  {row.status === "Aberto" && canEdit ? (
                     <Button type="button" disabled={saving} onClick={() => void completeService(row)}>
                       Concluir
                     </Button>

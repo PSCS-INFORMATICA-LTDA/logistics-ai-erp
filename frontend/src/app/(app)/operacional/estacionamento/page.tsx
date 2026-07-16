@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { GlassSelect } from "@/components/ui/GlassSelect";
+import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import {
@@ -27,6 +28,8 @@ import { formatCurrency, formatDateTimeBR } from "@/lib/utils";
 
 export default function EstacionamentoPage() {
   const { companyId } = useCompany();
+  const { canEditScreen } = useAccess();
+  const canEdit = canEditScreen("operacional.estacionamento");
   const supabase = useMemo(() => createClient(), []);
   const [types, setTypes] = useState<PatioVehicleType[]>([]);
   const [rows, setRows] = useState<ParkingEntryRow[]>([]);
@@ -146,6 +149,10 @@ export default function EstacionamentoPage() {
 
   const openEntry = async () => {
     if (!companyId) return;
+    if (!canEdit) {
+      setError("Seu acesso é só visualização. Peça permissão de Alteração para abrir entradas.");
+      return;
+    }
     const type = parkingTypes.find((t) => t.id === form.vehicle_type_id);
     if (!form.plate.trim() || !type) {
       setError("Informe placa e porte do veículo.");
@@ -185,6 +192,10 @@ export default function EstacionamentoPage() {
 
   const closeEntry = async (row: ParkingEntryRow) => {
     if (!companyId) return;
+    if (!canEdit) {
+      setError("Seu acesso é só visualização. Peça permissão de Alteração para finalizar.");
+      return;
+    }
     const draft = exitDraft[row.id] ?? {
       date: new Date().toISOString().slice(0, 10),
       time: new Date().toTimeString().slice(0, 5),
@@ -228,8 +239,14 @@ export default function EstacionamentoPage() {
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
+      {!canEdit ? (
+        <Alert variant="info">
+          Modo visualização: você pode consultar as ordens, mas não abrir nem finalizar entradas.
+        </Alert>
+      ) : null}
       {loading ? <Loading /> : null}
 
+      {canEdit ? (
       <section className={`space-y-4 ${glassFilterPanel()}`}>
         <h2 className="text-sm font-semibold text-slate-900">Abrir entrada</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -317,6 +334,7 @@ export default function EstacionamentoPage() {
           Abrir ordem de estacionamento
         </Button>
       </section>
+      ) : null}
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="min-w-full text-left text-sm">
@@ -349,7 +367,7 @@ export default function EstacionamentoPage() {
                     <div className="text-xs text-slate-500">{row.billing_mode ?? "Diária"}</div>
                   </td>
                   <td className="px-3 py-2">
-                    {row.status === "Aberto" ? (
+                    {row.status === "Aberto" && canEdit ? (
                       <div className="flex flex-wrap items-end gap-2">
                         <input
                           type="date"
@@ -381,6 +399,8 @@ export default function EstacionamentoPage() {
                           Finalizar
                         </Button>
                       </div>
+                    ) : row.status === "Aberto" ? (
+                      <span className="text-slate-500">Aberto</span>
                     ) : (
                       <span>{formatDateTimeBR(row.exit_date, row.exit_time)}</span>
                     )}
@@ -404,6 +424,7 @@ export default function EstacionamentoPage() {
                         entityType="parking_entry"
                         entityId={row.id}
                         code={row.code}
+                        canUpload={canEdit}
                       />
                     ) : null}
                   </td>

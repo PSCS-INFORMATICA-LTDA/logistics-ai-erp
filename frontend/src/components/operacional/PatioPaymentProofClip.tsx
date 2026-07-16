@@ -16,6 +16,8 @@ type Props = {
   entityType: Extract<AttachmentEntityType, "parking_entry" | "car_wash_service">;
   entityId: string;
   code: string;
+  /** false = só visualizar comprovante (sem anexar). */
+  canUpload?: boolean;
 };
 
 function PaperclipIcon({ className }: { className?: string }) {
@@ -35,7 +37,13 @@ function PaperclipIcon({ className }: { className?: string }) {
   );
 }
 
-export function PatioPaymentProofClip({ companyId, entityType, entityId, code }: Props) {
+export function PatioPaymentProofClip({
+  companyId,
+  entityType,
+  entityId,
+  code,
+  canUpload = true,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -103,27 +111,31 @@ export function PatioPaymentProofClip({ companyId, entityType, entityId, code }:
 
   return (
     <div className="flex items-center gap-1">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        aria-label={`Anexar comprovante ${code}`}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void handleUpload(file);
-          event.target.value = "";
-        }}
-      />
-      <button
-        type="button"
-        title="Anexar comprovante (Pix, cartão ou dinheiro) — opcional"
-        disabled={uploading}
-        onClick={() => inputRef.current?.click()}
-        className={glassIconBtn()}
-      >
-        <PaperclipIcon className="h-4 w-4" />
-      </button>
+      {canUpload ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            aria-label={`Anexar comprovante ${code}`}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void handleUpload(file);
+              event.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            title="Anexar comprovante (Pix, cartão ou dinheiro) — opcional"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            className={glassIconBtn()}
+          >
+            <PaperclipIcon className="h-4 w-4" />
+          </button>
+        </>
+      ) : null}
       {proofCount > 0 ? (
         <button
           type="button"
