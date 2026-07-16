@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { glassField } from "@/lib/liquid-glass-styles";
 
@@ -24,6 +25,18 @@ export function DeleteReasonModal({
   const reasonId = useId();
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const auditStampLabel = useMemo(() => {
+    if (!open) return "";
+    return new Date().toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -60,6 +73,20 @@ export function DeleteReasonModal({
         </h2>
         <p className="mt-1 text-sm text-slate-600">{description}</p>
 
+        <div className="mt-3">
+          <Alert variant="warning">
+            Atenção: antes da exclusão, o sistema registra automaticamente{" "}
+            <strong>seu nome/usuário</strong>, a <strong>data e a hora</strong>
+            {auditStampLabel ? (
+              <>
+                {" "}
+                (agora: <strong>{auditStampLabel}</strong>)
+              </>
+            ) : null}{" "}
+            e o motivo abaixo no Histórico de exclusões. Essa informação não pode ser apagada.
+          </Alert>
+        </div>
+
         <label className="mt-4 block space-y-1">
           <span className="text-sm font-medium text-slate-700">Motivo da exclusão *</span>
           <textarea
@@ -79,7 +106,7 @@ export function DeleteReasonModal({
             Cancelar
           </Button>
           <Button type="button" disabled={confirming} onClick={() => void submit()}>
-            {confirming ? "Excluindo…" : "Excluir"}
+            {confirming ? "Excluindo…" : "Excluir com registro"}
           </Button>
         </div>
       </div>
