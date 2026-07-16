@@ -232,7 +232,7 @@ export async function listDeletionAuditEvents(
 
   if (error) return { rows: [], error: error.message, missingReasonColumn };
 
-  const rows = ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
+  const rows = ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
     const payload = (row.payload_json as Record<string, unknown> | null) ?? null;
     const reason =
       (typeof row.reason === "string" && row.reason) || reasonFromPayload(payload) || null;

@@ -103,7 +103,7 @@ export function BillingParametersPanel() {
       setMsg(
         payload.syncNote ||
           payload.warning ||
-          "Parâmetros de mensalidade salvos. Use a tela Mensalidade para cadastrar o cartão."
+          "Parâmetros de mensalidade salvos. Cadastre ou atualize o cartão na seção abaixo."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar.");
@@ -118,8 +118,8 @@ export function BillingParametersPanel() {
   return (
     <Card>
       <CardHeader
-        title="Mensalidade (cartão)"
-        description="Defina valor de teste (Felipe) e valor de produção (Rafael). O cartão é cadastrado em Configurações → Mensalidade. Número e CVV nunca ficam gravados no GRX."
+        title="Valor e dia da cobrança"
+        description="Defina valor de teste (Felipe) e valor de produção (Rafael). O cartão fica nesta mesma tela, abaixo. Número e CVV nunca ficam gravados no GRX."
       />
       <CardBody className="space-y-4">
         {loading ? <p className="text-sm text-slate-500">Carregando…</p> : null}
