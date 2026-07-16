@@ -380,7 +380,7 @@ export default function ParametrosPage() {
       return;
     }
 
-    setMsg("Permissões salvas para o sócio selecionado.");
+    setMsg("Permissões salvas para o usuário selecionado.");
     setSavingPerms(false);
   };
 
