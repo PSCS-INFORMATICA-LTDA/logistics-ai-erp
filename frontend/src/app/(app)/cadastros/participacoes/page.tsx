@@ -5,6 +5,7 @@ import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
@@ -111,6 +112,8 @@ export default function ParticipacoesPage() {
   const [editing, setEditing] = useState<Partial<VehicleOwnership> | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
 
@@ -274,13 +277,25 @@ export default function ParticipacoesPage() {
     else await loadOwnerships();
   };
 
-  const handleDelete = async (id: string) => {
+  const requestDelete = (id: string) => {
     if (!canDelete) {
       setError("Seu acesso não inclui Exclusão nesta tela.");
       return;
     }
-    if (!confirm("Excluir permanentemente este registro?")) return;
-    if (!companyId) return;
+    setPendingDeleteId(id);
+  };
+
+  const handleDelete = async (reason: string) => {
+    if (!canDelete) {
+      setError("Seu acesso não inclui Exclusão nesta tela.");
+      setPendingDeleteId(null);
+      return;
+    }
+    if (!companyId || !pendingDeleteId) return;
+
+    const id = pendingDeleteId;
+    setDeleting(true);
+    setError(null);
 
     const existing = items.find((row) => row.id === id) as
       | (VehicleOwnership & Record<string, unknown>)
@@ -295,6 +310,7 @@ export default function ParticipacoesPage() {
         entityId: id,
         entityCode,
         summary: summary || `Participação ${id.slice(0, 8)}`,
+        reason,
         screenKey: "cadastros.participacoes",
         deleteMode: "hard",
         payload: row,
@@ -302,6 +318,8 @@ export default function ParticipacoesPage() {
     }
 
     const { error: err } = await supabase.from("vehicle_ownership").delete().eq("id", id);
+    setDeleting(false);
+    setPendingDeleteId(null);
     if (err) setError(err.message);
     else await loadOwnerships();
   };
@@ -529,7 +547,7 @@ export default function ParticipacoesPage() {
                               </Button>
                             ) : null}
                             {canDelete ? (
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(row.id)}>
+                            <Button variant="ghost" size="sm" onClick={() => requestDelete(row.id)}>
                               Excluir
                             </Button>
                             ) : null}
@@ -547,6 +565,17 @@ export default function ParticipacoesPage() {
           </Card>
         </>
       )}
+
+      <DeleteReasonModal
+        open={Boolean(pendingDeleteId)}
+        confirming={deleting}
+        title="Excluir participação"
+        description="Informe o motivo da exclusão permanente desta participação societária."
+        onCancel={() => {
+          if (!deleting) setPendingDeleteId(null);
+        }}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

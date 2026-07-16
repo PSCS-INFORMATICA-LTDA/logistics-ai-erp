@@ -12,6 +12,7 @@ export type DeletionAuditEvent = {
   entity_id: string;
   entity_code: string | null;
   summary: string | null;
+  reason: string | null;
   delete_mode: "soft" | "hard";
   payload_json: Record<string, unknown> | null;
 };
@@ -23,6 +24,7 @@ export type RecordDeletionInput = {
   entityId: string;
   entityCode?: string | null;
   summary?: string | null;
+  reason?: string | null;
   screenKey?: string | null;
   deleteMode: "soft" | "hard";
   payload?: Record<string, unknown> | null;
@@ -113,6 +115,7 @@ export async function recordDeletion(
     entity_id: String(input.entityId),
     entity_code: input.entityCode ?? null,
     summary: input.summary ?? null,
+    reason: input.reason?.trim() || null,
     delete_mode: input.deleteMode,
     payload_json: input.payload ?? null,
   });
@@ -127,7 +130,7 @@ export async function listDeletionAuditEvents(
   let query = supabase
     .from("deletion_audit_events")
     .select(
-      "id, company_id, occurred_at, actor_user_id, actor_name, actor_email, screen_key, entity_type, entity_id, entity_code, summary, delete_mode, payload_json"
+      "id, company_id, occurred_at, actor_user_id, actor_name, actor_email, screen_key, entity_type, entity_id, entity_code, summary, reason, delete_mode, payload_json"
     )
     .eq("company_id", companyId)
     .order("occurred_at", { ascending: false })

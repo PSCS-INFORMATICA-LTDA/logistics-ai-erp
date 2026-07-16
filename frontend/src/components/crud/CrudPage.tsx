@@ -8,6 +8,7 @@ import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Loading, Alert } from "@/components/ui/Badge";
+import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 
 export type Column<T> = {
   key: keyof T | string;
@@ -81,6 +82,8 @@ export function CrudPage<T extends { id: string }>({
   const [editing, setEditing] = useState<Partial<T> | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const formPanelRef = useRef<HTMLDivElement>(null);
   const openedEditIdRef = useRef<string | null>(null);
   const openedNewDraftRef = useRef(false);
@@ -205,13 +208,25 @@ export function CrudPage<T extends { id: string }>({
     return savedId;
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Deseja excluir este registro?")) return;
-    if (!companyId) return;
+  const requestDelete = (id: string) => {
     if (!screenCanDelete) {
       setError("Seu acesso não inclui Exclusão nesta tela.");
       return;
     }
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = async (reason: string) => {
+    if (!companyId || !pendingDeleteId) return;
+    if (!screenCanDelete) {
+      setError("Seu acesso não inclui Exclusão nesta tela.");
+      setPendingDeleteId(null);
+      return;
+    }
+
+    const id = pendingDeleteId;
+    setDeleting(true);
+    setError(null);
 
     const existing = items.find((row) => row.id === id) as Record<string, unknown> | undefined;
     const { entityCode, summary } = summarizeDeletedRow(existing, table);
@@ -222,6 +237,7 @@ export function CrudPage<T extends { id: string }>({
       entityId: id,
       entityCode,
       summary,
+      reason,
       screenKey: auditScreenKey ?? null,
       deleteMode: softDelete ? "soft" : "hard",
       payload: existing ?? null,
@@ -230,6 +246,8 @@ export function CrudPage<T extends { id: string }>({
     const { error: err } = softDelete
       ? await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq("id", id)
       : await supabase.from(table).delete().eq("id", id);
+    setDeleting(false);
+    setPendingDeleteId(null);
     if (err) setError(err.message);
     else await load();
   };
@@ -352,7 +370,7 @@ export function CrudPage<T extends { id: string }>({
                           title={deleteTitle}
                           onClick={() => {
                             if (!canDelete) return;
-                            void handleDelete(row.id);
+                            requestDelete(row.id);
                           }}
                         >
                           Excluir
@@ -371,6 +389,17 @@ export function CrudPage<T extends { id: string }>({
           )}
         </CardBody>
       </Card>
+
+      <DeleteReasonModal
+        open={Boolean(pendingDeleteId)}
+        confirming={deleting}
+        title="Excluir registro"
+        description="Informe o motivo da exclusão. O registro sai da lista e o motivo fica no Histórico de exclusões."
+        onCancel={() => {
+          if (!deleting) setPendingDeleteId(null);
+        }}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

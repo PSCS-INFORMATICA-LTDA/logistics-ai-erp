@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import {
   createVehicleExpense,
@@ -65,6 +66,8 @@ export default function DreDespesasVeiculoPage() {
   const [chartOfAccountId, setChartOfAccountId] = useState("");
   const [serviceOrderId, setServiceOrderId] = useState("");
   const [description, setDescription] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const monthLabel = useMemo(
     () => new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
@@ -179,14 +182,19 @@ export default function DreDespesasVeiculoPage() {
     await loadExpenses();
   };
 
-  const remove = async (id: string) => {
-    if (!companyId) return;
+  const remove = async (reason: string) => {
+    if (!companyId || !pendingDeleteId) return;
     if (!canDelete) {
       setError("Seu acesso não inclui Exclusão nesta tela.");
+      setPendingDeleteId(null);
       return;
     }
-    if (!window.confirm("Excluir este lançamento do DRE do veículo?")) return;
-    const result = await deleteVehicleExpense(supabase, companyId, id);
+    setDeleting(true);
+    setError(null);
+    setMsg(null);
+    const result = await deleteVehicleExpense(supabase, companyId, pendingDeleteId, reason);
+    setDeleting(false);
+    setPendingDeleteId(null);
     if (result.error) {
       setError(result.error);
       return;
@@ -429,7 +437,11 @@ export default function DreDespesasVeiculoPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         {canDelete ? (
-                          <Button type="button" variant="ghost" onClick={() => void remove(row.id)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setPendingDeleteId(row.id)}
+                          >
                             Excluir
                           </Button>
                         ) : null}
@@ -442,6 +454,17 @@ export default function DreDespesasVeiculoPage() {
           )}
         </section>
       </CardBody>
+
+      <DeleteReasonModal
+        open={Boolean(pendingDeleteId)}
+        confirming={deleting}
+        title="Excluir despesa do veículo"
+        description="Informe o motivo da exclusão deste lançamento do DRE do veículo."
+        onCancel={() => {
+          if (!deleting) setPendingDeleteId(null);
+        }}
+        onConfirm={remove}
+      />
     </Card>
   );
 }

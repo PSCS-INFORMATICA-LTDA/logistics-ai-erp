@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import {
   createCompanyLedgerEntry,
@@ -66,6 +67,8 @@ export default function DreLancamentosPage() {
   const [chartOfAccountId, setChartOfAccountId] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [description, setDescription] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const monthLabel = useMemo(
     () => new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
@@ -170,14 +173,19 @@ export default function DreLancamentosPage() {
     await load();
   };
 
-  const remove = async (id: string) => {
-    if (!companyId) return;
+  const remove = async (reason: string) => {
+    if (!companyId || !pendingDeleteId) return;
     if (!canDelete) {
       setError("Seu acesso não inclui Exclusão nesta tela.");
+      setPendingDeleteId(null);
       return;
     }
-    if (!window.confirm("Excluir este lançamento do DRE da empresa?")) return;
-    const result = await deleteCompanyLedgerEntry(supabase, companyId, id);
+    setDeleting(true);
+    setError(null);
+    setMsg(null);
+    const result = await deleteCompanyLedgerEntry(supabase, companyId, pendingDeleteId, reason);
+    setDeleting(false);
+    setPendingDeleteId(null);
     if (result.error) {
       setError(result.error);
       return;
@@ -414,7 +422,11 @@ export default function DreLancamentosPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         {canDelete ? (
-                          <Button type="button" variant="ghost" onClick={() => void remove(row.id)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setPendingDeleteId(row.id)}
+                          >
                             Excluir
                           </Button>
                         ) : null}
@@ -432,6 +444,17 @@ export default function DreLancamentosPage() {
           DRE. Esta tela é o controle geral da empresa no mês (como na planilha do Rafael).
         </p>
       </CardBody>
+
+      <DeleteReasonModal
+        open={Boolean(pendingDeleteId)}
+        confirming={deleting}
+        title="Excluir lançamento"
+        description="Informe o motivo da exclusão deste lançamento do DRE da empresa."
+        onCancel={() => {
+          if (!deleting) setPendingDeleteId(null);
+        }}
+        onConfirm={remove}
+      />
     </Card>
   );
 }

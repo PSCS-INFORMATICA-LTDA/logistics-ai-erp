@@ -150,6 +150,7 @@ export default function HistoricoExclusoesPage() {
               <th className="px-3 py-2">Tipo</th>
               <th className="px-3 py-2">Código</th>
               <th className="px-3 py-2">Resumo</th>
+              <th className="px-3 py-2">Motivo</th>
               <th className="px-3 py-2">Modo</th>
               <th className="px-3 py-2" />
             </tr>
@@ -173,13 +174,16 @@ export default function HistoricoExclusoesPage() {
                   <td className="max-w-xs truncate px-3 py-2" title={row.summary ?? undefined}>
                     {row.summary || "—"}
                   </td>
+                  <td className="max-w-xs truncate px-3 py-2" title={row.reason ?? undefined}>
+                    {row.reason || "—"}
+                  </td>
                   <td className="px-3 py-2">
                     <Badge variant={row.delete_mode === "soft" ? "warning" : "danger"}>
                       {row.delete_mode === "soft" ? "Soft" : "Hard"}
                     </Badge>
                   </td>
                   <td className="px-3 py-2">
-                    {row.payload_json ? (
+                    {row.payload_json || row.reason ? (
                       <button
                         type="button"
                         className="text-xs font-medium text-brand-700 hover:underline"
@@ -192,16 +196,24 @@ export default function HistoricoExclusoesPage() {
                     ) : null}
                   </td>
                 </tr>
-                {expandedId === row.id && row.payload_json ? (
+                {expandedId === row.id ? (
                   <tr className="border-t border-slate-50 bg-slate-50/80">
-                    <td colSpan={8} className="px-3 py-3">
-                      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-slate-700">
-                        {JSON.stringify(row.payload_json, null, 2)}
-                      </pre>
+                    <td colSpan={9} className="px-3 py-3">
+                      {row.reason ? (
+                        <p className="mb-2 text-sm text-slate-800">
+                          <span className="font-medium">Motivo:</span> {row.reason}
+                        </p>
+                      ) : null}
+                      {row.payload_json ? (
+                        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-slate-700">
+                          {JSON.stringify(row.payload_json, null, 2)}
+                        </pre>
+                      ) : null}
                       <p className="mt-2 text-xs text-slate-500">
                         ID: {row.entity_id}
-                        {typeof (row.payload_json as { created_at?: string }).created_at ===
-                        "string"
+                        {row.payload_json &&
+                        typeof (row.payload_json as { created_at?: string }).created_at ===
+                          "string"
                           ? ` · Criado em ${formatDateBR(
                               (row.payload_json as { created_at: string }).created_at
                             )}`
@@ -214,7 +226,7 @@ export default function HistoricoExclusoesPage() {
             ))}
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
                   Nenhuma exclusão registrada ainda.
                 </td>
               </tr>

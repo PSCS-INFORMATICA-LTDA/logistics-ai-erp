@@ -146,7 +146,8 @@ export async function createCompanyLedgerEntry(
 export async function deleteCompanyLedgerEntry(
   supabase: SupabaseClient,
   companyId: string,
-  id: string
+  id: string,
+  reason?: string | null
 ): Promise<{ error: string | null }> {
   const { data: existing } = await supabase
     .from("financial_transactions")
@@ -166,6 +167,7 @@ export async function deleteCompanyLedgerEntry(
       entityId: id,
       entityCode,
       summary,
+      reason,
       screenKey: "dre.lancamentos",
       deleteMode: "hard",
       payload: row,

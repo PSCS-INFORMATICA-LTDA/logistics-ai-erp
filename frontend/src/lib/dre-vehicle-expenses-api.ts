@@ -296,7 +296,8 @@ export async function createVehicleExpense(
 export async function deleteVehicleExpense(
   supabase: SupabaseClient,
   companyId: string,
-  id: string
+  id: string,
+  reason?: string | null
 ): Promise<{ error: string | null }> {
   const { data: existing } = await supabase
     .from("financial_transactions")
@@ -315,6 +316,7 @@ export async function deleteVehicleExpense(
       entityId: id,
       entityCode,
       summary,
+      reason,
       screenKey: "dre.despesas-veiculo",
       deleteMode: "hard",
       payload: row,
