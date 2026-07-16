@@ -58,11 +58,13 @@ export default function HistoricoExclusoesPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [missingReasonColumn, setMissingReasonColumn] = useState(false);
 
   const load = useCallback(async () => {
     if (!companyId || !isAdmin) return;
     setLoading(true);
     setError(null);
+    setMissingReasonColumn(false);
     const result = await listDeletionAuditEvents(supabase, companyId, {
       entityType: entityType || null,
       fromDate: fromDate || null,
@@ -70,6 +72,7 @@ export default function HistoricoExclusoesPage() {
       limit: 300,
     });
     if (result.error) setError(result.error);
+    setMissingReasonColumn(Boolean(result.missingReasonColumn));
     setRows(result.rows);
     setLoading(false);
   }, [companyId, entityType, fromDate, isAdmin, supabase, toDate]);
@@ -103,10 +106,16 @@ export default function HistoricoExclusoesPage() {
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
-      {error && /reason/i.test(error) ? (
+      {missingReasonColumn ? (
         <Alert variant="warning">
-          A coluna de observação ainda não existe no banco. Aplique o SQL{" "}
-          <code className="text-xs">apply-049-deletion-audit-reason.sql</code> no Supabase.
+          A coluna de observação (<code className="text-xs">reason</code>) ainda não existe no
+          Supabase. Rode no SQL Editor:
+          <pre className="mt-2 overflow-x-auto rounded bg-white/70 p-2 text-xs text-slate-800">
+            {`ALTER TABLE public.deletion_audit_events
+  ADD COLUMN IF NOT EXISTS reason TEXT;`}
+          </pre>
+          Depois disso, novas exclusões gravam a observação na coluna correta. Limpe os filtros De/Até
+          se a lista parecer vazia.
         </Alert>
       ) : null}
 

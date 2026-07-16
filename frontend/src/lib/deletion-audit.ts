@@ -136,7 +136,19 @@ async function resolveActor(
   return { userId: user.id, name, email };
 }
 
-/** Grava evento de exclusão. Falha do log não bloqueia a exclusão (retorna erro só informativo). */
+function isMissingReasonColumnError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes("reason") && (m.includes("does not exist") || m.includes("não existe"));
+}
+
+function reasonFromPayload(payload: Record<string, unknown> | null | undefined): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const nested = payload.__deletion_reason;
+  return typeof nested === "string" && nested.trim() ? nested.trim() : null;
+}
+
+/** Grava evento de exclusão. Motivo é obrigatório; se a coluna reason ainda não existir no banco, grava no payload. */
 export async function recordDeletion(
   input: RecordDeletionInput
 ): Promise<{ error: string | null }> {
@@ -145,7 +157,7 @@ export async function recordDeletion(
   if (reasonError) return { error: reasonError };
 
   const actor = await resolveActor(input.supabase, input.companyId);
-  const { error } = await input.supabase.from("deletion_audit_events").insert({
+  const base = {
     company_id: input.companyId,
     actor_user_id: actor.userId,
     actor_name: actor.name,
@@ -155,32 +167,80 @@ export async function recordDeletion(
     entity_id: String(input.entityId),
     entity_code: input.entityCode ?? null,
     summary: input.summary ?? null,
-    reason,
     delete_mode: input.deleteMode,
+  };
+
+  const { error } = await input.supabase.from("deletion_audit_events").insert({
+    ...base,
+    reason,
     payload_json: input.payload ?? null,
   });
-  return { error: error?.message ?? null };
+
+  if (!error) return { error: null };
+
+  if (isMissingReasonColumnError(error.message)) {
+    const payloadWithReason = {
+      ...(input.payload ?? {}),
+      __deletion_reason: reason,
+    };
+    const retry = await input.supabase.from("deletion_audit_events").insert({
+      ...base,
+      payload_json: payloadWithReason,
+    });
+    // Log gravado sem a coluna reason (motivo fica no payload). Aplique o SQL 049 quando puder.
+    return { error: retry.error?.message ?? null };
+  }
+
+  return { error: error.message };
 }
 
 export async function listDeletionAuditEvents(
   supabase: SupabaseClient,
   companyId: string,
   options?: { limit?: number; entityType?: string | null; fromDate?: string | null; toDate?: string | null }
-): Promise<{ rows: DeletionAuditEvent[]; error: string | null }> {
-  let query = supabase
-    .from("deletion_audit_events")
-    .select(
-      "id, company_id, occurred_at, actor_user_id, actor_name, actor_email, screen_key, entity_type, entity_id, entity_code, summary, reason, delete_mode, payload_json"
-    )
-    .eq("company_id", companyId)
-    .order("occurred_at", { ascending: false })
-    .limit(options?.limit ?? 200);
+): Promise<{ rows: DeletionAuditEvent[]; error: string | null; missingReasonColumn?: boolean }> {
+  const selectWithReason =
+    "id, company_id, occurred_at, actor_user_id, actor_name, actor_email, screen_key, entity_type, entity_id, entity_code, summary, reason, delete_mode, payload_json";
+  const selectWithoutReason =
+    "id, company_id, occurred_at, actor_user_id, actor_name, actor_email, screen_key, entity_type, entity_id, entity_code, summary, delete_mode, payload_json";
 
-  if (options?.entityType) query = query.eq("entity_type", options.entityType);
-  if (options?.fromDate) query = query.gte("occurred_at", `${options.fromDate}T00:00:00`);
-  if (options?.toDate) query = query.lte("occurred_at", `${options.toDate}T23:59:59.999`);
+  const run = async (select: string) => {
+    let query = supabase
+      .from("deletion_audit_events")
+      .select(select)
+      .eq("company_id", companyId)
+      .order("occurred_at", { ascending: false })
+      .limit(options?.limit ?? 200);
 
-  const { data, error } = await query;
-  if (error) return { rows: [], error: error.message };
-  return { rows: (data ?? []) as DeletionAuditEvent[], error: null };
+    if (options?.entityType) query = query.eq("entity_type", options.entityType);
+    if (options?.fromDate) query = query.gte("occurred_at", `${options.fromDate}T00:00:00`);
+    if (options?.toDate) query = query.lte("occurred_at", `${options.toDate}T23:59:59.999`);
+    return query;
+  };
+
+  const first = await run(selectWithReason);
+  let data = first.data;
+  let error = first.error;
+  let missingReasonColumn = false;
+
+  if (error && isMissingReasonColumnError(error.message)) {
+    missingReasonColumn = true;
+    const second = await run(selectWithoutReason);
+    data = second.data;
+    error = second.error;
+  }
+
+  if (error) return { rows: [], error: error.message, missingReasonColumn };
+
+  const rows = ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
+    const payload = (row.payload_json as Record<string, unknown> | null) ?? null;
+    const reason =
+      (typeof row.reason === "string" && row.reason) || reasonFromPayload(payload) || null;
+    return {
+      ...(row as unknown as DeletionAuditEvent),
+      reason,
+    };
+  });
+
+  return { rows, error: null, missingReasonColumn };
 }
