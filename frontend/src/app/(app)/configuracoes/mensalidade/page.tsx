@@ -183,13 +183,16 @@ export default function MensalidadePage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Renovação da licença</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Termo de responsabilidade, aceite e cartão para renovação mensal da licença. A Senha
-          Máster do cliente serve só para conceder acessos aos sócios — não abre os preços da PSCS.
-        </p>
-      </div>
+      <Card>
+        <div className="border-b border-slate-100 px-6 py-4">
+          <h1 className="text-2xl font-bold text-slate-900">Renovação da licença</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Termo de responsabilidade, aceite e cartão para renovação mensal da licença. A Senha
+            Máster do cliente serve só para conceder acessos aos sócios — não abre os preços da
+            PSCS.
+          </p>
+        </div>
+      </Card>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
       {msg ? <Alert variant="info">{msg}</Alert> : null}
@@ -202,22 +205,22 @@ export default function MensalidadePage() {
           description={`Versão ${LICENSE_TERMS_VERSION} · renovação mensal · reajuste IGPM após 12 meses`}
         />
         <CardBody className="space-y-4">
-          <div className="max-h-72 space-y-3.5 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/80 px-5 py-4 text-sm leading-7 text-slate-700 [text-align:justify] [text-justify:inter-word] hyphens-auto">
+          <div className="max-h-72 space-y-3.5 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-700 text-justify hyphens-auto [text-justify:inter-word]">
             {LICENSE_TERMS_PARAGRAPHS.map((paragraph, index) => (
-              <p key={`terms-p-${index}`} lang="pt-BR" className="text-pretty">
+              <p key={`terms-p-${index}`} lang="pt-BR">
                 {paragraph}
               </p>
             ))}
           </div>
 
-          <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800">
+          <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800">
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 accent-brand-700"
+              className="mt-1 h-4 w-4 shrink-0 accent-brand-700"
               checked={termsChecked}
               onChange={(e) => setTermsChecked(e.target.checked)}
             />
-            <span>
+            <span className="text-justify [text-justify:inter-word]">
               Li e concordo com o termo de responsabilidade e com a renovação mensal da licença
               (versão {LICENSE_TERMS_VERSION}).
             </span>
