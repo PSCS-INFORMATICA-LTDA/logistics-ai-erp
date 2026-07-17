@@ -25,18 +25,18 @@ const sizes = {
   proposal: { width: 240, height: 96 },
 };
 
-/** Proporção do pscs-logo-mark.png — sm legível no menu largo. */
+/** Proporção do logo Logistics AI Platform (1222×458). */
 const markSizes = {
-  sm: { width: 168, height: 70 },
-  md: { width: 200, height: 83 },
-  lg: { width: 240, height: 100 },
-  proposal: { width: 220, height: 91 },
+  sm: { width: 196, height: 74 },
+  md: { width: 240, height: 90 },
+  lg: { width: 300, height: 112 },
+  proposal: { width: 260, height: 98 },
 };
 
 /** Logo da empresa adquirente (ex.: GRX) — voucher, proposta, e-mail. */
 const BRAND_LOGO_SRC = "/grx-logo.png?v=3";
-/** Logo do sistema PSCS Systems 3D — menu lateral / chrome do produto. */
-const SYSTEM_LOGO_MARK_SRC = "/pscs-logo-mark.png?v=3";
+/** Logo do sistema (Logistics AI Platform) — menu lateral / chrome do produto. */
+const SYSTEM_LOGO_MARK_SRC = "/pscs-logo-mark.png?v=4";
 
 const MARK_DEPTH_LAYERS = [4, 3, 2, 1] as const;
 
@@ -110,7 +110,7 @@ export function BrandLogo({
               src={SYSTEM_LOGO_MARK_SRC}
               priority
               unoptimized
-              alt="PSCS Systems"
+              alt="Logistics AI Platform"
               ariaHidden={false}
               className={cn("brand-logo-mark-image", imageClassName)}
             />
