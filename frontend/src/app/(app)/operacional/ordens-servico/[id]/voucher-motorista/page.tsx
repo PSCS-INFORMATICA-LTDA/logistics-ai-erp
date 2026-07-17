@@ -15,6 +15,10 @@ import {
   resolveDesignatedDriverId,
 } from "@/lib/service-order-display-status";
 import { useCompany } from "@/lib/company-context";
+import {
+  companyDisplayName,
+  getCompanyLogoUrl,
+} from "@/lib/company-logo";
 import { getDriverPhotoUrl } from "@/lib/driver-photo";
 import { getVehiclePhotoUrl } from "@/lib/vehicle-photo";
 import { serviceOrderShowsDriverPhoto } from "@/lib/service-order-field-visibility";
@@ -50,13 +54,15 @@ export default function ServiceOrderDriverVoucherPage() {
       vehicle: Vehicle | null,
       driverPhotoPath: string | null
     ) => {
-      const [driverPhotoUrl, vehiclePhotoUrl] = await Promise.all([
+      const [driverPhotoUrl, vehiclePhotoUrl, companyLogoUrl] = await Promise.all([
         getDriverPhotoUrl(driverPhotoPath),
         getVehiclePhotoUrl(vehicle?.photo_storage_path),
+        getCompanyLogoUrl(company?.logo_storage_path),
       ]);
       setContext({
-        companyName: company?.trade_name || company?.name || "GRX Management",
+        companyName: companyDisplayName(company),
         companyDocument: company?.document ?? null,
+        companyLogoUrl,
         driverName: nextDriver?.name ?? "Motorista designado",
         driverDocument: nextDriver?.document ?? nextDriver?.cnh_number ?? null,
         driverPhone: nextDriver?.phone ?? null,
@@ -65,7 +71,13 @@ export default function ServiceOrderDriverVoucherPage() {
         vehicleDescription: buildVehicleDescription(row, vehicle),
       });
     },
-    [company?.document, company?.name, company?.trade_name]
+    [
+      company,
+      company?.document,
+      company?.logo_storage_path,
+      company?.name,
+      company?.trade_name,
+    ]
   );
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { DEFAULT_COMPANY_LOGO_SRC } from "@/lib/company-logo";
 
 type BrandLogoProps = {
   className?: string;
@@ -16,6 +17,9 @@ type BrandLogoProps = {
   unoptimized?: boolean;
   /** @deprecated Mantido por compatibilidade. */
   performanceLite?: boolean;
+  /** Logo da empresa (signed URL). Se omitido, usa fallback GRX. Só plaque3d/default. */
+  companyLogoSrc?: string | null;
+  companyLogoAlt?: string;
 };
 
 const sizes = {
@@ -33,8 +37,6 @@ const markSizes = {
   proposal: { width: 260, height: 98 },
 };
 
-/** Logo da empresa adquirente (ex.: GRX) — voucher, proposta, e-mail. */
-const BRAND_LOGO_SRC = "/grx-logo.png?v=3";
 /** Logo do sistema (Logistics AI Platform) — menu lateral / chrome do produto. */
 const SYSTEM_LOGO_MARK_SRC = "/pscs-logo-mark.png?v=7";
 
@@ -48,7 +50,7 @@ function LogoImage({
   alt = "",
   ariaHidden = true,
   unoptimized = false,
-  src = BRAND_LOGO_SRC,
+  src,
 }: {
   dim: { width: number; height: number };
   className?: string;
@@ -57,7 +59,7 @@ function LogoImage({
   alt?: string;
   ariaHidden?: boolean;
   unoptimized?: boolean;
-  src?: string;
+  src: string;
 }) {
   return (
     <Image
@@ -86,8 +88,11 @@ export function BrandLogo({
   variant = "default",
   plaqueSurface = "page",
   unoptimized = false,
+  companyLogoSrc = null,
+  companyLogoAlt = "Logo da empresa",
 }: BrandLogoProps) {
   const dim = sizes[size];
+  const companySrc = companyLogoSrc?.trim() || DEFAULT_COMPANY_LOGO_SRC;
 
   if (variant === "mark") {
     const markDim = markSizes[size];
@@ -132,11 +137,12 @@ export function BrandLogo({
 
   const image = (
     <Image
-      src={BRAND_LOGO_SRC}
-      alt="GRX Transportes e Logística"
+      src={companySrc}
+      alt={companyLogoAlt}
       width={dim.width}
       height={dim.height}
       priority
+      unoptimized={unoptimized || Boolean(companyLogoSrc)}
       className={cn("h-auto w-auto max-w-full object-contain", imageClassName)}
     />
   );
@@ -160,9 +166,10 @@ export function BrandLogo({
           >
             <LogoImage
               dim={dim}
+              src={companySrc}
               priority
-              unoptimized={unoptimized}
-              alt="GRX Transportes e Logística"
+              unoptimized={unoptimized || Boolean(companyLogoSrc)}
+              alt={companyLogoAlt}
               ariaHidden={false}
               className={cn("brand-logo-image brand-logo-image--front", imageClassName)}
             />

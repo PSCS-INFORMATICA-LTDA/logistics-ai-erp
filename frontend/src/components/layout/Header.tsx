@@ -2,17 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useCompany } from "@/lib/company-context";
+import { companyDisplayName } from "@/lib/company-logo";
 import { clearMasterSession } from "@/lib/master-password";
-
-const COMPANY_NAME = "GRX Transportes e Logística";
 
 type HeaderProps = {
   onMenuClick?: () => void;
 };
 
 export function Header({ onMenuClick }: HeaderProps) {
+  const { company } = useCompany();
   const router = useRouter();
   const supabase = createClient();
+  const companyName = companyDisplayName(company);
 
   const handleLogout = async () => {
     clearMasterSession();
@@ -39,10 +41,10 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div
           className="app-header-company liquid-glass-btn liquid-glass-btn--secondary min-w-0 text-left"
           role="status"
-          aria-label={`Empresa ${COMPANY_NAME}`}
+          aria-label={`Empresa ${companyName}`}
         >
           <p className="app-header-company-label">Empresa</p>
-          <p className="app-header-company-name truncate">{COMPANY_NAME}</p>
+          <p className="app-header-company-name truncate">{companyName}</p>
         </div>
       </div>
       <button type="button" className="app-header-btn shrink-0" onClick={handleLogout}>

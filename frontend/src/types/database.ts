@@ -4,6 +4,8 @@ export type Company = {
   trade_name: string | null;
   document: string | null;
   status: string;
+  /** Path no Storage (company-attachments) — logo da empresa. */
+  logo_storage_path?: string | null;
 };
 
 export type CompanyBillingSettings = {

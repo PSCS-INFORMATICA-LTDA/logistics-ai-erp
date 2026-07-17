@@ -10,8 +10,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Badge";
 
 export default function SetupPage() {
-  const [name, setName] = useState("GRX Transportes");
-  const [tradeName, setTradeName] = useState("GRX");
+  const [name, setName] = useState("");
+  const [tradeName, setTradeName] = useState("");
   const [document, setDocument] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,11 @@ export default function SetupPage() {
 
     const { data: company, error: companyErr } = await supabase
       .from("companies")
-      .insert({ name, trade_name: tradeName, document: document || null })
+      .insert({
+        name: name.trim(),
+        trade_name: tradeName.trim() || null,
+        document: document.trim() || null,
+      })
       .select()
       .single();
 
@@ -56,7 +60,7 @@ export default function SetupPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/configuracoes/empresa");
     router.refresh();
   };
 
@@ -65,14 +69,27 @@ export default function SetupPage() {
       <Card className="w-full max-w-lg border-slate-200 shadow-md">
         <CardHeader
           title="Configurar empresa"
-          description="Primeiro acesso — cadastre a empresa GRX"
+          description="Primeiro acesso — cadastre o nome da sua empresa. Depois você poderá enviar o logo em Configurações → Empresa."
         />
         <CardBody>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <Alert variant="error">{error}</Alert>}
-            <Input label="Razão social" value={name} onChange={(e) => setName(e.target.value)} required />
-            <Input label="Nome fantasia" value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
-            <Input label="CNPJ" value={document} onChange={(e) => setDocument(e.target.value)} />
+            <Input
+              label="Razão social"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <Input
+              label="Nome fantasia (aparece no header e documentos)"
+              value={tradeName}
+              onChange={(e) => setTradeName(e.target.value)}
+            />
+            <Input
+              label="CNPJ"
+              value={document}
+              onChange={(e) => setDocument(e.target.value)}
+            />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Criando..." : "Criar empresa e continuar"}
             </Button>

@@ -1,4 +1,6 @@
-const BRAND_LOGO_PATH = "/grx-logo.png?v=2";
+import { DEFAULT_COMPANY_LOGO_SRC } from "@/lib/company-logo";
+
+const BRAND_LOGO_PATH = DEFAULT_COMPANY_LOGO_SRC;
 const DEFAULT_PUBLIC_APP_URL = "https://grx-management.vercel.app";
 const DEFAULT_COMPANY_TAGLINE = "GRX Transportes e Logística";
 
@@ -235,8 +237,12 @@ export function renderBrandLogoPlaque3DToDataUrl(source: HTMLImageElement): stri
   return compressCanvasToEmailDataUrl(canvas);
 }
 
-export async function fetchBrandLogoDataUrl(origin?: string): Promise<string | null> {
+export async function fetchBrandLogoDataUrl(
+  origin?: string,
+  preferredLogoUrl?: string | null
+): Promise<string | null> {
   if (
+    !preferredLogoUrl &&
     cachedBrandLogoPlaque3D?.startsWith("data:image") &&
     cachedBrandLogoPlaqueVersion === PLAQUE_CACHE_VERSION
   ) {
@@ -244,6 +250,13 @@ export async function fetchBrandLogoDataUrl(origin?: string): Promise<string | n
   }
 
   try {
+    if (preferredLogoUrl) {
+      const preferred = await loadImageDirect(preferredLogoUrl);
+      if (preferred) {
+        const plaque3d = renderBrandLogoPlaque3DToDataUrl(preferred);
+        if (plaque3d) return plaque3d;
+      }
+    }
     const image = await loadBrandLogoImage(origin);
     if (image) {
       const plaque3d = renderBrandLogoPlaque3DToDataUrl(image);

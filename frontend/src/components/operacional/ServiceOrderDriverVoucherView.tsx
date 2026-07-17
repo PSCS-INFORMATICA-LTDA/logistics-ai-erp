@@ -19,6 +19,7 @@ import {
 export type DriverVoucherContext = {
   companyName: string;
   companyDocument?: string | null;
+  companyLogoUrl?: string | null;
   driverName: string;
   driverDocument: string | null;
   driverPhone: string | null;
@@ -171,7 +172,15 @@ export function ServiceOrderDriverVoucherView({
       <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-sm print:border-0 print:p-0 print:shadow-none">
         <header className="mb-4 flex flex-col gap-4 border-b-2 border-brand-600 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-[200px]">
-            <BrandLogo variant="plaque3d" plaqueSurface="page" size="proposal" performanceLite unoptimized />
+            <BrandLogo
+              variant="plaque3d"
+              plaqueSurface="page"
+              size="proposal"
+              performanceLite
+              unoptimized
+              companyLogoSrc={context.companyLogoUrl}
+              companyLogoAlt={context.companyName}
+            />
           </div>
           <div className="text-left sm:text-right">
             <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">

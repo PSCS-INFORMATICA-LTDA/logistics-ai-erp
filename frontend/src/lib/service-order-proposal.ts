@@ -9,6 +9,7 @@ import type { ServiceOrder } from "@/types/database";
 
 export type ServiceOrderProposalContext = {
   companyName: string;
+  companyLogoUrl?: string | null;
   driverName?: string | null;
   dreAccountName?: string | null;
 };

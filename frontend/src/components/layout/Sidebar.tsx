@@ -65,6 +65,7 @@ const NAV: NavItem[] = [
   {
     label: "Configurações",
     children: [
+      { href: "/configuracoes/empresa", label: "Empresa" },
       { href: "/configuracoes/integracoes", label: "Integrações" },
       { href: "/configuracoes/mensalidade", label: "Renovação da licença" },
     ],

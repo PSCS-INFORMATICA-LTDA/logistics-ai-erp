@@ -115,6 +115,12 @@ export const APP_SCREENS: AppScreen[] = [
     href: "/configuracoes/historico-exclusoes",
   },
   {
+    key: "configuracoes.empresa",
+    label: "Empresa",
+    group: "Configurações",
+    href: "/configuracoes/empresa",
+  },
+  {
     key: "configuracoes.integracoes",
     label: "Integrações",
     group: "Configurações",

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { ServiceOrderProposalView } from "@/components/operacional/ServiceOrderProposalView";
 import { Loading, Alert } from "@/components/ui/Badge";
 import { useCompany } from "@/lib/company-context";
+import { companyDisplayName, getCompanyLogoUrl } from "@/lib/company-logo";
 import { createClient } from "@/lib/supabase/client";
 import type { ServiceOrder } from "@/types/database";
 
@@ -17,8 +18,20 @@ export default function ServiceOrderPropostaPage() {
   const [order, setOrder] = useState<ServiceOrder | null>(null);
   const [driverName, setDriverName] = useState<string | null>(null);
   const [dreAccountName, setDreAccountName] = useState<string | null>(null);
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const url = await getCompanyLogoUrl(company?.logo_storage_path);
+      if (!cancelled) setCompanyLogoUrl(url);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [company?.logo_storage_path]);
 
   useEffect(() => {
     if (!orderId) {
@@ -96,7 +109,8 @@ export default function ServiceOrderPropostaPage() {
       <ServiceOrderProposalView
         order={order}
         context={{
-          companyName: company?.trade_name || company?.name || "GRX Management",
+          companyName: companyDisplayName(company),
+          companyLogoUrl,
           driverName,
           dreAccountName,
         }}

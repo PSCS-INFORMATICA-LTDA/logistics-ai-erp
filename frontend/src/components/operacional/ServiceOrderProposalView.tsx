@@ -417,10 +417,19 @@ export function ServiceOrderProposalView({
                   size="proposal"
                   performanceLite
                   unoptimized
+                  companyLogoSrc={context.companyLogoUrl}
+                  companyLogoAlt={context.companyName}
                 />
               </div>
               <div className="hidden print:block">
-                <BrandLogo variant="plaque3d" plaqueSurface="page" size="proposal" unoptimized />
+                <BrandLogo
+                  variant="plaque3d"
+                  plaqueSurface="page"
+                  size="proposal"
+                  unoptimized
+                  companyLogoSrc={context.companyLogoUrl}
+                  companyLogoAlt={context.companyName}
+                />
               </div>
             </div>
             <div className="text-left sm:text-right">
