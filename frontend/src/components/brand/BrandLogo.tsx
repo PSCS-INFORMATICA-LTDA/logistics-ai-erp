@@ -36,7 +36,7 @@ const markSizes = {
 /** Logo da empresa adquirente (ex.: GRX) — voucher, proposta, e-mail. */
 const BRAND_LOGO_SRC = "/grx-logo.png?v=3";
 /** Logo do sistema PSCS Systems 3D — menu lateral / chrome do produto. */
-const SYSTEM_LOGO_MARK_SRC = "/pscs-logo-mark.png?v=2";
+const SYSTEM_LOGO_MARK_SRC = "/pscs-logo-mark.png?v=3";
 
 const MARK_DEPTH_LAYERS = [4, 3, 2, 1] as const;
 

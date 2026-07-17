@@ -7,7 +7,7 @@ import { useCompany } from "@/lib/company-context";
 import { clearMasterSession } from "@/lib/master-password";
 
 /** Logo da empresa adquirente no header (sem fundo). */
-const COMPANY_MARK_SRC = "/grx-company-mark.png?v=2";
+const COMPANY_MARK_SRC = "/grx-company-mark.png?v=3";
 
 type HeaderProps = {
   onMenuClick?: () => void;
@@ -47,7 +47,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             src={COMPANY_MARK_SRC}
             alt={companyName}
             width={606}
-            height={516}
+            height={522}
             unoptimized
             priority
             className="app-header-company-mark-image"
