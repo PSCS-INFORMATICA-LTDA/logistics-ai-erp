@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { BillingParametersPanel } from "@/components/billing/BillingParametersPanel";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { useCompany } from "@/lib/company-context";
 import { glassField } from "@/lib/liquid-glass-styles";
 import { formatBRL, SUBSCRIPTION_STATUS_LABELS } from "@/lib/billing";
 import {
@@ -15,8 +13,6 @@ import {
   LICENSE_TERMS_TITLE,
   LICENSE_TERMS_VERSION,
 } from "@/lib/license-terms";
-import { isMasterSessionUnlocked } from "@/lib/master-password";
-import { createClient } from "@/lib/supabase/client";
 import type { CompanyBillingSettings } from "@/types/database";
 
 type StatusPayload = {
@@ -24,12 +20,11 @@ type StatusPayload = {
   chargeAmount: number;
   chargeAmountLabel: string;
   statusLabel: string;
+  canManagePscsPricing?: boolean;
   asaas: { configured: boolean; env: string };
 };
 
 export default function MensalidadePage() {
-  const { companyId } = useCompany();
-  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -38,10 +33,6 @@ export default function MensalidadePage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [payload, setPayload] = useState<StatusPayload | null>(null);
   const [termsChecked, setTermsChecked] = useState(false);
-  const [authUserId, setAuthUserId] = useState<string | null>(null);
-  const pscsUnlocked = Boolean(
-    companyId && authUserId && isMasterSessionUnlocked(companyId, authUserId)
-  );
 
   const [holderName, setHolderName] = useState("");
   const [number, setNumber] = useState("");
@@ -87,18 +78,11 @@ export default function MensalidadePage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    void supabase.auth.getUser().then(({ data }) => {
-      setAuthUserId(data.user?.id ?? null);
-    });
-  }, [supabase]);
+  const termsRegistered =
+    payload?.settings?.terms_version === LICENSE_TERMS_VERSION &&
+    Boolean(payload?.settings?.terms_accepted_at);
 
-  const termsRegistered = useMemo(() => {
-    const settings = payload?.settings;
-    return (
-      settings?.terms_version === LICENSE_TERMS_VERSION && Boolean(settings.terms_accepted_at)
-    );
-  }, [payload?.settings]);
+  const isPscsOperator = Boolean(payload?.canManagePscsPricing);
 
   const registerAcceptance = async () => {
     if (!termsChecked) {
@@ -202,29 +186,19 @@ export default function MensalidadePage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Renovação da licença</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Área do cliente: termo de responsabilidade, aceite e cartão para renovação mensal. Os
-          valores (teste/produção) são configurados só pela PSCS.
+          Termo de responsabilidade, aceite e cartão para renovação mensal da licença. A Senha
+          Máster do cliente serve só para conceder acessos aos sócios — não abre os preços da PSCS.
         </p>
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
       {msg ? <Alert variant="info">{msg}</Alert> : null}
 
-      {pscsUnlocked ? (
-        <BillingParametersPanel />
-      ) : (
-        <Alert variant="info">
-          Parâmetros de valor (teste/produção/Asaas) são exclusivos da PSCS. Para vê-los, entre com{" "}
-          <Link href="/configuracoes/parametros" className="font-medium underline">
-            Senha Máster
-          </Link>{" "}
-          e volte a esta tela. O cliente usa apenas o termo + cartão abaixo.
-        </Alert>
-      )}
+      {isPscsOperator ? <BillingParametersPanel /> : null}
 
       <Card>
         <CardHeader
-          title={`Cliente — ${LICENSE_TERMS_TITLE}`}
+          title={LICENSE_TERMS_TITLE}
           description={`Versão ${LICENSE_TERMS_VERSION} · renovação mensal · reajuste IGPM após 12 meses`}
         />
         <CardBody className="space-y-4">

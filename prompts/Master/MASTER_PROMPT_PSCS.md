@@ -52,8 +52,9 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 - Mensalidade sugerida de referência: **mínimo ~R$ 800/mês** (proposta comercial mais ampla já citada ~R$ 2.500 conforme escopo de suporte).
 - Módulo de **mensalidade com cartão** via **Asaas** (não guardar número/CVV no banco).
 - Tela **Configurações → Renovação da licença** (`/configuracoes/mensalidade`):
-  - **PSCS (Senha Máster):** bloco valor teste/produção, dia e sync Asaas.
-  - **Cliente:** termo + aceite + cartão/titular (sem editar preços).
+  - **PSCS (operador por e-mail):** bloco valor teste/produção, dia e sync Asaas — `PSCS_OPERATOR_EMAILS` / `isPscsOperatorEmail`. **Não** usa Senha Máster.
+  - **Cliente comprador (Rafael etc.):** termo + aceite + cartão/titular. Vê valor cobrado, mas **não** edita preços.
+  - **Senha Máster:** só concessão de acessos por sócio (Parâmetros) — do cliente, não da PSCS.
 - **Termo de responsabilidade** obrigatório antes do cartão (renovação mensal; reajuste **IGPM** após 12 meses com aviso 30 dias). Aceite gravado (`terms_version`, `terms_accepted_at/by/ip`). SQL: `apply-050-license-terms-acceptance.sql`. Versão texto: `LICENSE_TERMS_VERSION` em `license-terms.ts`.
 - **Pausado:** criação da conta Asaas sandbox — aguardar decisão do Felipe (ele cria ou o operador cria). Retomar depois.
 - Env necessários (quando retomar): `ASAAS_API_KEY`, `ASAAS_ENV`, `ASAAS_WEBHOOK_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`.

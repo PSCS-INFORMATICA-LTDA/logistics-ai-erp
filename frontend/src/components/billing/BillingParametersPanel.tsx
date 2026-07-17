@@ -101,7 +101,7 @@ export function BillingParametersPanel() {
     <Card>
       <CardHeader
         title="Parâmetros PSCS (somente operador)"
-        description="Área exclusiva da PSCS: modo teste/produção, valores e dia de cobrança. O cliente (Rafael) não usa este bloco — ele só vê o termo, o aceite e o cartão."
+        description="Exclusivo da equipe PSCS (login operador). A Senha Máster do cliente NÃO libera este bloco — ela só controla acessos dos sócios."
       />
       <CardBody className="space-y-4">
         {loading ? <p className="text-sm text-slate-500">Carregando…</p> : null}
@@ -109,8 +109,8 @@ export function BillingParametersPanel() {
         {msg ? <Alert variant="info">{msg}</Alert> : null}
 
         <Alert variant="info">
-          Este bloco é da central PSCS. Dados do titular e cartão ficam na seção do cliente, abaixo
-          (após o termo).
+          Visível só para e-mail operador PSCS. O cliente comprador vê apenas termo, aceite e cartão
+          abaixo.
         </Alert>
 
         {!asaasConfigured ? (

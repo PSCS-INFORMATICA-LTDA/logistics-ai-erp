@@ -7,6 +7,7 @@ import {
 } from "@/lib/asaas";
 import { resolveChargeAmount } from "@/lib/billing";
 import { defaultBillingRow, loadBillingSettings, requireCompanyMember } from "@/lib/billing-server";
+import { isPscsOperatorEmail } from "@/lib/pscs-operators";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,16 @@ export async function PUT(request: Request) {
   const auth = await requireCompanyMember();
   if (auth.error || !auth.user || !auth.membership) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  if (!isPscsOperatorEmail(auth.user.email)) {
+    return NextResponse.json(
+      {
+        error:
+          "Parâmetros de valor da licença são exclusivos da PSCS. O cliente usa apenas o termo e o cartão.",
+      },
+      { status: 403 }
+    );
   }
 
   const body = (await request.json().catch(() => null)) as Body | null;
