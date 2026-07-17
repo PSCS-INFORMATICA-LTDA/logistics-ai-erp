@@ -2,23 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useCompany } from "@/lib/company-context";
 import { clearMasterSession } from "@/lib/master-password";
+
+const COMPANY_NAME = "GRX Logistics Transport";
 
 type HeaderProps = {
   onMenuClick?: () => void;
 };
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { company } = useCompany();
   const router = useRouter();
   const supabase = createClient();
-
-  const rawName = (company?.trade_name || company?.name || "").trim();
-  const companyName =
-    !rawName || /^grx\b/i.test(rawName)
-      ? "GRX Transport Logistics"
-      : rawName;
 
   const handleLogout = async () => {
     clearMasterSession();
@@ -29,7 +23,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header className="app-shell-header app-header-shell sticky top-0 z-30">
-      <div className="app-header-brand-row flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <div className="app-header-brand-row flex min-w-0 flex-1 items-center justify-start gap-2 sm:gap-3">
         <button
           type="button"
           className="app-header-menu-btn lg:hidden"
@@ -42,9 +36,9 @@ export function Header({ onMenuClick }: HeaderProps) {
             <span />
           </span>
         </button>
-        <div className="app-header-company min-w-0" title={companyName}>
+        <div className="app-header-company min-w-0 text-left">
           <p className="app-header-company-label">Empresa</p>
-          <p className="app-header-company-name truncate">{companyName}</p>
+          <p className="app-header-company-name truncate">{COMPANY_NAME}</p>
         </div>
       </div>
       <button type="button" className="app-header-btn shrink-0" onClick={handleLogout}>
