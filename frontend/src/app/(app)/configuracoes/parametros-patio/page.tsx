@@ -258,7 +258,7 @@ export default function ParametrosPatioPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Parâmetros do pátio</h1>
+        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Parâmetros do Pátio</h1>
         <p className="mt-1 text-sm text-slate-500">
           Portes de veículo e tabela de preços (diária, mensal e lava) — base da planilha Tabela_Precos_Vigencia.
         </p>

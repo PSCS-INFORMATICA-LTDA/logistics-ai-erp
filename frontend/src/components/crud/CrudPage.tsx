@@ -399,7 +399,7 @@ export function CrudPage<T extends { id: string }>({
         open={Boolean(pendingDeleteId)}
         confirming={deleting}
         title="Excluir registro"
-        description="Informe o motivo da exclusão. O registro sai da lista e o motivo fica no Histórico de exclusões."
+        description="Informe o motivo da exclusão. O registro sai da lista e o motivo fica no Histórico de Exclusões."
         onCancel={() => {
           if (!deleting) setPendingDeleteId(null);
         }}

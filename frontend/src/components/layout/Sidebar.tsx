@@ -50,15 +50,15 @@ const NAV: NavItem[] = [
   {
     label: "Parâmetros",
     children: [
-      { href: "/configuracoes/parametros-patio", label: "Parâmetros do pátio" },
-      { href: "/configuracoes/parametros-frete", label: "Parâmetros de frete" },
+      { href: "/configuracoes/parametros-patio", label: "Parâmetros do Pátio" },
+      { href: "/configuracoes/parametros-frete", label: "Parâmetros de Frete" },
       {
         href: "/configuracoes/parametros",
         label: "Senha Máster - Concessão de Acessos",
       },
       {
         href: "/configuracoes/historico-exclusoes",
-        label: "Histórico de exclusões",
+        label: "Histórico de Exclusões",
       },
     ],
   },
@@ -67,7 +67,7 @@ const NAV: NavItem[] = [
     children: [
       { href: "/configuracoes/empresa", label: "Empresa" },
       { href: "/configuracoes/integracoes", label: "Integrações" },
-      { href: "/configuracoes/mensalidade", label: "Renovação da licença" },
+      { href: "/configuracoes/mensalidade", label: "Renovação da Licença" },
     ],
   },
 ];

@@ -489,7 +489,7 @@ export function FreightCalculatorPanel({
             <p className="text-xs text-slate-500">
               Preço-base em{" "}
               <Link href="/configuracoes/parametros-frete" className="text-brand-700 underline">
-                Parâmetros de frete
+                Parâmetros de Frete
               </Link>
               . Amarelo = override só desta OS (recalcula na hora).
             </p>

@@ -115,7 +115,7 @@ export default function ParametrosFretePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Parâmetros de frete</h1>
+        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Parâmetros de Frete</h1>
         <p className="mt-1 text-sm text-slate-500">
           Cadastro mestre de R$/km por modalidade e categoria de veículo. A OS usa esta tarifa
           automaticamente; override pontual fica no formulário (amarelo).

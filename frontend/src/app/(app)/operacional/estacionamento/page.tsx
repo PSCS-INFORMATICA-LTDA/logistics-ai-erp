@@ -231,7 +231,7 @@ export default function EstacionamentoPage() {
           <p className="mt-1 text-sm text-slate-500">
             Ordem própria do pátio — preços em{" "}
             <Link href="/configuracoes/parametros-patio" className="text-brand-700 underline">
-              Parâmetros do pátio
+              Parâmetros do Pátio
             </Link>
             .
           </p>

@@ -91,7 +91,7 @@ export default function HistoricoExclusoesPage() {
   if (!isAdmin) {
     return (
       <Alert variant="warning">
-        Histórico de exclusões disponível apenas para administradores da empresa.
+        Histórico de Exclusões disponível apenas para administradores da empresa.
       </Alert>
     );
   }
@@ -99,7 +99,7 @@ export default function HistoricoExclusoesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Histórico de exclusões</h1>
+        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Histórico de Exclusões</h1>
         <p className="mt-1 text-sm text-slate-500">
           Quem excluiu, quando (data/hora) e a observação/motivo informado no momento da exclusão.
         </p>

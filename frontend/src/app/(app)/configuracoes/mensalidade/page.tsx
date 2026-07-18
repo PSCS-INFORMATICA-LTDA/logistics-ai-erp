@@ -185,7 +185,7 @@ export default function MensalidadePage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <Card>
         <div className="border-b border-slate-100 px-6 py-4">
-          <h1 className="text-2xl font-bold text-slate-900">Renovação da licença</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Renovação da Licença</h1>
           <p className="mt-1 text-sm text-slate-500">
             Termo de responsabilidade, aceite e cartão para renovação mensal da licença. A Senha
             Máster do cliente serve só para conceder acessos aos sócios — não abre os preços da

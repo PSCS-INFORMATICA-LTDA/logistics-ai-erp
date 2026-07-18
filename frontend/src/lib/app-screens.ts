@@ -92,13 +92,13 @@ export const APP_SCREENS: AppScreen[] = [
   },
   {
     key: "configuracoes.parametros-patio",
-    label: "Parâmetros do pátio",
+    label: "Parâmetros do Pátio",
     group: "Parâmetros",
     href: "/configuracoes/parametros-patio",
   },
   {
     key: "configuracoes.parametros-frete",
-    label: "Parâmetros de frete",
+    label: "Parâmetros de Frete",
     group: "Parâmetros",
     href: "/configuracoes/parametros-frete",
   },
@@ -110,7 +110,7 @@ export const APP_SCREENS: AppScreen[] = [
   },
   {
     key: "configuracoes.historico-exclusoes",
-    label: "Histórico de exclusões",
+    label: "Histórico de Exclusões",
     group: "Parâmetros",
     href: "/configuracoes/historico-exclusoes",
   },
@@ -128,7 +128,7 @@ export const APP_SCREENS: AppScreen[] = [
   },
   {
     key: "configuracoes.mensalidade",
-    label: "Renovação da licença",
+    label: "Renovação da Licença",
     group: "Configurações",
     href: "/configuracoes/mensalidade",
   },

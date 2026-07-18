@@ -85,7 +85,7 @@ export function DeleteReasonModal({
                 (agora: <strong>{auditStampLabel}</strong>)
               </>
             ) : null}{" "}
-            e o motivo abaixo no Histórico de exclusões. Essa informação não pode ser apagada.
+            e o motivo abaixo no Histórico de Exclusões. Essa informação não pode ser apagada.
           </Alert>
         </div>
 

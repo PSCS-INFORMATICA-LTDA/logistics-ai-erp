@@ -85,7 +85,7 @@ export async function resolveFreightRate(params: {
   );
   if (!fb) {
     return {
-      error: `Sem tarifa vigente para ${params.modality} / ${category}. Cadastre em Parâmetros de frete.`,
+      error: `Sem tarifa vigente para ${params.modality} / ${category}. Cadastre em Parâmetros de Frete.`,
     };
   }
   return {

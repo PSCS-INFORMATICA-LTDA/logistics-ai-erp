@@ -221,7 +221,7 @@ export default function LavaRapidoPage() {
         <p className="mt-1 text-sm text-slate-500">
           Ordem própria — valores por porte em{" "}
           <Link href="/configuracoes/parametros-patio" className="text-brand-700 underline">
-            Parâmetros do pátio
+            Parâmetros do Pátio
           </Link>
           .
         </p>

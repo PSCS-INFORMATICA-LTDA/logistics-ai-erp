@@ -106,7 +106,7 @@ export async function resolvePatioPrice(params: {
   );
   if (!match) {
     return {
-      error: `Sem preço vigente para ${params.modality} / ${params.serviceName}. Cadastre em Parâmetros do pátio.`,
+      error: `Sem preço vigente para ${params.modality} / ${params.serviceName}. Cadastre em Parâmetros do Pátio.`,
     };
   }
   return { price: Number(match.price), billingUnit: match.billing_unit };
