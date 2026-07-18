@@ -149,7 +149,7 @@ export default function ParametrosPage() {
 
   const partnerOptions = useMemo(
     () => [
-      { value: "", label: "Selecione o sócio…" },
+      { value: "", label: "Selecione o usuário…" },
       ...partners.map((p) => ({
         value: p.id,
         label: `${p.name} (${p.code}) — ${p.partner_type}`,
@@ -444,7 +444,7 @@ export default function ParametrosPage() {
         <Card>
           <CardHeader
             title="Senha Máster - Concessão de Acessos"
-            description="Área master: acesso a todas as telas e definição de permissões por sócio."
+            description="Área master: acesso a todas as telas e definição de permissões por usuário."
           />
           <CardBody className="space-y-4">
             {error && <Alert variant="error">{error}</Alert>}
@@ -632,7 +632,7 @@ export default function ParametrosPage() {
       <Card>
         <CardHeader
           title="Senha Máster - Concessão de Acessos"
-          description="Somente parametrização de acessos por sócio. Valores e cartão da licença ficam em Configurações → Renovação da licença."
+          description="Somente parametrização de acessos por usuário. Valores e cartão da licença ficam em Configurações → Renovação da licença."
         />
         <CardBody className="space-y-4">
           {error && <Alert variant="error">{error}</Alert>}
@@ -680,10 +680,10 @@ export default function ParametrosPage() {
             </div>
           ) : null}
 
-          <h3 className="text-base font-semibold text-slate-800">Permissões por sócio</h3>
+          <h3 className="text-base font-semibold text-slate-800">Permissões por usuário</h3>
 
           <GlassSelect
-            label="Sócio (usuário cadastrado)"
+            label="Usuário cadastrado"
             value={selectedPartnerId}
             onChange={setSelectedPartnerId}
             options={partnerOptions}
@@ -697,7 +697,7 @@ export default function ParametrosPage() {
 
           {!selectedPartnerId ? (
             <p className="text-sm text-slate-500">
-              Selecione um sócio da lista para liberar as telas.
+              Selecione um usuário da lista para liberar as telas.
             </p>
           ) : (
             <>
