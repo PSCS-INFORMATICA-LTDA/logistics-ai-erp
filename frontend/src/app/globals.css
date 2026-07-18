@@ -173,35 +173,35 @@ body {
     inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
-/* Verde musgo — Exportar Excel */
+/* Verde Excel (#217346) — Exportar Excel, liquid glass */
 .liquid-glass-btn--moss {
   color: #ffffff;
   font-weight: 700;
   background: linear-gradient(
     145deg,
-    rgba(107, 142, 35, 0.92) 0%,
-    rgba(85, 107, 47, 0.95) 48%,
-    rgba(61, 84, 32, 0.96) 100%
+    rgba(33, 115, 70, 0.94) 0%,
+    rgba(24, 92, 55, 0.96) 48%,
+    rgba(16, 70, 42, 0.97) 100%
   );
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.28);
   box-shadow:
-    0 8px 24px rgba(61, 84, 32, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+    0 8px 24px rgba(16, 70, 42, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16);
 }
 
 .liquid-glass-btn--moss:hover:not(:disabled) {
   color: #ffffff;
   background: linear-gradient(
     145deg,
-    rgba(124, 158, 48, 0.95) 0%,
-    rgba(107, 142, 35, 0.97) 48%,
-    rgba(85, 107, 47, 0.96) 100%
+    rgba(39, 132, 82, 0.96) 0%,
+    rgba(33, 115, 70, 0.98) 48%,
+    rgba(24, 92, 55, 0.97) 100%
   );
   box-shadow:
-    0 12px 28px rgba(61, 84, 32, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+    0 12px 28px rgba(16, 70, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .liquid-glass-btn--ghost {
@@ -236,7 +236,7 @@ body {
   }
 
   .liquid-glass-btn--moss {
-    background: linear-gradient(145deg, #6b8e23 0%, #556b2f 50%, #3d5420 100%);
+    background: linear-gradient(145deg, #217346 0%, #185c37 50%, #10462a 100%);
   }
 }
 

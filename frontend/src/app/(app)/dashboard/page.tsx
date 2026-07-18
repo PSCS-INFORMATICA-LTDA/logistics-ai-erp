@@ -366,10 +366,19 @@ export default function DashboardPage() {
               <Button
                 type="button"
                 variant="moss"
-                className="min-w-[10.5rem] px-5 py-2.5 text-sm font-bold tracking-wide text-white shadow-lg"
+                className="inline-flex min-w-[10.5rem] items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold tracking-wide text-white shadow-lg"
                 disabled={exporting || loading || !dateFrom || !dateTo}
                 onClick={() => void handleExportExcel()}
               >
+                <svg
+                  viewBox="0 0 16 16"
+                  className="h-4 w-4 shrink-0"
+                  fill="none"
+                  aria-hidden
+                >
+                  <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M1.5 5.5h13M1.5 10h13M6 1.5v13" stroke="currentColor" strokeWidth="1.2" />
+                </svg>
                 {exporting ? "Gerando Excel…" : "Exportar Excel"}
               </Button>
             </div>
