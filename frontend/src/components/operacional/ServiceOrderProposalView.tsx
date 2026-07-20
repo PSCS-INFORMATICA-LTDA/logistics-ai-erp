@@ -120,7 +120,6 @@ export function ServiceOrderProposalView({
   }, [publicToken, order, context]);
 
   const whatsappHref = whatsappShare?.primaryHref ?? null;
-  const whatsappAppHref = whatsappShare?.desktopHref ?? null;
 
   const shareIconBase = "h-10 w-10 shrink-0 p-0";
 
@@ -133,7 +132,7 @@ export function ServiceOrderProposalView({
     if (!whatsappShare) return;
     setWhatsappHint(
       isWindowsWhatsAppDesktop()
-        ? "Mensagem copiada. WhatsApp abrirá com o texto — use Ctrl+V se o chat vier vazio."
+        ? "Mensagem copiada. O sistema tenta abrir o WhatsApp do PC (app já aberto). Se abrir o Web, use o link «abrir no WhatsApp Web» abaixo ou Ctrl+V no app."
         : "Mensagem copiada. Confira o chat do cliente e pressione Enter."
     );
   };
@@ -279,8 +278,9 @@ export function ServiceOrderProposalView({
             {whatsappHref ? (
               <a
                 href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
+                {...(whatsappHref.startsWith("whatsapp://")
+                  ? {}
+                  : { target: "_blank", rel: "noopener noreferrer" })}
                 title="Enviar no WhatsApp"
                 aria-label="Enviar proposta no WhatsApp"
                 className={cn(
@@ -349,12 +349,19 @@ export function ServiceOrderProposalView({
             <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
               WhatsApp: mensagem copiada ao clicar. A prévia do link (logo 3D) atualiza em conversas novas — o
               WhatsApp guarda cache da imagem antiga por alguns dias.
-              {whatsappAppHref && whatsappHref !== whatsappAppHref ? (
+              {whatsappShare.storeAppHref &&
+              whatsappHref &&
+              whatsappHref !== whatsappShare.storeAppHref ? (
                 <>
                   {" "}
                   Se o app não abrir,{" "}
-                  <a href={whatsappAppHref} className="font-medium text-brand-700 underline">
-                    abrir no WhatsApp desktop
+                  <a
+                    href={whatsappShare.storeAppHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-brand-700 underline"
+                  >
+                    abrir no WhatsApp Web
                   </a>
                   .
                 </>

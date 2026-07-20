@@ -397,7 +397,7 @@ export function ServiceOrderRowActions({
         href={`/operacional/ordens-servico/${row.id}/proposta`}
         target="_blank"
         rel="noreferrer"
-        className={glassAction("neutral")}
+        className={glassAction("sky")}
       >
         PDF / {completed ? "OS concluída" : "Proposta"}
       </Link>
@@ -529,7 +529,7 @@ export function ServiceOrderRowActions({
           disabled={resetting || accepting || rejecting}
           title="Reabrir proposta para novo aceite ou recusa"
           onClick={() => void handleResetProposal()}
-          className={glassAction("neutral")}
+          className={glassAction("sky")}
         >
           Reabrir proposta
         </button>

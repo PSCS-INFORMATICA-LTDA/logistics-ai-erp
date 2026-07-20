@@ -419,9 +419,29 @@ body {
 }
 
 .liquid-glass-action--sky {
-  color: #0c4a6e;
-  background: linear-gradient(145deg, rgba(14, 165, 233, 0.16) 0%, rgba(255, 255, 255, 0.52) 100%);
-  border-color: rgba(14, 165, 233, 0.32);
+  color: #ffffff;
+  font-weight: 600;
+  background: linear-gradient(
+    145deg,
+    rgba(14, 165, 233, 0.9) 0%,
+    rgba(2, 132, 199, 0.94) 48%,
+    rgba(3, 105, 161, 0.96) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 6px 18px rgba(2, 132, 199, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.liquid-glass-action--sky:hover:not(:disabled) {
+  color: #ffffff;
+  background: linear-gradient(
+    145deg,
+    rgba(56, 189, 248, 0.95) 0%,
+    rgba(14, 165, 233, 0.96) 48%,
+    rgba(2, 132, 199, 0.97) 100%
+  );
 }
 
 /* ── Liquid Glass — painéis e campos de filtro ── */

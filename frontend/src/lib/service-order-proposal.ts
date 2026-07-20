@@ -752,8 +752,9 @@ export function buildWhatsAppShareLinks(
   const desktopHref = `whatsapp://send?${desktopParams}`;
   const mobileHref = `${mobileBase}?text=${encodedText}`;
 
-  // Desktop: api.whatsapp.com — abre Web ou delega ao app (funcionava antes; whatsapp:// falha no Chrome).
-  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : storeAppHref;
+  // Desktop: protocolo nativo foca o WhatsApp já aberto no PC (evita nova aba Web).
+  // Fallback Web fica em storeAppHref para o utilizador clicar se o protocolo falhar.
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
 
   return {
     message: messageForShare,
@@ -770,11 +771,14 @@ export function isWhatsAppNativeHref(href: string): boolean {
 
 export function openWhatsAppShareHref(href: string, targetWindow?: Window | null): void {
   if (isWhatsAppNativeHref(href)) {
+    // Não use aba about:blank — o protocolo deve focar o app desktop, sem aba Web.
     if (targetWindow && !targetWindow.closed) {
-      targetWindow.location.href = href;
-      return;
+      try {
+        targetWindow.close();
+      } catch {
+        /* ignore */
+      }
     }
-    // Deixa o clique nativo no <a href> abrir o protocolo quando possível.
     launchCustomProtocol(href);
     return;
   }
