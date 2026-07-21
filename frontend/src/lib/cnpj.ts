@@ -1,4 +1,4 @@
-import { formatCep, normalizeCep } from "@/lib/cep";
+import { fetchAddressByCep, formatCep, normalizeCep } from "@/lib/cep";
 import { formatCnpj, isValidCnpj, onlyDigits } from "@/lib/br-documents";
 
 export type CnpjCompanyInfo = {
@@ -20,6 +20,8 @@ export type CnpjCompanyInfo = {
   /** IE não vem da Receita Federal aberta; campo fica para preenchimento manual. */
   stateRegistration: string;
   checkedAt: string;
+  /** true quando logradouro veio do CEP (Receita às vezes não traz rua/número). */
+  streetFromCep?: boolean;
 };
 
 function formatPhoneFromBrasilApi(dddTelefone?: string | null): string {
@@ -91,6 +93,7 @@ export async function fetchCompanyByCnpj(cnpjInput: string): Promise<CnpjCompany
     situacao_cadastral?: string | number;
     cep?: string;
     logradouro?: string;
+    descricao_tipo_de_logradouro?: string;
     numero?: string;
     complemento?: string;
     bairro?: string;
@@ -99,12 +102,20 @@ export async function fetchCompanyByCnpj(cnpjInput: string): Promise<CnpjCompany
     ddd_telefone_1?: string;
   };
 
-  const street = (data.logradouro ?? "").trim();
-  const addressNumber = (data.numero ?? "").trim();
+  let street = (data.logradouro ?? "").trim();
+  // Receita às vezes manda tipo + logradouro separados
+  const streetType = (data.descricao_tipo_de_logradouro ?? "").trim();
+  if (street && streetType && !street.toLowerCase().startsWith(streetType.toLowerCase())) {
+    street = `${streetType} ${street}`.trim();
+  }
+
+  let addressNumber = (data.numero ?? "").trim();
+  if (/^(s\/?n|sn)$/i.test(addressNumber)) addressNumber = "";
+
   const addressComplement = (data.complemento ?? "").trim();
-  const neighborhood = (data.bairro ?? "").trim();
-  const city = (data.municipio ?? "").trim();
-  const state = (data.uf ?? "").trim().toUpperCase();
+  let neighborhood = (data.bairro ?? "").trim();
+  let city = (data.municipio ?? "").trim();
+  let state = (data.uf ?? "").trim().toUpperCase();
   const postalCode = data.cep ? formatCep(normalizeCep(String(data.cep))) : "";
   const status = (data.descricao_situacao_cadastral ?? String(data.situacao_cadastral ?? "")).trim();
   const legalName = (data.razao_social ?? "").trim();
@@ -112,6 +123,24 @@ export async function fetchCompanyByCnpj(cnpjInput: string): Promise<CnpjCompany
 
   if (!legalName) {
     throw new Error("CNPJ encontrado, mas sem razão social. Preencha os dados manualmente.");
+  }
+
+  // Muitos MEI/CNPJ novos vêm só com CEP + bairro/cidade, sem logradouro na Receita.
+  // Completa a rua (e lacunas) via consulta de CEP.
+  let streetFromCep = false;
+  if (postalCode && !street) {
+    try {
+      const cepAddr = await fetchAddressByCep(postalCode);
+      if (cepAddr.street) {
+        street = cepAddr.street;
+        streetFromCep = true;
+      }
+      if (!neighborhood && cepAddr.neighborhood) neighborhood = cepAddr.neighborhood;
+      if (!city && cepAddr.city) city = cepAddr.city;
+      if (!state && cepAddr.state) state = cepAddr.state.trim().toUpperCase();
+    } catch {
+      // Mantém o que veio do CNPJ; usuário completa manualmente.
+    }
   }
 
   const addressParts = {
@@ -141,6 +170,7 @@ export async function fetchCompanyByCnpj(cnpjInput: string): Promise<CnpjCompany
     phone: formatPhoneFromBrasilApi(data.ddd_telefone_1),
     stateRegistration: "",
     checkedAt: new Date().toISOString(),
+    streetFromCep,
   };
 }
 

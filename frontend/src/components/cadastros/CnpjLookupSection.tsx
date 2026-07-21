@@ -44,10 +44,15 @@ export function CnpjLookupSection({
       for (const [key, value] of Object.entries(patch)) {
         set(key, value);
       }
+      const base = info.isActive
+        ? "CNPJ ATIVO na Receita. Dados preenchidos — salve para gravar no banco."
+        : `Situação na Receita: ${info.status}. Dados preenchidos — salve para gravar no banco.`;
       setOkMessage(
-        info.isActive
-          ? "CNPJ ATIVO na Receita. Dados preenchidos — salve para gravar no banco."
-          : `Situação na Receita: ${info.status}. Dados preenchidos — salve para gravar no banco.`
+        info.streetFromCep
+          ? `${base} Logradouro completado pelo CEP (a Receita não trouxe a rua neste CNPJ). Confira o número.`
+          : !info.street
+            ? `${base} Endereço incompleto na Receita — preencha o logradouro/número manualmente.`
+            : base
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao consultar CNPJ.");
