@@ -6,6 +6,17 @@ export type Company = {
   status: string;
   /** Path no Storage (company-attachments) — logo da empresa. */
   logo_storage_path?: string | null;
+  state_registration?: string | null;
+  postal_code?: string | null;
+  street?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  address?: string | null;
+  cnpj_status?: string | null;
+  cnpj_checked_at?: string | null;
 };
 
 export type CompanyBillingSettings = {
@@ -271,9 +282,20 @@ export type Client = {
   code: string;
   name: string;
   document: string | null;
+  trade_name?: string | null;
+  state_registration?: string | null;
+  postal_code?: string | null;
+  street?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  neighborhood?: string | null;
+  city: string | null;
+  state?: string | null;
+  address?: string | null;
+  cnpj_status?: string | null;
+  cnpj_checked_at?: string | null;
   contact_name: string | null;
   phone: string | null;
-  city: string | null;
   status: string;
   notes: string | null;
 };
@@ -285,9 +307,20 @@ export type Supplier = {
   name: string;
   category: string;
   document: string | null;
+  trade_name?: string | null;
+  state_registration?: string | null;
+  postal_code?: string | null;
+  street?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  neighborhood?: string | null;
+  city: string | null;
+  state?: string | null;
+  address?: string | null;
+  cnpj_status?: string | null;
+  cnpj_checked_at?: string | null;
   contact_name: string | null;
   phone: string | null;
-  city: string | null;
   status: string;
   notes: string | null;
 };

@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { CrudPage } from "@/components/crud/CrudPage";
 import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { Badge } from "@/components/ui/Badge";
+import {
+  uploadPendingVehicleDocuments,
+  VehicleDocumentsSection,
+  type PendingVehicleDocument,
+} from "@/components/vehicles/VehicleDocumentsSection";
 import { VehiclePhotoUpload } from "@/components/vehicles/VehiclePhotoUpload";
 import { nextCode } from "@/lib/codes";
 import { ANTT_AXLE_OPTIONS } from "@/lib/antt-freight";
@@ -32,7 +37,7 @@ export default function VeiculosPage() {
   return (
     <CrudPage<Vehicle>
       title="Veículos"
-      description="Cadastro oficial da frota — foto mestre + placa normalizada automaticamente"
+      description="Cadastro da frota — foto mestre, documentos (CRLV, ANTT/NTT) e placa normalizada"
       table="vehicles"
       auditScreenKey="cadastros.veiculos"
       orderBy="plate"
@@ -82,10 +87,15 @@ function VehicleForm({
     item?.photo_storage_path ?? null
   );
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [pendingDocs, setPendingDocs] = useState<PendingVehicleDocument[]>([]);
+  const [docsRefreshKey, setDocsRefreshKey] = useState(0);
 
   useEffect(() => {
     setPhotoStoragePath(item?.photo_storage_path ?? null);
     setPendingPhotoFile(null);
+    pendingDocs.forEach((d) => URL.revokeObjectURL(d.previewUrl));
+    setPendingDocs([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset só ao trocar veículo
   }, [item?.id, item?.photo_storage_path]);
 
   return (
@@ -123,18 +133,36 @@ function VehicleForm({
         }
 
         const vehicleId = await onSave(data);
-        if (!vehicleId || !companyId || !pendingPhotoFile) return;
+        if (!vehicleId || !companyId) return;
 
-        const { error: photoError } = await uploadVehiclePhoto({
-          companyId,
-          vehicleId,
-          file: pendingPhotoFile,
-          previousPath: photoStoragePath,
-        });
-        if (photoError) {
-          window.alert(`Veículo salvo, mas a foto não foi enviada: ${photoError}`);
-        } else {
-          setPendingPhotoFile(null);
+        if (pendingPhotoFile) {
+          const { error: photoError } = await uploadVehiclePhoto({
+            companyId,
+            vehicleId,
+            file: pendingPhotoFile,
+            previousPath: photoStoragePath,
+          });
+          if (photoError) {
+            window.alert(`Veículo salvo, mas a foto não foi enviada: ${photoError}`);
+          } else {
+            setPendingPhotoFile(null);
+          }
+        }
+
+        if (pendingDocs.length > 0) {
+          const { uploaded, errors } = await uploadPendingVehicleDocuments({
+            companyId,
+            vehicleId,
+            docs: pendingDocs,
+          });
+          pendingDocs.forEach((d) => URL.revokeObjectURL(d.previewUrl));
+          setPendingDocs([]);
+          setDocsRefreshKey((k) => k + 1);
+          if (errors > 0) {
+            window.alert(
+              `Veículo salvo. Documentos: ${uploaded} enviados, ${errors} com falha.`
+            );
+          }
         }
       }}
     >
@@ -156,6 +184,16 @@ function VehicleForm({
               pendingFile={pendingPhotoFile}
               onPendingFileChange={setPendingPhotoFile}
               onPhotoPathChange={setPhotoStoragePath}
+            />
+
+            <VehicleDocumentsSection
+              companyId={companyId}
+              vehicleId={item?.id ?? null}
+              disabled={saving}
+              pendingDocs={pendingDocs}
+              onPendingDocsChange={setPendingDocs}
+              refreshKey={docsRefreshKey}
+              onUploaded={() => setDocsRefreshKey((k) => k + 1)}
             />
 
             <FormFields
