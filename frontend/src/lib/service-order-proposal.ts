@@ -700,21 +700,31 @@ export function isWindowsWhatsAppDesktop(): boolean {
 }
 
 const WHATSAPP_URL_TEXT_BUDGET = 2800;
+/** Windows corta `whatsapp://` longo e o app abre vazio — manter texto nativo curto. */
+const WHATSAPP_NATIVE_TEXT_BUDGET = 900;
 
-function truncateTextForWhatsAppUrl(text: string): string {
-  if (encodeURIComponent(text).length <= WHATSAPP_URL_TEXT_BUDGET) return text;
+function truncateEncodedText(text: string, budget: number): string {
+  if (encodeURIComponent(text).length <= budget) return text;
 
   const linkMatch = text.match(/https?:\/\/\S+/);
   if (linkMatch) {
-    const short = `Proposta GRX — veja e confirme pelo link:\n${linkMatch[0]}`;
-    if (encodeURIComponent(short).length <= WHATSAPP_URL_TEXT_BUDGET) return short;
+    const short = `Segue o link para confirmar:\n${linkMatch[0]}`;
+    if (encodeURIComponent(short).length <= budget) return short;
   }
 
   let trimmed = text;
-  while (trimmed.length > 0 && encodeURIComponent(trimmed).length > WHATSAPP_URL_TEXT_BUDGET) {
+  while (trimmed.length > 0 && encodeURIComponent(trimmed).length > budget) {
     trimmed = trimmed.slice(0, -20);
   }
   return `${trimmed.trim()}…`;
+}
+
+function truncateTextForWhatsAppUrl(text: string): string {
+  return truncateEncodedText(text, WHATSAPP_URL_TEXT_BUDGET);
+}
+
+function truncateTextForWhatsAppNativeUrl(text: string): string {
+  return truncateEncodedText(text, WHATSAPP_NATIVE_TEXT_BUDGET);
 }
 
 export type WhatsAppShareLinks = {
@@ -743,7 +753,9 @@ export function buildWhatsAppShareLinks(
   const messageForShare = formatWhatsAppShareMessage(text);
   const plainMessage = plainTextForWhatsAppUrl(messageForShare);
   const urlText = truncateTextForWhatsAppUrl(plainMessage);
+  const nativeText = truncateTextForWhatsAppNativeUrl(plainMessage);
   const encodedText = encodeURIComponent(urlText);
+  const encodedNativeText = encodeURIComponent(nativeText);
 
   // Sem telefone válido não montamos link “solto” — evita abrir chat errado / colar no contato errado.
   const emptyHref = "";
@@ -759,19 +771,13 @@ export function buildWhatsAppShareLinks(
     };
   }
 
-  const desktopParams = `phone=${normalized}&text=${encodedText}`;
   const storeAppHref = `https://api.whatsapp.com/send?phone=${normalized}&text=${encodedText}`;
-  // Formato oficial: whatsapp://send?phone=… (sem barra extra após send).
-  const desktopHref = `whatsapp://send?${desktopParams}`;
+  // App do PC (proposta cliente e designação motorista): nunca WhatsApp Web.
+  const desktopHref = `whatsapp://send?phone=${normalized}&text=${encodedNativeText}`;
   const mobileHref = `https://wa.me/${normalized}?text=${encodedText}`;
 
-  // Mobile: wa.me. Windows: link Meta (whatsapp:// só foca o app e ignora phone/text).
-  // Outros desktop: protocolo nativo; fallback HTTPS em openWhatsAppPreferApp.
-  const primaryHref = isMobileWhatsAppDevice()
-    ? mobileHref
-    : isWindowsDesktop()
-      ? storeAppHref
-      : desktopHref;
+  // Desktop = protocolo do app; mobile = wa.me. Sem abrir api/web no PC.
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
 
   return {
     message: messageForShare,
@@ -822,9 +828,8 @@ export function openWhatsAppShareHref(href: string, targetWindow?: Window | null
  * Abre o WhatsApp no chat do telefone cadastrado (com a mensagem na URL).
  * Só chamar a partir de clique do utilizador — nunca logo após `await`.
  *
- * Windows: usa o link Meta HTTPS. O protocolo `whatsapp://` no Desktop Windows
- * costuma só focar o app já aberto e descartar phone/text (chat vazio).
- * macOS/Linux: tenta `whatsapp://`; se não houver handoff, cai no HTTPS.
+ * No PC (inclui Windows): só o app via `whatsapp://` — mesmo fluxo da proposta ao cliente.
+ * Não abre WhatsApp Web / api.whatsapp.com (aba lenta e fora do app já aberto).
  */
 export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
   if (!links.opensDirectChat || !links.phoneDigits) return false;
@@ -834,38 +839,15 @@ export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
     return true;
   }
 
-  const httpsHref = links.storeAppHref || links.mobileHref;
-  if (!httpsHref) return false;
-
-  // Windows Desktop: HTTPS é o único caminho confiável para abrir o chat certo.
-  if (isWindowsDesktop()) {
-    openExternalUrl(httpsHref);
-    return true;
+  const nativeHref = links.desktopHref || links.primaryHref;
+  if (!nativeHref || !isWhatsAppNativeHref(nativeHref)) {
+    window.alert(
+      "Instale o WhatsApp no PC para abrir o chat do telefone cadastrado.\n\nNão usamos WhatsApp Web neste fluxo."
+    );
+    return false;
   }
-
-  const nativeHref = links.desktopHref;
-  if (!nativeHref) {
-    openExternalUrl(httpsHref);
-    return true;
-  }
-
-  let handedOff = false;
-  const markHandedOff = () => {
-    handedOff = true;
-  };
-  document.addEventListener("visibilitychange", markHandedOff);
-  window.addEventListener("blur", markHandedOff);
 
   launchCustomProtocol(nativeHref);
-
-  window.setTimeout(() => {
-    document.removeEventListener("visibilitychange", markHandedOff);
-    window.removeEventListener("blur", markHandedOff);
-    if (!handedOff && document.visibilityState === "visible") {
-      openExternalUrl(httpsHref);
-    }
-  }, 900);
-
   return true;
 }
 
@@ -952,6 +934,14 @@ export type WhatsAppShareResult = {
 };
 
 function launchCustomProtocol(url: string) {
+  // location.href no gesto do clique é o caminho mais estável no Windows para
+  // focar o WhatsApp Desktop já aberto no chat (phone+text), sem aba Web.
+  try {
+    window.location.href = url;
+    return;
+  } catch {
+    /* fallback abaixo */
+  }
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.rel = "noopener noreferrer";

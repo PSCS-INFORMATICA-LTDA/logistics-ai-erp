@@ -678,25 +678,26 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               </p>
               <p className="break-all text-xs text-slate-500">{sharePayload.assignmentUrl}</p>
               <div className="flex flex-wrap items-center gap-2">
-                {sharePayload.whatsappLinks.opensDirectChat ? (
-                  <button
-                    type="button"
+                {sharePayload.whatsappLinks.opensDirectChat &&
+                sharePayload.whatsappLinks.desktopHref ? (
+                  <a
+                    href={sharePayload.whatsappLinks.desktopHref}
                     title={`WhatsApp para ${
                       formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                       selectedDriver?.phone ||
                       "motorista"
                     }`}
                     aria-label={`Abrir WhatsApp para ${shareDriverName}`}
-                    disabled={saving}
                     className={cn(
                       glassAction("green", true),
-                      "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold"
+                      "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold",
+                      saving && "pointer-events-none opacity-50"
                     )}
                     onClick={handleWhatsAppShareClick}
                   >
                     <WhatsAppIcon className="h-5 w-5" />
                     Abrir WhatsApp
-                  </button>
+                  </a>
                 ) : (
                   <button
                     type="button"
@@ -728,12 +729,12 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               {sharePayload.whatsappLinks.opensDirectChat &&
               sharePayload.whatsappLinks.phoneDigits ? (
                 <p className="text-xs text-slate-600">
-                  Abre o chat de{" "}
+                  Mesmo fluxo da proposta ao cliente: abre o <strong>WhatsApp do PC</strong> no chat
+                  de{" "}
                   <strong>
                     {formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits)}
                   </strong>{" "}
-                  com a mensagem e o link da designação já preenchidos. Se o Windows perguntar,
-                  escolha o WhatsApp instalado.
+                  com a mensagem e o link — sem WhatsApp Web.
                 </p>
               ) : (
                 <p className="text-sm text-amber-800">
