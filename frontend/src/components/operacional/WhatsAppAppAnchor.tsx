@@ -8,9 +8,11 @@ type Props = {
   className?: string;
   title?: string;
   "aria-label"?: string;
+  id?: string;
   children: ReactNode;
   /** Roda no clique (antes da navegação). */
   onOpen?: () => void;
+  onMouseDown?: (event: MouseEvent<HTMLAnchorElement>) => void;
 };
 
 function isDesktopBridgeHref(href: string): boolean {
@@ -28,8 +30,10 @@ export function WhatsAppAppAnchor({
   className,
   title,
   "aria-label": ariaLabel,
+  id,
   children,
   onOpen,
+  onMouseDown,
 }: Props) {
   const native = isWhatsAppNativeHref(href);
   const bridge = isDesktopBridgeHref(href);
@@ -52,12 +56,14 @@ export function WhatsAppAppAnchor({
 
   return (
     <a
+      id={id}
       href={href}
       title={title}
       aria-label={ariaLabel}
       className={className}
       data-whatsapp-target={bridge ? "desktop-bridge" : native ? "desktop-app" : "https"}
       {...(native || bridge ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+      onMouseDown={onMouseDown}
       onClick={handleClick}
     >
       {children}

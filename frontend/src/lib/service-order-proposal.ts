@@ -795,9 +795,9 @@ export function buildWhatsAppShareLinks(
   }
 
   const storeAppHref = `https://api.whatsapp.com/send?phone=${normalized}&text=${encodedText}`;
-  // PC: só protocolo do app (não abre aba Web).
-  const desktopHref = `whatsapp://send/?phone=${normalized}&text=${encodedNativeText}`;
-  const desktopChatOnlyHref = `whatsapp://send/?phone=${normalized}`;
+  // PC: protocolo oficial do app (sem barra após send — no Desktop o send/? falha com frequência).
+  const desktopHref = `whatsapp://send?phone=${normalized}&text=${encodedNativeText}`;
+  const desktopChatOnlyHref = `whatsapp://send?phone=${normalized}`;
   const desktopBridgeHref = buildWhatsAppDesktopBridgeHref(normalized, nativeText);
   const desktopChatOnlyBridgeHref = buildWhatsAppDesktopBridgeHref(normalized);
   const mobileHref = `https://wa.me/${normalized}?text=${encodedText}`;

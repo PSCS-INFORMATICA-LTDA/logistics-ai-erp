@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
+import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
@@ -27,7 +28,6 @@ import {
   formatPhoneForWhatsApp,
   formatWhatsAppPhoneDisplay,
   launchPreparedEmailShare,
-  shareWhatsAppDesktopChat,
 } from "@/lib/service-order-proposal";
 import { glassAction } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
@@ -122,7 +122,6 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   const [driverPayInput, setDriverPayInput] = useState("");
   const [assistantPayInput, setAssistantPayInput] = useState("");
 
-  const shareIconBase = "h-10 w-10 shrink-0 p-0";
   const companyName = company?.trade_name || company?.name || "GRX Transportes e Logística";
   const selectedDriver = drivers.find((d) => d.id === selectedId);
   const rejectedDriverIds = orderDetails.driver_assignment_rejected_driver_ids ?? [];
@@ -448,23 +447,6 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       : `Registrar envio da designação da ${orderDetails.code} para ${driver.name}?\n\n${payLines}\n\nO link ficará ativo para o motorista aceitar ou recusar. Se fechar o WhatsApp sem enviar, use «Cancelar designação» na lista da OS.`;
   };
 
-  const launchDriverWhatsAppShare = (
-    payload: DriverAssignmentSharePayload,
-    driverId?: string,
-    driverName?: string
-  ) => {
-    const links = payload.whatsappLinks;
-    if (!links.opensDirectChat || !links.desktopChatOnlyHref?.startsWith("whatsapp://")) {
-      window.alert(
-        "Cadastre o telefone do motorista para o WhatsApp abrir no app, no contato certo."
-      );
-      return false;
-    }
-    const opened = shareWhatsAppDesktopChat(links);
-    if (opened) notifyAssignmentSentOnce(driverId, driverName);
-    return opened;
-  };
-
   const launchDriverEmailShare = (payload: DriverAssignmentSharePayload) => {
     if (!payload.emailBundle) {
       window.alert("E-mail do motorista não cadastrado.");
@@ -489,12 +471,6 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       return;
     }
 
-    // Já registrado: só o clique no <a whatsapp://> / openWhatsAppPreferApp abre o app.
-    if (sharePayload && selectedId === driver.id) {
-      launchDriverWhatsAppShare(sharePayload, driver.id, driver.name);
-      return;
-    }
-
     void (async () => {
       const payDetails = resolvePayDetails();
       if (!payDetails) return;
@@ -504,7 +480,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
         driver.phone?.trim() ||
         "o motorista";
       const confirmed = window.confirm(
-        `${buildShareConfirmMessage(driver, payDetails)}\n\nDepois clique em WhatsApp para abrir o app no chat de ${phoneLabel}.`
+        `${buildShareConfirmMessage(driver, payDetails)}\n\nEm seguida clique no botão verde «Abrir WhatsApp» — é esse clique que abre o app no chat de ${phoneLabel}.`
       );
       if (!confirmed) return;
 
@@ -513,8 +489,11 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       });
       if (!payload) return;
 
-      // Não abrir após await (Chrome manda para Web ou bloqueia).
-      // O botão WhatsApp do painel é <a href="whatsapp://"> — 2º clique abre o app.
+      // Chrome só abre whatsapp:// no gesto do clique nativo no <a>.
+      // Depois do await, o painel mostra o botão verde (mesmo padrão da proposta).
+      window.setTimeout(() => {
+        document.getElementById("assign-driver-whatsapp-open")?.focus();
+      }, 50);
     })();
   };
 
@@ -559,14 +538,18 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   };
 
   const handleWhatsAppShareMouseDown = () => {
-    if (sharePayload?.whatsappLinks.message) {
-      copyTextToClipboardSync(sharePayload.whatsappLinks.message);
-    }
+    const text = sharePayload?.whatsappMessage || sharePayload?.whatsappLinks.message;
+    if (text) copyTextToClipboardSync(text);
   };
 
   const handleWhatsAppShareOpen = () => {
     notifyAssignmentSentOnce(selectedId, shareDriverName);
   };
+
+  const whatsappOpenHref =
+    sharePayload?.whatsappLinks.opensDirectChat && sharePayload.whatsappLinks.primaryHref
+      ? sharePayload.whatsappLinks.primaryHref
+      : "";
 
   const handleEmailShareClick = () => {
     if (!sharePayload) {
@@ -668,44 +651,45 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           {sharePayload ? (
             <div className="space-y-4">
               <p className="text-sm text-emerald-800">
-                Designação registrada para <strong>{shareDriverName}</strong>. Clique em{" "}
-                <strong>WhatsApp</strong> — abre o app no contato e a mensagem já vai copiada.
+                Designação registrada para <strong>{shareDriverName}</strong>. Agora clique no
+                botão verde abaixo — é o único clique que abre o app WhatsApp no chat do motorista
+                (mesmo fluxo da proposta ao cliente).
               </p>
               <textarea
                 readOnly
                 rows={8}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
-                value={sharePayload.whatsappLinks.message}
+                value={sharePayload.whatsappMessage || sharePayload.whatsappLinks.message}
               />
-              <div className="flex flex-wrap items-center gap-2">
-                {sharePayload.whatsappLinks.opensDirectChat &&
-                sharePayload.whatsappLinks.desktopChatOnlyHref?.startsWith("whatsapp://") ? (
-                  <a
-                    href={sharePayload.whatsappLinks.desktopChatOnlyHref}
+              <div className="flex flex-col gap-2">
+                {whatsappOpenHref.startsWith("whatsapp://") ? (
+                  <WhatsAppAppAnchor
+                    id="assign-driver-whatsapp-open"
+                    href={whatsappOpenHref}
                     title={`WhatsApp app — ${
                       formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                       selectedDriver?.phone ||
                       "motorista"
                     }`}
-                    aria-label={`Enviar designação no WhatsApp para ${shareDriverName}`}
+                    aria-label={`Abrir WhatsApp para ${shareDriverName}`}
                     className={cn(
                       glassAction("green", true),
-                      "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold",
+                      "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold",
                       saving && "pointer-events-none opacity-50"
                     )}
                     onMouseDown={handleWhatsAppShareMouseDown}
-                    onClick={handleWhatsAppShareOpen}
+                    onOpen={handleWhatsAppShareOpen}
                   >
                     <WhatsAppIcon className="h-5 w-5" />
-                    WhatsApp
-                  </a>
+                    Abrir WhatsApp
+                  </WhatsAppAppAnchor>
                 ) : (
                   <button
                     type="button"
                     title="Cadastre o telefone do motorista"
                     className={cn(
                       glassAction("green", true),
-                      "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold opacity-50"
+                      "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold opacity-50"
                     )}
                     onClick={() =>
                       window.alert(
@@ -714,7 +698,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                     }
                   >
                     <WhatsAppIcon className="h-5 w-5" />
-                    WhatsApp
+                    Abrir WhatsApp
                   </button>
                 )}
                 {sharePayload.emailBundle ? (
@@ -723,21 +707,22 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                     title="Enviar designação por e-mail"
                     aria-label="Enviar designação por e-mail"
                     disabled={saving}
-                    className={cn(glassAction("sky", true), shareIconBase)}
+                    className={cn(glassAction("sky", true), "inline-flex h-11 w-fit items-center gap-2 px-4")}
                     onClick={handleEmailShareClick}
                   >
                     <MailIcon className="h-5 w-5" />
+                    E-mail
                   </button>
                 ) : null}
               </div>
               <p className="text-xs text-slate-600">
-                Abre o <strong>app</strong> no chat de{" "}
+                Abre o <strong>app do PC</strong> no chat de{" "}
                 <strong>
                   {formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                     "telefone cadastrado"}
                 </strong>
-                . Se a caixa vier vazia, Ctrl+V — a mensagem completa já foi copiada nesse clique
-                (no contato certo).
+                , com a mensagem e o link da designação. Se o WhatsApp só voltar à tela inicial,
+                saia do app pela bandeja e clique de novo em «Abrir WhatsApp».
               </p>
             </div>
           ) : loading ? (

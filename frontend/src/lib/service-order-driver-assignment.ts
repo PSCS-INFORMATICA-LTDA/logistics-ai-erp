@@ -304,7 +304,11 @@ export async function prepareDriverAssignmentSharePayload(
     assignmentUrl,
     payDetails
   );
-  const whatsappLinks = buildWhatsAppShareLinks(urlMessage, driverPhone);
+  const whatsappLinks = {
+    ...buildWhatsAppShareLinks(urlMessage, driverPhone),
+    // URL nativa usa texto compacto; clipboard/painel guardam a mensagem completa.
+    message: whatsappMessage,
+  };
 
   let emailBundle: EmailShareBundle | null = null;
   if (driverEmail?.trim()) {

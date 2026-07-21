@@ -24,8 +24,8 @@ export default function AbrirWhatsAppPage() {
 
     setAppHref(
       text
-        ? `whatsapp://send/?phone=${phone}&text=${encodeURIComponent(text)}`
-        : `whatsapp://send/?phone=${phone}`
+        ? `whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`
+        : `whatsapp://send?phone=${phone}`
     );
   }, []);
 
