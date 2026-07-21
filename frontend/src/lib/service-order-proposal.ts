@@ -765,8 +765,13 @@ export function buildWhatsAppShareLinks(
   const desktopHref = `whatsapp://send?${desktopParams}`;
   const mobileHref = `https://wa.me/${normalized}?text=${encodedText}`;
 
-  // Desktop: protocolo nativo abre o app no chat do telefone cadastrado.
-  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
+  // Mobile: wa.me. Windows: link Meta (whatsapp:// só foca o app e ignora phone/text).
+  // Outros desktop: protocolo nativo; fallback HTTPS em openWhatsAppPreferApp.
+  const primaryHref = isMobileWhatsAppDevice()
+    ? mobileHref
+    : isWindowsDesktop()
+      ? storeAppHref
+      : desktopHref;
 
   return {
     message: messageForShare,
@@ -814,10 +819,12 @@ export function openWhatsAppShareHref(href: string, targetWindow?: Window | null
 }
 
 /**
- * Abre o WhatsApp no chat do telefone cadastrado.
- * No PC: tenta o app (`whatsapp://`) no mesmo gesto do clique; se não ganhar foco,
- * cai no link Meta com o mesmo telefone (evita “não abriu nada” após await/async).
+ * Abre o WhatsApp no chat do telefone cadastrado (com a mensagem na URL).
  * Só chamar a partir de clique do utilizador — nunca logo após `await`.
+ *
+ * Windows: usa o link Meta HTTPS. O protocolo `whatsapp://` no Desktop Windows
+ * costuma só focar o app já aberto e descartar phone/text (chat vazio).
+ * macOS/Linux: tenta `whatsapp://`; se não houver handoff, cai no HTTPS.
  */
 export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
   if (!links.opensDirectChat || !links.phoneDigits) return false;
@@ -827,10 +834,16 @@ export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
     return true;
   }
 
-  const nativeHref = links.desktopHref;
   const httpsHref = links.storeAppHref || links.mobileHref;
-  if (!nativeHref && !httpsHref) return false;
+  if (!httpsHref) return false;
 
+  // Windows Desktop: HTTPS é o único caminho confiável para abrir o chat certo.
+  if (isWindowsDesktop()) {
+    openExternalUrl(httpsHref);
+    return true;
+  }
+
+  const nativeHref = links.desktopHref;
   if (!nativeHref) {
     openExternalUrl(httpsHref);
     return true;
@@ -848,7 +861,7 @@ export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
   window.setTimeout(() => {
     document.removeEventListener("visibilitychange", markHandedOff);
     window.removeEventListener("blur", markHandedOff);
-    if (!handedOff && document.visibilityState === "visible" && httpsHref) {
+    if (!handedOff && document.visibilityState === "visible") {
       openExternalUrl(httpsHref);
     }
   }, 900);
@@ -965,7 +978,7 @@ export function openWhatsAppDesktopSync(
     return { copied: false, mode: "mobile-web" };
   }
 
-  launchCustomProtocol(links.desktopHref);
+  openWhatsAppPreferApp(links);
   return { copied: false, mode: "desktop-app" };
 }
 

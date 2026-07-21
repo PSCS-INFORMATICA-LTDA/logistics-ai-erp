@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Badge";
@@ -118,6 +118,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
   const [sharePayload, setSharePayload] = useState<DriverAssignmentSharePayload | null>(null);
   const [shareDriverName, setShareDriverName] = useState("");
+  const assignmentSentNotifiedRef = useRef(false);
   const [driverPayInput, setDriverPayInput] = useState("");
   const [assistantPayInput, setAssistantPayInput] = useState("");
 
@@ -144,6 +145,23 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   const resetShareStep = () => {
     setSharePayload(null);
     setShareDriverName("");
+    assignmentSentNotifiedRef.current = false;
+  };
+
+  const notifyAssignmentSentOnce = (driverId?: string, driverName?: string) => {
+    if (assignmentSentNotifiedRef.current) return;
+    const id = driverId || selectedId;
+    const name = driverName || shareDriverName;
+    if (!id || !name) return;
+    assignmentSentNotifiedRef.current = true;
+    onAssignmentSent?.(id, name);
+  };
+
+  const handleClose = () => {
+    if (sharePayload) {
+      notifyAssignmentSentOnce();
+    }
+    onClose();
   };
 
   const resolvePayDetails = (): DriverAssignmentPayDetails | null => {
@@ -308,11 +326,16 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (sharePayload && !assignmentSentNotifiedRef.current && selectedId && shareDriverName) {
+        assignmentSentNotifiedRef.current = true;
+        onAssignmentSent?.(selectedId, shareDriverName);
+      }
+      onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open, sharePayload, selectedId, shareDriverName, onAssignmentSent, onClose]);
 
   const registerAssignmentShareForDriver = async (
     driver: DriverListRow,
@@ -355,8 +378,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
     setSharePayload(payload);
     setShareDriverName(driver.name);
-    if (options?.notifySent !== false) {
-      onAssignmentSent?.(driver.id, driver.name);
+    // Lista só atualiza após Abrir WhatsApp / e-mail / Fechar (evita fechar o modal no meio).
+    if (options?.notifySent === true) {
+      notifyAssignmentSentOnce(driver.id, driver.name);
     }
     return payload;
   };
@@ -424,7 +448,11 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       : `Registrar envio da designação da ${orderDetails.code} para ${driver.name}?\n\n${payLines}\n\nO link ficará ativo para o motorista aceitar ou recusar. Se fechar o WhatsApp sem enviar, use «Cancelar designação» na lista da OS.`;
   };
 
-  const launchDriverWhatsAppShare = (payload: DriverAssignmentSharePayload) => {
+  const launchDriverWhatsAppShare = (
+    payload: DriverAssignmentSharePayload,
+    driverId?: string,
+    driverName?: string
+  ) => {
     const links = payload.whatsappLinks;
     if (!links.opensDirectChat) {
       window.alert(
@@ -432,8 +460,12 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       );
       return false;
     }
-    // Só no gesto do clique (sem await no meio) — app no chat do telefone cadastrado.
-    return openWhatsAppPreferApp(links);
+    // Só no gesto do clique (sem await no meio) — abre o chat do telefone cadastrado.
+    const opened = openWhatsAppPreferApp(links);
+    if (opened) {
+      notifyAssignmentSentOnce(driverId, driverName);
+    }
+    return opened;
   };
 
   const launchDriverEmailShare = (payload: DriverAssignmentSharePayload) => {
@@ -460,9 +492,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       return;
     }
 
-    // Designação já registrada: abrir no mesmo gesto do clique (Chrome bloqueia whatsapp:// após await).
+    // Designação já registrada: abrir no mesmo gesto do clique (Chrome bloqueia deep link após await).
     if (sharePayload && selectedId === driver.id) {
-      launchDriverWhatsAppShare(sharePayload);
+      launchDriverWhatsAppShare(sharePayload, driver.id, driver.name);
       return;
     }
 
@@ -475,7 +507,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
         driver.phone?.trim() ||
         "o motorista";
       const confirmed = window.confirm(
-        `${buildShareConfirmMessage(driver, payDetails)}\n\nDepois clique no ícone verde do WhatsApp para abrir o chat de ${phoneLabel}.`
+        `${buildShareConfirmMessage(driver, payDetails)}\n\nEm seguida clique em «Abrir WhatsApp» para o chat de ${phoneLabel}.`
       );
       if (!confirmed) return;
 
@@ -484,11 +516,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       });
       if (!payload) return;
 
-      onAssignmentSent?.(driver.id, driver.name);
-      // Não abrir aqui (gesto já perdido). O painel mostra o ícone <a>/botão para o 2º clique.
-      window.alert(
-        `Designação registrada para ${driver.name}.\n\nClique no ícone verde do WhatsApp para abrir o app no chat de ${phoneLabel}.`
-      );
+      // Não abrir aqui (gesto já perdido) e não atualizar a lista ainda —
+      // o painel do modal fica aberto com o botão «Abrir WhatsApp» (2º clique).
     })();
   };
 
@@ -509,7 +538,10 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
     void (async () => {
       if (sharePayload && selectedId === driver.id) {
-        if (launchDriverEmailShare(sharePayload)) return;
+        if (launchDriverEmailShare(sharePayload)) {
+          notifyAssignmentSentOnce(driver.id, driver.name);
+          return;
+        }
       }
 
       const payDetails = resolvePayDetails();
@@ -524,7 +556,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       if (!payload) return;
 
       if (launchDriverEmailShare(payload)) {
-        onAssignmentSent?.(driver.id, driver.name);
+        notifyAssignmentSentOnce(driver.id, driver.name);
       }
     })();
   };
@@ -538,7 +570,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       );
       return;
     }
-    launchDriverWhatsAppShare(sharePayload);
+    launchDriverWhatsAppShare(sharePayload, selectedId, shareDriverName);
   };
 
   const handleEmailShareClick = () => {
@@ -546,7 +578,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       window.alert("E-mail do motorista não cadastrado ou conteúdo ainda não preparado.");
       return;
     }
-    launchDriverEmailShare(sharePayload);
+    if (launchDriverEmailShare(sharePayload)) {
+      notifyAssignmentSentOnce();
+    }
   };
   if (!open) return null;
 
@@ -566,7 +600,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       role="dialog"
       aria-modal="true"
       aria-labelledby="assign-driver-title"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
@@ -639,8 +673,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           {sharePayload ? (
             <div className="space-y-4">
               <p className="text-sm text-emerald-800">
-                Designação registrada para <strong>{shareDriverName}</strong>. Use os ícones abaixo
-                ou na lista do motorista para enviar.
+                Designação registrada para <strong>{shareDriverName}</strong>. Clique em{" "}
+                <strong>Abrir WhatsApp</strong> para enviar no número cadastrado.
               </p>
               <p className="break-all text-xs text-slate-500">{sharePayload.assignmentUrl}</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -652,22 +686,30 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                       selectedDriver?.phone ||
                       "motorista"
                     }`}
-                    aria-label={`Enviar designação no WhatsApp para ${shareDriverName}`}
+                    aria-label={`Abrir WhatsApp para ${shareDriverName}`}
                     disabled={saving}
-                    className={cn(glassAction("green", true), shareIconBase)}
+                    className={cn(
+                      glassAction("green", true),
+                      "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold"
+                    )}
                     onClick={handleWhatsAppShareClick}
                   >
                     <WhatsAppIcon className="h-5 w-5" />
+                    Abrir WhatsApp
                   </button>
                 ) : (
                   <button
                     type="button"
                     title="Cadastre o telefone do motorista para abrir o WhatsApp no contato certo"
                     aria-label="WhatsApp indisponível — telefone do motorista não cadastrado"
-                    className={cn(glassAction("green", true), shareIconBase, "opacity-50")}
+                    className={cn(
+                      glassAction("green", true),
+                      "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold opacity-50"
+                    )}
                     onClick={handleWhatsAppShareClick}
                   >
                     <WhatsAppIcon className="h-5 w-5" />
+                    Abrir WhatsApp
                   </button>
                 )}
                 {sharePayload.emailBundle ? (
@@ -686,11 +728,12 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               {sharePayload.whatsappLinks.opensDirectChat &&
               sharePayload.whatsappLinks.phoneDigits ? (
                 <p className="text-xs text-slate-600">
-                  Clique no ícone verde: o sistema tenta o <strong>WhatsApp do PC</strong> no chat de{" "}
+                  Abre o chat de{" "}
                   <strong>
                     {formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits)}
-                  </strong>
-                  . Se o app não responder, abre o mesmo número pelo link da Meta (com a mensagem).
+                  </strong>{" "}
+                  com a mensagem e o link da designação já preenchidos. Se o Windows perguntar,
+                  escolha o WhatsApp instalado.
                 </p>
               ) : (
                 <p className="text-sm text-amber-800">
@@ -862,7 +905,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
+            <Button type="button" variant="secondary" disabled={saving} onClick={handleClose}>
               {sharePayload ? "Fechar" : "Cancelar"}
             </Button>
             {!sharePayload ? (
