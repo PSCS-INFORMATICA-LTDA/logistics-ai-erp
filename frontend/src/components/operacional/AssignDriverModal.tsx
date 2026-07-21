@@ -485,7 +485,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
         driver.phone?.trim() ||
         "o motorista";
       const confirmed = window.confirm(
-        `${buildShareConfirmMessage(driver, payDetails)}\n\nEm seguida clique no botão verde «Abrir WhatsApp» — é esse clique que abre o app no chat de ${phoneLabel}.`
+        `${buildShareConfirmMessage(driver, payDetails)}\n\nEm seguida clique em «Copiar e enviar no WhatsApp». No app, pesquise o número ${phoneLabel} (já cadastrado neste motorista).`
       );
       if (!confirmed) return;
 
@@ -572,19 +572,19 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
 
     if (result.mode === "share") {
       setWhatsappStatus(
-        `Escolha o WhatsApp do PC no painel Compartilhar e o contato ${phoneLabel}.`
+        `No painel Compartilhar escolha WhatsApp. Depois pesquise ${phoneLabel} / ${phone} (telefone do motorista na designação) e envie.`
       );
     } else if (result.mode === "cancelled") {
       setWhatsappStatus(
-        `Compartilhar cancelado. Mensagem copiada — abra o chat de ${phoneLabel} e Ctrl+V.`
+        `Compartilhar cancelado. Mensagem copiada — no WhatsApp busque ${phoneLabel} e Ctrl+V.`
       );
     } else if (result.mode === "protocol") {
       setWhatsappStatus(
-        `Tentamos abrir o app em ${phoneLabel}. Se não abriu o chat certo: WhatsApp do PC → esse número → Ctrl+V.`
+        `App aberto. Confira o chat de ${phoneLabel}; se precisar, Ctrl+V (mensagem completa já copiada).`
       );
     } else {
       setWhatsappStatus(
-        `Mensagem copiada. Abra o WhatsApp do PC, busque ${phoneLabel} e Ctrl+V.`
+        `Mensagem copiada. No WhatsApp do PC busque ${phoneLabel} e Ctrl+V.`
       );
     }
 
@@ -791,8 +791,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                 </p>
               ) : (
                 <p className="text-xs text-slate-600">
-                  No Windows: o botão copia a mensagem completa e abre o Compartilhar do sistema
-                  (escolha o WhatsApp do PC). Sem WhatsApp Web.
+                  No Windows: Compartilhar → WhatsApp → pesquise o telefone do motorista (o número
+                  também vai no início da mensagem). Sem WhatsApp Web.
                 </p>
               )}
             </div>

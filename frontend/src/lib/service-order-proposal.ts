@@ -920,7 +920,12 @@ export async function sendWhatsAppDesktopMessage(input: {
 }): Promise<DesktopWhatsAppSendResult> {
   const phone = input.phoneDigits.replace(/\D/g, "");
   const message = input.message.trim();
-  const copied = message ? copyTextToClipboardSync(message) : false;
+  const phoneLabel = formatWhatsAppPhoneDisplay(phone) || phone;
+  // Windows Share não deixa pré-selecionar contato — o número vai no topo para buscar no WhatsApp.
+  const shareText = phone
+    ? `Enviar para o motorista: ${phoneLabel} (${phone})\n\n${message}`
+    : message;
+  const copied = shareText ? copyTextToClipboardSync(shareText) : false;
 
   if (!phone || phone.length < 10) {
     return { copied, mode: "clipboard-only" };
@@ -930,7 +935,7 @@ export async function sendWhatsAppDesktopMessage(input: {
     try {
       await navigator.share({
         title: input.title?.trim() || "WhatsApp",
-        text: message,
+        text: shareText,
       });
       return { copied, mode: "share" };
     } catch (err) {

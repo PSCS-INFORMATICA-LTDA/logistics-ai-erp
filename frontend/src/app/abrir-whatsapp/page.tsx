@@ -60,23 +60,23 @@ export default function AbrirWhatsAppPage() {
 
     if (result.mode === "share") {
       setStatus(
-        `Mensagem enviada ao painel Compartilhar. Escolha o WhatsApp do PC e o contato ${phoneLabel}.`
+        `Escolha WhatsApp no Compartilhar. Depois pesquise ${phoneLabel} / ${phone} (telefone do motorista) e envie.`
       );
       return;
     }
     if (result.mode === "cancelled") {
-      setStatus("Compartilhar cancelado. A mensagem continua copiada — Ctrl+V no chat do motorista.");
+      setStatus(
+        `Compartilhar cancelado. Mensagem copiada — no WhatsApp busque ${phoneLabel} e Ctrl+V.`
+      );
       return;
     }
     if (result.mode === "protocol") {
       setStatus(
-        `Tentamos abrir o app no número ${phoneLabel}. Se não abriu o chat certo, abra o WhatsApp do PC, busque esse número e Ctrl+V.`
+        `App aberto. Confira o chat de ${phoneLabel}; se precisar, Ctrl+V.`
       );
       return;
     }
-    setStatus(
-      `Mensagem copiada. Abra o WhatsApp do PC, busque ${phoneLabel} e cole com Ctrl+V.`
-    );
+    setStatus(`Mensagem copiada. No WhatsApp busque ${phoneLabel} e Ctrl+V.`);
   };
 
   return (
@@ -91,10 +91,11 @@ export default function AbrirWhatsAppPage() {
             <span className="text-slate-500"> ({phone})</span>
           </p>
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
-            No Windows o Chrome <strong>não consegue forçar</strong> o app a abrir o chat sozinho.
-            O botão verde copia a mensagem completa e abre o{" "}
-            <strong>Compartilhar do Windows</strong> (escolha WhatsApp) ou tenta o app no número
-            certo. Sem WhatsApp Web.
+            1) Compartilhar → <strong>WhatsApp</strong>
+            <br />
+            2) Pesquise o telefone do motorista: <strong>{phoneLabel}</strong> ({phone})
+            <br />
+            3) Envie (a mensagem completa já vai no compartilhamento)
           </p>
         </>
       )}
