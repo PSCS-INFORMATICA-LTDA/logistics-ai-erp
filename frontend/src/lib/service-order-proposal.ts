@@ -813,6 +813,49 @@ export function openWhatsAppShareHref(href: string, targetWindow?: Window | null
   openExternalUrl(href, targetWindow);
 }
 
+/**
+ * Abre o WhatsApp no chat do telefone cadastrado.
+ * No PC: tenta o app (`whatsapp://`) no mesmo gesto do clique; se não ganhar foco,
+ * cai no link Meta com o mesmo telefone (evita “não abriu nada” após await/async).
+ * Só chamar a partir de clique do utilizador — nunca logo após `await`.
+ */
+export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
+  if (!links.opensDirectChat || !links.phoneDigits) return false;
+
+  if (isMobileWhatsAppDevice()) {
+    openExternalUrl(links.mobileHref || links.storeAppHref);
+    return true;
+  }
+
+  const nativeHref = links.desktopHref;
+  const httpsHref = links.storeAppHref || links.mobileHref;
+  if (!nativeHref && !httpsHref) return false;
+
+  if (!nativeHref) {
+    openExternalUrl(httpsHref);
+    return true;
+  }
+
+  let handedOff = false;
+  const markHandedOff = () => {
+    handedOff = true;
+  };
+  document.addEventListener("visibilitychange", markHandedOff);
+  window.addEventListener("blur", markHandedOff);
+
+  launchCustomProtocol(nativeHref);
+
+  window.setTimeout(() => {
+    document.removeEventListener("visibilitychange", markHandedOff);
+    window.removeEventListener("blur", markHandedOff);
+    if (!handedOff && document.visibilityState === "visible" && httpsHref) {
+      openExternalUrl(httpsHref);
+    }
+  }, 900);
+
+  return true;
+}
+
 export function openExternalUrl(url: string, targetWindow?: Window | null): void {
   if (targetWindow && !targetWindow.closed) {
     targetWindow.location.href = url;

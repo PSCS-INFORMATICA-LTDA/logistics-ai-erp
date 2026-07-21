@@ -26,6 +26,7 @@ import {
   isDemoSeedWhatsAppPhone,
   isLocalhostPublicProposalUrl,
   launchProposalEmailShareSync,
+  openWhatsAppPreferApp,
   resolveClientProposalShareUrl,
   resolveProposalAcceptanceTestUrl,
   resolveProposalAmount,
@@ -130,8 +131,10 @@ export function ServiceOrderProposalView({
 
   const shareIconBase = "h-10 w-10 shrink-0 p-0";
 
-  const handleWhatsAppAnchorClick = () => {
+  const handleWhatsAppAnchorClick = (event: React.MouseEvent) => {
     if (!whatsappShare?.opensDirectChat || !clientPhoneLabel) return;
+    event.preventDefault();
+    openWhatsAppPreferApp(whatsappShare);
     setWhatsappHint(
       `Abrindo o WhatsApp no chat de ${clientPhoneLabel} (telefone do cliente na OS). A mensagem já vai nesse contato — não use Ctrl+V.`
     );
