@@ -278,7 +278,11 @@ function OrdensServicoPageContent() {
             : row
         )
       );
-      setListRefreshKey((key) => key + 1);
+      // Recarrega a lista só depois (e em modo silencioso no CrudPage).
+      // Nunca no mesmo clique do WhatsApp — isso desmontava o modal e cancelava o app.
+      window.setTimeout(() => {
+        setListRefreshKey((key) => key + 1);
+      }, 1500);
     },
     []
   );

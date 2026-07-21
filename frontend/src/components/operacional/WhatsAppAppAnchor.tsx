@@ -39,19 +39,24 @@ export function WhatsAppAppAnchor({
   const bridge = isDesktopBridgeHref(href);
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    onOpen?.();
-
     if (bridge) {
       // Evita soft-nav do Next.js; precisa ser navegação completa para a ponte.
       event.preventDefault();
+      onOpen?.();
       window.location.assign(href);
       return;
     }
 
     if (native) {
-      // Clique nativo no protocolo — não preventDefault.
+      // Clique nativo no protocolo — não preventDefault e não setState no onOpen
+      // antes da navegação (pai remountando mata o whatsapp://).
+      // Adia onOpen para depois do browser aceitar o protocolo.
+      const open = onOpen;
+      if (open) window.setTimeout(() => open(), 750);
       return;
     }
+
+    onOpen?.();
   };
 
   return (

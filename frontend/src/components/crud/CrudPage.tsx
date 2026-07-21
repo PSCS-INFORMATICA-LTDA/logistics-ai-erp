@@ -100,9 +100,14 @@ export function CrudPage<T extends { id: string }>({
     });
   }, [formPanelKey, isNew, editing]);
 
+  const hasLoadedItemsRef = useRef(false);
+
   const load = useCallback(async () => {
     if (!companyId) return;
-    setLoading(true);
+    // Recarga silenciosa: não trocar a tabela por <Loading /> — isso desmontava modais
+    // abertos (ex.: designação) e cancelava o clique em whatsapp:// no meio do caminho.
+    const silentRefresh = hasLoadedItemsRef.current;
+    if (!silentRefresh) setLoading(true);
     setError(null);
     let query = supabase.from(table).select("*").eq("company_id", companyId);
     if (softDelete) query = query.is("deleted_at", null);
@@ -116,12 +121,14 @@ export function CrudPage<T extends { id: string }>({
     if (err) {
       setError(err.message);
       setItems([]);
+      hasLoadedItemsRef.current = false;
     } else {
       let rows = (data as T[]) ?? [];
       if (transformItems) {
         rows = await transformItems(rows, companyId);
       }
       setItems(rows);
+      hasLoadedItemsRef.current = rows.length > 0;
     }
     setLoading(false);
   }, [companyId, table, orderBy, softDelete, eqFilters, supabase, transformItems, refreshKey]);

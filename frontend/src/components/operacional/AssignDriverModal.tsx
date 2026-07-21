@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
 import { Button } from "@/components/ui/Button";
@@ -542,9 +543,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     if (text) copyTextToClipboardSync(text);
   };
 
-  const handleWhatsAppShareOpen = () => {
-    notifyAssignmentSentOnce(selectedId, shareDriverName);
-  };
+  // NÃO chamar onAssignmentSent no clique do WhatsApp.
+  // Isso atualizava a lista, o CrudPage ia para Loading, o modal sumia e o
+  // navegador cancelava o whatsapp:// — nada abria (nem app, nem Web).
 
   const whatsappOpenHref =
     sharePayload?.whatsappLinks.opensDirectChat && sharePayload.whatsappLinks.primaryHref
@@ -560,8 +561,6 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       notifyAssignmentSentOnce();
     }
   };
-  if (!open) return null;
-
   const sortedDrivers = [...drivers].sort((a, b) => {
     const aRefused = isDriverRefusedForThisOrder(a);
     const bRefused = isDriverRefusedForThisOrder(b);
@@ -572,9 +571,11 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     return a.name.localeCompare(b.name, "pt-BR");
   });
 
-  return (
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="assign-driver-title"
@@ -678,7 +679,6 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                       saving && "pointer-events-none opacity-50"
                     )}
                     onMouseDown={handleWhatsAppShareMouseDown}
-                    onOpen={handleWhatsAppShareOpen}
                   >
                     <WhatsAppIcon className="h-5 w-5" />
                     Abrir WhatsApp
@@ -921,6 +921,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
