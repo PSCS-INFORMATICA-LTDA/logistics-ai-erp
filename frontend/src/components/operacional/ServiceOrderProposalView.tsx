@@ -123,10 +123,10 @@ export function ServiceOrderProposalView({
 
   const clientPhoneOk =
     Boolean(formatPhoneForWhatsApp(order.phone)) && !isDemoSeedWhatsAppPhone(order.phone);
-  // PC: ponte /abrir-whatsapp → app. Mobile: primaryHref (wa.me). Nunca api.whatsapp.com.
+  // PC: whatsapp:// no clique. Mobile: wa.me. Nunca api.whatsapp.com.
   const whatsappHref =
-    whatsappShare?.opensDirectChat && whatsappShare.desktopBridgeHref?.startsWith("/abrir-whatsapp")
-      ? whatsappShare.desktopBridgeHref
+    whatsappShare?.opensDirectChat && whatsappShare.desktopHref?.startsWith("whatsapp://")
+      ? whatsappShare.desktopHref
       : whatsappShare?.opensDirectChat && whatsappShare.primaryHref
         ? whatsappShare.primaryHref
         : null;

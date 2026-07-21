@@ -803,8 +803,9 @@ export function buildWhatsAppShareLinks(
   const desktopChatOnlyBridgeHref = buildWhatsAppDesktopBridgeHref(normalized);
   const mobileHref = `https://wa.me/${normalized}?text=${encodedText}`;
 
-  // PC: ponte same-origin (primary). Mobile: wa.me. Nunca api.whatsapp.com na UI.
-  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopBridgeHref;
+  // PC: whatsapp:// direto no clique (gesto do usuário). Ponte /abrir-whatsapp só como fallback.
+  // Mobile: wa.me. Nunca api.whatsapp.com na UI.
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
 
   return {
     message: messageForShare,
@@ -867,12 +868,6 @@ export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
 
   if (isMobileWhatsAppDevice()) {
     openExternalUrl(links.mobileHref || links.storeAppHref);
-    return true;
-  }
-
-  const bridgeHref = links.desktopBridgeHref;
-  if (bridgeHref?.startsWith("/abrir-whatsapp")) {
-    window.location.assign(bridgeHref);
     return true;
   }
 
