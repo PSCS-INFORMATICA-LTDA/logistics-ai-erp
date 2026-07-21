@@ -855,7 +855,8 @@ export function openWhatsAppShareHref(href: string, targetWindow?: Window | null
 
 /**
  * Abre o WhatsApp no chat do telefone cadastrado.
- * PC: whatsapp:// (app). Mobile: wa.me. Nunca api/web no desktop.
+ * PC: whatsapp:// só com phone (texto longo no protocolo falha / vira Web).
+ * Mobile: wa.me com texto.
  */
 export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
   if (!links.opensDirectChat || !links.phoneDigits) return false;
@@ -867,10 +868,18 @@ export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
     return true;
   }
 
-  const nativeHref = links.desktopHref;
+  // Só o número: no Windows isso abre o app no contato certo com mais estabilidade.
+  const nativeHref = links.desktopChatOnlyHref || links.desktopHref;
   if (!nativeHref || !isWhatsAppNativeHref(nativeHref)) return false;
   launchCustomProtocol(nativeHref);
   return true;
+}
+
+/** Copia a mensagem e abre o app no chat do telefone (PC). */
+export function shareWhatsAppDesktopChat(links: WhatsAppShareLinks): boolean {
+  if (!links.opensDirectChat || !links.phoneDigits) return false;
+  if (links.message) copyTextToClipboardSync(links.message);
+  return openWhatsAppPreferApp(links);
 }
 
 export function openExternalUrl(url: string, targetWindow?: Window | null): void {

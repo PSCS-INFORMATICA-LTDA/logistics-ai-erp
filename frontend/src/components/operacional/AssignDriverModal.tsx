@@ -27,7 +27,7 @@ import {
   formatPhoneForWhatsApp,
   formatWhatsAppPhoneDisplay,
   launchPreparedEmailShare,
-  openWhatsAppPreferApp,
+  shareWhatsAppDesktopChat,
 } from "@/lib/service-order-proposal";
 import { glassAction } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
@@ -454,13 +454,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     driverName?: string
   ) => {
     const links = payload.whatsappLinks;
-    if (!links.opensDirectChat || !links.desktopHref?.startsWith("whatsapp://")) {
+    if (!links.opensDirectChat || !links.desktopChatOnlyHref?.startsWith("whatsapp://")) {
       window.alert(
         "Cadastre o telefone do motorista para o WhatsApp abrir no app, no contato certo."
       );
       return false;
     }
-    const opened = openWhatsAppPreferApp(links);
+    const opened = shareWhatsAppDesktopChat(links);
     if (opened) notifyAssignmentSentOnce(driverId, driverName);
     return opened;
   };
@@ -556,6 +556,12 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
         notifyAssignmentSentOnce(driver.id, driver.name);
       }
     })();
+  };
+
+  const handleWhatsAppShareMouseDown = () => {
+    if (sharePayload?.whatsappLinks.message) {
+      copyTextToClipboardSync(sharePayload.whatsappLinks.message);
+    }
   };
 
   const handleWhatsAppShareOpen = () => {
@@ -663,13 +669,19 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
             <div className="space-y-4">
               <p className="text-sm text-emerald-800">
                 Designação registrada para <strong>{shareDriverName}</strong>. Clique em{" "}
-                <strong>WhatsApp</strong> para abrir o app com o texto da designação.
+                <strong>WhatsApp</strong> — abre o app no contato e a mensagem já vai copiada.
               </p>
+              <textarea
+                readOnly
+                rows={8}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
+                value={sharePayload.whatsappLinks.message}
+              />
               <div className="flex flex-wrap items-center gap-2">
                 {sharePayload.whatsappLinks.opensDirectChat &&
-                sharePayload.whatsappLinks.desktopHref?.startsWith("whatsapp://") ? (
+                sharePayload.whatsappLinks.desktopChatOnlyHref?.startsWith("whatsapp://") ? (
                   <a
-                    href={sharePayload.whatsappLinks.desktopHref}
+                    href={sharePayload.whatsappLinks.desktopChatOnlyHref}
                     title={`WhatsApp app — ${
                       formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                       selectedDriver?.phone ||
@@ -681,6 +693,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                       "inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold",
                       saving && "pointer-events-none opacity-50"
                     )}
+                    onMouseDown={handleWhatsAppShareMouseDown}
                     onClick={handleWhatsAppShareOpen}
                   >
                     <WhatsAppIcon className="h-5 w-5" />
@@ -718,12 +731,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                 ) : null}
               </div>
               <p className="text-xs text-slate-600">
-                Abre o app no chat de{" "}
+                Abre o <strong>app</strong> no chat de{" "}
                 <strong>
                   {formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                     "telefone cadastrado"}
                 </strong>
-                .
+                . Se a caixa vier vazia, Ctrl+V — a mensagem completa já foi copiada nesse clique
+                (no contato certo).
               </p>
             </div>
           ) : loading ? (
