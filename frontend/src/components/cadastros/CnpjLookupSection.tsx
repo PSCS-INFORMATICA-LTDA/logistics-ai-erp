@@ -52,13 +52,16 @@ export function CnpjLookupSection({
       const base = info.isActive
         ? "CNPJ ATIVO na Receita. Dados preenchidos — salve para gravar no banco."
         : `Situação na Receita: ${info.status}. Dados preenchidos — salve para gravar no banco.`;
-      setOkMessage(
-        info.streetFromCep
-          ? `${base} Logradouro completado pelo CEP (a Receita não trouxe a rua neste CNPJ). Confira o número.`
-          : !info.street
-            ? `${base} Endereço incompleto na Receita — preencha o logradouro/número manualmente.`
-            : base
-      );
+      let detail = "";
+      if (info.addressEnriched && info.addressNumber) {
+        detail = " Endereço e número completados na consulta.";
+      } else if (info.streetFromCep) {
+        detail =
+          " Logradouro completado pelo CEP. Confira o número se estiver em branco.";
+      } else if (!info.street || !info.addressNumber) {
+        detail = " Endereço incompleto — preencha logradouro/número se faltarem.";
+      }
+      setOkMessage(`${base}${detail}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao consultar CNPJ.");
     } finally {
