@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NumericCodeField } from "@/components/cadastros/NumericCodeField";
 import { CrudPage } from "@/components/crud/CrudPage";
 import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { Badge } from "@/components/ui/Badge";
@@ -10,9 +11,10 @@ import {
   type PendingVehicleDocument,
 } from "@/components/vehicles/VehicleDocumentsSection";
 import { VehiclePhotoUpload } from "@/components/vehicles/VehiclePhotoUpload";
-import { nextCode } from "@/lib/codes";
+import { resolveEntityNumericCode } from "@/lib/codes";
 import { ANTT_AXLE_OPTIONS } from "@/lib/antt-freight";
 import { useCompany } from "@/lib/company-context";
+import { useSeedNumericCode } from "@/lib/use-seed-numeric-code";
 import { createClient } from "@/lib/supabase/client";
 import { uploadVehiclePhoto } from "@/lib/vehicle-photo";
 import { normalizePlate } from "@/lib/utils";
@@ -37,7 +39,7 @@ export default function VeiculosPage() {
   return (
     <CrudPage<Vehicle>
       title="Veículos"
-      description="Cadastro da frota — foto mestre, documentos (CRLV, ANTT/NTT) e placa normalizada"
+      description="Cadastro da frota — código numérico sequencial de 8 dígitos (editável), foto, documentos e placa"
       table="vehicles"
       auditScreenKey="cadastros.veiculos"
       orderBy="plate"
@@ -83,6 +85,7 @@ function VehicleForm({
   onSave: (data: Record<string, unknown>) => Promise<string | null>;
   onCancel: () => void;
 }) {
+  const { seedCode, codeReady } = useSeedNumericCode("vehicles", companyId, item);
   const [photoStoragePath, setPhotoStoragePath] = useState<string | null>(
     item?.photo_storage_path ?? null
   );
@@ -98,12 +101,17 @@ function VehicleForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset só ao trocar veículo
   }, [item?.id, item?.photo_storage_path]);
 
+  if (!codeReady) {
+    return <p className="text-sm text-slate-500">Gerando próximo código...</p>;
+  }
+
   return (
     <EntityForm
+      key={item?.id ?? `new-${seedCode}`}
       saving={saving}
       onCancel={onCancel}
       initial={{
-        code: item?.code ?? "",
+        code: seedCode,
         plate: item?.plate ?? "",
         plate_display: item?.plate_display ?? "",
         model: item?.model ?? "",
@@ -115,9 +123,13 @@ function VehicleForm({
         notes: item?.notes ?? "",
       }}
       onSubmit={async (data) => {
-        if (!item?.id && companyId && !data.code) {
-          data.code = await nextCode("vehicles", companyId, "VEI");
+        const resolved = resolveEntityNumericCode(data.code, { existingCode: item?.code });
+        if (!resolved.ok) {
+          window.alert("Informe um código numérico com até 8 dígitos (ex.: 00000001).");
+          return;
         }
+        data.code = resolved.code;
+
         if (data.plate) {
           data.plate = normalizePlate(String(data.plate));
           if (!data.plate_display) data.plate_display = data.plate;
@@ -196,11 +208,15 @@ function VehicleForm({
               onUploaded={() => setDocsRefreshKey((k) => k + 1)}
             />
 
+            <NumericCodeField
+              value={String(form.code ?? "")}
+              onChange={(v) => set("code", v)}
+            />
+
             <FormFields
               form={form}
               set={setField}
               fields={[
-                { name: "code", label: "Código", required: true },
                 { name: "plate", label: "Placa", required: true },
                 { name: "plate_display", label: "Placa (exibição)" },
                 { name: "model", label: "Modelo" },

@@ -51,3 +51,24 @@ export function isValidNumericCode(value: unknown, digits = 8): boolean {
   const normalized = normalizeNumericCode(value, digits);
   return normalized.length === digits && /^\d+$/.test(normalized);
 }
+
+/**
+ * Normaliza código numérico novo; na edição, preserva código legado (ex.: VEI001)
+ * se o usuário não alterou o valor.
+ */
+export function resolveEntityNumericCode(
+  value: unknown,
+  options?: { existingCode?: string | null; digits?: number }
+): { ok: true; code: string } | { ok: false } {
+  const digits = options?.digits ?? 8;
+  const raw = String(value ?? "").trim();
+  const normalized = normalizeNumericCode(raw, digits);
+  if (isValidNumericCode(normalized, digits)) {
+    return { ok: true, code: normalized };
+  }
+  const existing = String(options?.existingCode ?? "").trim();
+  if (existing && raw === existing) {
+    return { ok: true, code: existing };
+  }
+  return { ok: false };
+}

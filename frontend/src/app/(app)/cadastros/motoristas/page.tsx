@@ -231,7 +231,7 @@ function MotoristasPageContent() {
       <CrudPage<DriverListRow>
         key={refreshKey}
         title="Motoristas"
-        description="Filtre por categoria CNH e disponibilidade para oferta de transporte"
+        description="Código numérico sequencial de 8 dígitos (editável) · filtre por CNH e disponibilidade"
         table="drivers"
         auditScreenKey="cadastros.motoristas"
         orderBy="name"

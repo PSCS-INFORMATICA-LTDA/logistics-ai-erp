@@ -14,11 +14,13 @@ import {
   validatePartnerDocument,
   validatePartnerRg,
 } from "@/lib/br-documents";
+import { NumericCodeField } from "@/components/cadastros/NumericCodeField";
 import { useAccess } from "@/lib/access-context";
-import { nextCode } from "@/lib/codes";
+import { resolveEntityNumericCode } from "@/lib/codes";
 import { useCompany } from "@/lib/company-context";
 import { glassField } from "@/lib/liquid-glass-styles";
 import { softDeletePartnerByCode } from "@/lib/partners";
+import { useSeedNumericCode } from "@/lib/use-seed-numeric-code";
 import type { Partner } from "@/types/database";
 import { PARTNER_TYPES, STATUS_OPTIONS } from "@/types/database";
 
@@ -72,7 +74,7 @@ function SociosPageContent() {
       <CrudPage<Partner>
         key={refreshKey}
         title="Sócios"
-        description="Cadastro de sócios e responsáveis — nome completo, RG e CPF/CNPJ"
+        description="Cadastro de sócios — código numérico sequencial de 8 dígitos (editável), RG e CPF/CNPJ"
         table="partners"
         auditScreenKey="cadastros.socios"
         orderBy="code"
@@ -125,13 +127,19 @@ function PartnerEntityForm({
 }) {
   const [docError, setDocError] = useState<string | null>(null);
   const [rgError, setRgError] = useState<string | null>(null);
+  const { seedCode, codeReady } = useSeedNumericCode("partners", companyId, item);
+
+  if (!codeReady) {
+    return <p className="text-sm text-slate-500">Gerando próximo código...</p>;
+  }
 
   return (
     <EntityForm
+      key={item?.id ?? `new-${seedCode}`}
       saving={saving}
       onCancel={onCancel}
       initial={{
-        code: item?.code ?? "",
+        code: seedCode,
         name: item?.name ?? "",
         partner_type: item?.partner_type ?? "Socio",
         status: item?.status ?? "Ativo",
@@ -148,9 +156,12 @@ function PartnerEntityForm({
         setDocError(docMsg);
         if (rgMsg || docMsg) return;
 
-        if (!item?.id && companyId && !data.code) {
-          data.code = await nextCode("partners", companyId, "SOC");
+        const resolved = resolveEntityNumericCode(data.code, { existingCode: item?.code });
+        if (!resolved.ok) {
+          window.alert("Informe um código numérico com até 8 dígitos (ex.: 00000001).");
+          return;
         }
+        data.code = resolved.code;
 
         const rgRaw = String(data.rg ?? "").trim();
         data.rg = partnerType === "Empresa" || !rgRaw ? null : formatRg(rgRaw);
@@ -175,6 +186,11 @@ function PartnerEntityForm({
             {rgError && <Alert variant="error">{rgError}</Alert>}
             {docError && <Alert variant="error">{docError}</Alert>}
 
+            <NumericCodeField
+              value={String(form.code ?? "")}
+              onChange={(v) => set("code", v)}
+            />
+
             <FormFields
               form={form}
               set={(key, value) => {
@@ -187,7 +203,6 @@ function PartnerEntityForm({
                 set(key, value);
               }}
               fields={[
-                { name: "code", label: "Código", required: true },
                 {
                   name: "name",
                   label: "Nome completo / Razão social",

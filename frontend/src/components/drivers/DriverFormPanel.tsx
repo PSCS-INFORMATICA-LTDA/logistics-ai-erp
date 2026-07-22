@@ -22,7 +22,9 @@ import {
   toggleCnhCategory,
   validateCnh,
 } from "@/lib/cnh";
-import { nextCode } from "@/lib/codes";
+import { NumericCodeField } from "@/components/cadastros/NumericCodeField";
+import { resolveEntityNumericCode } from "@/lib/codes";
+import { useSeedNumericCode } from "@/lib/use-seed-numeric-code";
 import { isSimilarName, normalizeText } from "@/lib/utils";
 import type { Driver } from "@/types/database";
 import { DRIVER_TYPES, STATUS_OPTIONS } from "@/types/database";
@@ -38,6 +40,7 @@ type Props = {
 
 export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: Props) {
   const supabase = createClient();
+  const { seedCode, codeReady } = useSeedNumericCode("drivers", companyId, item);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [cnhError, setCnhError] = useState<string | null>(null);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
@@ -73,6 +76,10 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
     );
   };
 
+  if (!codeReady) {
+    return <p className="text-sm text-slate-500">Gerando próximo código...</p>;
+  }
+
   return (
     <>
       {duplicateWarning && <Alert variant="warning">{duplicateWarning}</Alert>}
@@ -80,11 +87,11 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
       {uploadMsg && <Alert variant="info">{uploadMsg}</Alert>}
 
       <EntityForm
-        key={item?.id ?? "new"}
+        key={item?.id ?? `new-${seedCode}`}
         saving={saving}
         onCancel={onCancel}
         initial={{
-          code: item?.code ?? "",
+          code: seedCode,
           name: item?.name ?? "",
           driver_type: item?.driver_type ?? "Motorista",
           status: item?.status ?? "Ativo",
@@ -110,9 +117,12 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
           }
           setCnhError(null);
 
-          if (!item?.id && companyId && !data.code) {
-            data.code = await nextCode("drivers", companyId, "MOT");
+          const resolved = resolveEntityNumericCode(data.code, { existingCode: item?.code });
+          if (!resolved.ok) {
+            window.alert("Informe um código numérico com até 8 dígitos (ex.: 00000001).");
+            return;
           }
+          data.code = resolved.code;
           data.name_normalized = normalizeText(String(data.name));
           if (data.cnh_number === "") data.cnh_number = null;
           else data.cnh_number = normalizeCnh(String(data.cnh_number));
@@ -216,6 +226,11 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
                 }}
               />
 
+              <NumericCodeField
+                value={String(form.code ?? "")}
+                onChange={(v) => set("code", v)}
+              />
+
               <FormFields
                 form={form}
                 set={(key, value) => {
@@ -223,7 +238,6 @@ export function DriverFormPanel({ item, companyId, saving, onSave, onCancel }: P
                   set(key, value);
                 }}
                 fields={[
-                  { name: "code", label: "Código", required: true },
                   { name: "name", label: "Nome", required: true },
                   {
                     name: "driver_type",

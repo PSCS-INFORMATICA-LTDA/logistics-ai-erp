@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { CnpjLookupSection } from "@/components/cadastros/CnpjLookupSection";
+import { NumericCodeField } from "@/components/cadastros/NumericCodeField";
 import { CrudPage } from "@/components/crud/CrudPage";
 import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { Badge } from "@/components/ui/Badge";
-import { isValidNumericCode, nextNumericCode, normalizeNumericCode } from "@/lib/codes";
+import { resolveEntityNumericCode } from "@/lib/codes";
 import { useCompany } from "@/lib/company-context";
-import { glassField } from "@/lib/liquid-glass-styles";
+import { useSeedNumericCode } from "@/lib/use-seed-numeric-code";
 import type { Supplier } from "@/types/database";
 import { STATUS_OPTIONS, SUPPLIER_CATEGORIES } from "@/types/database";
 
@@ -78,28 +78,7 @@ function SupplierForm({
   onSave: (data: Record<string, unknown>) => Promise<string | null>;
   onCancel: () => void;
 }) {
-  const [seedCode, setSeedCode] = useState(item?.code ?? "");
-  const [codeReady, setCodeReady] = useState(Boolean(item?.id || item?.code));
-
-  useEffect(() => {
-    if (item?.id) {
-      setSeedCode(item.code ?? "");
-      setCodeReady(true);
-      return;
-    }
-    if (!companyId) return;
-    let cancelled = false;
-    setCodeReady(false);
-    void nextNumericCode("suppliers", companyId, 8).then((code) => {
-      if (!cancelled) {
-        setSeedCode(code);
-        setCodeReady(true);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [item?.id, item?.code, companyId]);
+  const { seedCode, codeReady } = useSeedNumericCode("suppliers", companyId, item);
 
   if (!codeReady) {
     return <p className="text-sm text-slate-500">Gerando próximo código...</p>;
@@ -133,11 +112,12 @@ function SupplierForm({
         notes: item?.notes ?? "",
       }}
       onSubmit={async (data) => {
-        data.code = normalizeNumericCode(data.code, 8);
-        if (!isValidNumericCode(data.code, 8)) {
+        const resolved = resolveEntityNumericCode(data.code, { existingCode: item?.code });
+        if (!resolved.ok) {
           window.alert("Informe um código numérico com até 8 dígitos (ex.: 00000001).");
           return;
         }
+        data.code = resolved.code;
         emptyToNull(data, [
           "document",
           "trade_name",
@@ -163,21 +143,10 @@ function SupplierForm({
         <>
           <CnpjLookupSection form={form} set={set} />
 
-          <label className="block space-y-1 sm:col-span-2">
-            <span className="text-sm font-medium text-slate-700">Código (numérico · 8 posições)</span>
-            <input
-              className={glassField(false)}
-              value={String(form.code ?? "")}
-              inputMode="numeric"
-              maxLength={8}
-              onChange={(e) => set("code", e.target.value.replace(/\D/g, "").slice(0, 8))}
-              placeholder="00000001"
-            />
-            <span className="text-xs text-slate-500">
-              Sequencial automático (next number). Campo aberto — pode alterar se precisar de outro
-              número.
-            </span>
-          </label>
+          <NumericCodeField
+            value={String(form.code ?? "")}
+            onChange={(v) => set("code", v)}
+          />
 
           <FormFields
             form={form}
