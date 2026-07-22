@@ -86,7 +86,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Tarifas frete/km | Cadastro mestre em **Parâmetros de frete** (R$/km por modalidade + categoria; ida/volta a partir de N km, padrão 500). OS puxa a tarifa e permite override amarelo — sem chips de sugestão. SQL: `apply-043-freight-rate-tables.sql`. |
 | Multiempresa | `companies` + `company_members` + RLS desde o schema V1. |
 | Código cadastro | Padrão Philippe: código **numérico sequencial 8 posições** (`00000001…`), campo **aberto/editável**. Já em **Clientes, Fornecedores, Veículos, Sócios, Motoristas**. Unicidade por empresa (`UNIQUE company_id+code` no banco + bloqueio amigável no `CrudPage`). Códigos legados (`VEI001`/`SOC001`/`MOT001`) preservados na edição até o usuário trocar. OS/número de pedido e barcode ficam para depois. |
-| Documento único | **CNPJ/CPF não pode repetir** na mesma empresa em Clientes, Fornecedores, Motoristas e Sócios (comparação por dígitos). **Veículos:** placa única por empresa (UI + `UNIQUE company_id+plate`). SQL: `apply-053-unique-party-documents.sql`. |
+| Documento único | **CNPJ/CPF não pode repetir** na mesma empresa em Clientes, Fornecedores, Motoristas e Sócios (comparação por dígitos). **Veículos:** código 8 dígitos + **placa única** por empresa (campo amarelo obrigatório, bloqueio na UI + `UNIQUE company_id+plate`). SQL: `apply-053-unique-party-documents.sql`. |
 
 ---
 
