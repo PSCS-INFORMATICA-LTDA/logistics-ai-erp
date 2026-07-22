@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
+import {
+  formatDuplicateCodeError,
+  isEntityCodeTaken,
+  isUniqueConstraintError,
+} from "@/lib/codes";
 import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -186,7 +191,22 @@ export function CrudPage<T extends { id: string }>({
     setSaving(true);
     setError(null);
 
-    const payload = { ...data, company_id: companyId };
+    const payload: Record<string, unknown> = { ...data, company_id: companyId };
+    const code = typeof payload.code === "string" ? payload.code.trim() : "";
+
+    if (code) {
+      const check = await isEntityCodeTaken(table, companyId, code, editing?.id ?? null);
+      if (check.error) {
+        setSaving(false);
+        setError(check.error);
+        return null;
+      }
+      if (check.taken) {
+        setSaving(false);
+        setError(formatDuplicateCodeError(code));
+        return null;
+      }
+    }
 
     let err;
     let savedId: string | null = null;
@@ -206,7 +226,12 @@ export function CrudPage<T extends { id: string }>({
 
     setSaving(false);
     if (err) {
-      setError(err.message);
+      const msg = err.message;
+      if (code && isUniqueConstraintError(msg)) {
+        setError(formatDuplicateCodeError(code));
+      } else {
+        setError(msg);
+      }
       return null;
     }
     setEditing(null);

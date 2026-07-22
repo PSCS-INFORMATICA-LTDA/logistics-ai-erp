@@ -85,7 +85,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Estacionamento / Lava | Módulos próprios: portes + tabela de preços (diária/mensal/**rotativo por hora**/lava) em **Parâmetros do pátio**; ordens em Operacional → Estacionamento / Lava-rápido; DRE **Receita Estacionamento** / **Receita Lava Rápido** no fechamento. Rotativo: **1ª hora** + **hora adicional** (exemplo seed R$ 10 / R$ 5). Clipe de comprovante **opcional** antes de finalizar. SQL: `apply-041` + `apply-042` + `apply-044-patio-rotativo-hourly.sql`. Na OS geral: **Tipo** e **Natureza DRE** só **Frete** e **Transporte**. |
 | Tarifas frete/km | Cadastro mestre em **Parâmetros de frete** (R$/km por modalidade + categoria; ida/volta a partir de N km, padrão 500). OS puxa a tarifa e permite override amarelo — sem chips de sugestão. SQL: `apply-043-freight-rate-tables.sql`. |
 | Multiempresa | `companies` + `company_members` + RLS desde o schema V1. |
-| Código cadastro | Padrão Philippe: código **numérico sequencial 8 posições** (`00000001…`), campo **aberto/editável**. Já em **Clientes, Fornecedores, Veículos, Sócios, Motoristas**. Códigos legados (`VEI001`/`SOC001`/`MOT001`) preservados na edição até o usuário trocar. OS/número de pedido e barcode ficam para depois. |
+| Código cadastro | Padrão Philippe: código **numérico sequencial 8 posições** (`00000001…`), campo **aberto/editável**. Já em **Clientes, Fornecedores, Veículos, Sócios, Motoristas**. Unicidade por empresa (`UNIQUE company_id+code` no banco + bloqueio amigável no `CrudPage`). Códigos legados (`VEI001`/`SOC001`/`MOT001`) preservados na edição até o usuário trocar. OS/número de pedido e barcode ficam para depois. |
 
 ---
 

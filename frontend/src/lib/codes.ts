@@ -72,3 +72,40 @@ export function resolveEntityNumericCode(
   }
   return { ok: false };
 }
+
+/** True se já existe outro registro com o mesmo código na empresa. */
+export async function isEntityCodeTaken(
+  table: string,
+  companyId: string,
+  code: string,
+  excludeId?: string | null
+): Promise<{ taken: boolean; error?: string }> {
+  const supabase = createClient();
+  let query = supabase
+    .from(table)
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("code", code)
+    .limit(1);
+
+  if (excludeId) {
+    query = query.neq("id", excludeId);
+  }
+
+  const { data, error } = await query;
+  if (error) return { taken: false, error: error.message };
+  return { taken: (data?.length ?? 0) > 0 };
+}
+
+export function formatDuplicateCodeError(code: string): string {
+  return `Já existe um cadastro com o código ${code} nesta empresa. Escolha outro número.`;
+}
+
+export function isUniqueConstraintError(message: string | null | undefined): boolean {
+  const text = String(message ?? "").toLowerCase();
+  return (
+    text.includes("duplicate key") ||
+    text.includes("unique constraint") ||
+    text.includes("23505")
+  );
+}

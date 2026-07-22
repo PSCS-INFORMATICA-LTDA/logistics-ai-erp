@@ -32,8 +32,8 @@ export function NumericCodeField({ value, onChange, digits = 8 }: Props) {
         placeholder={"0".repeat(digits - 1) + "1"}
       />
       <span className="text-xs text-slate-500">
-        Sequencial automático (next number). Campo aberto — pode alterar se precisar de outro
-        número.
+        Sequencial automático (next number). Campo aberto — pode alterar, mas não pode repetir um
+        código já usado nesta empresa.
       </span>
     </label>
   );
