@@ -384,6 +384,7 @@ export async function rejectFinancialTransaction(input: {
 
 export function entrySourceLabel(source: string | null): string {
   if (source === COMPANY_LEDGER_ENTRY_SOURCE) return "Empresa";
+  if (source === "import_historico_teste") return "Importação teste";
   if (source === VEHICLE_EXPENSE_ENTRY_SOURCE) return "Veículo";
   if (!source) return "Sistema";
   return source;

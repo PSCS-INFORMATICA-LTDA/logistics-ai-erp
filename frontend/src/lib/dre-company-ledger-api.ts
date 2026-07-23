@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { COMPANY_LEDGER_ENTRY_SOURCE } from "@/lib/company-ledger";
+import {
+  COMPANY_LEDGER_ENTRY_SOURCE,
+  COMPANY_LEDGER_ENTRY_SOURCES,
+} from "@/lib/company-ledger";
 import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
 import { buildApprovalInsertFields } from "@/lib/financial-approval";
 
@@ -246,7 +249,7 @@ export async function fetchCompanyLedger(
     `
     )
     .eq("company_id", companyId)
-    .eq("entry_source", COMPANY_LEDGER_ENTRY_SOURCE)
+    .in("entry_source", [...COMPANY_LEDGER_ENTRY_SOURCES])
     .gte("transaction_date", start)
     .lt("transaction_date", end)
     .order("transaction_date", { ascending: false });
