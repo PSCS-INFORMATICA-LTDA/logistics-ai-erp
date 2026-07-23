@@ -29,6 +29,19 @@ function formatDate(value: string): string {
   return `${d}/${m}/${y}`;
 }
 
+function formatSubmittedAt(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function DreAprovacoesPage() {
   const { companyId } = useCompany();
   const { isAdmin, loading: accessLoading } = useAccess();
@@ -195,7 +208,8 @@ export default function DreAprovacoesPage() {
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-3 py-2">Data</th>
+              <th className="px-3 py-2">Data do lançamento</th>
+              <th className="px-3 py-2">Lançado por</th>
               <th className="px-3 py-2">Origem</th>
               <th className="px-3 py-2">Conta / placa</th>
               <th className="px-3 py-2">Descrição</th>
@@ -208,7 +222,23 @@ export default function DreAprovacoesPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-slate-100 align-top">
-                <td className="whitespace-nowrap px-3 py-2">{formatDate(row.transaction_date)}</td>
+                <td className="whitespace-nowrap px-3 py-2">
+                  <div className="font-medium text-slate-900">
+                    {formatDate(row.transaction_date)}
+                  </div>
+                  {row.submitted_at ? (
+                    <div className="text-xs text-slate-500">
+                      Enviado {formatSubmittedAt(row.submitted_at)}
+                    </div>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2">
+                  {row.submitted_by_name || (
+                    <span className="text-slate-400">
+                      {row.submitted_by ? "Usuário sem nome" : "—"}
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2">{entrySourceLabel(row.entry_source)}</td>
                 <td className="px-3 py-2">
                   <div>{row.dre_account_name || "—"}</div>
@@ -268,7 +298,7 @@ export default function DreAprovacoesPage() {
             ))}
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
                   Nenhum lançamento pendente. Se acabou de aplicar o SQL 056, novos manuais
                   aparecerão aqui.
                 </td>

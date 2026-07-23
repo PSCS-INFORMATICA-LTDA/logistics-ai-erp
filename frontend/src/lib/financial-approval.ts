@@ -41,6 +41,8 @@ export type PendingApprovalRow = {
   approval_status: ApprovalStatus;
   submitted_at: string | null;
   submitted_by: string | null;
+  /** Nome (ou e-mail) de quem criou/enviou o lançamento. */
+  submitted_by_name: string | null;
   dre_account_name: string | null;
   plate: string | null;
 };
@@ -221,12 +223,37 @@ export async function listPendingFinancialApprovals(
     return { rows: [], error: error.message };
   }
 
+  const submitterIds = Array.from(
+    new Set(
+      (data ?? [])
+        .map((raw) => (raw as { submitted_by?: string | null }).submitted_by)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const nameByUserId = new Map<string, string>();
+  if (submitterIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", submitterIds);
+
+    for (const p of profiles ?? []) {
+      const label =
+        (typeof p.full_name === "string" && p.full_name.trim()) ||
+        (typeof p.email === "string" && p.email.trim()) ||
+        null;
+      if (label) nameByUserId.set(p.id, label);
+    }
+  }
+
   const rows: PendingApprovalRow[] = (data ?? []).map((raw) => {
     const item = raw as Record<string, unknown>;
     const account = item.chart_of_account as { name?: string } | { name?: string }[] | null;
     const vehicle = item.vehicle as { plate?: string } | { plate?: string }[] | null;
     const accountName = Array.isArray(account) ? account[0]?.name : account?.name;
     const plate = Array.isArray(vehicle) ? vehicle[0]?.plate : vehicle?.plate;
+    const submittedBy = (item.submitted_by as string | null) ?? null;
     return {
       id: String(item.id),
       company_id: String(item.company_id),
@@ -238,7 +265,8 @@ export async function listPendingFinancialApprovals(
       entry_source: (item.entry_source as string | null) ?? null,
       approval_status: (item.approval_status as ApprovalStatus) ?? "submitted",
       submitted_at: (item.submitted_at as string | null) ?? null,
-      submitted_by: (item.submitted_by as string | null) ?? null,
+      submitted_by: submittedBy,
+      submitted_by_name: submittedBy ? nameByUserId.get(submittedBy) ?? null : null,
       dre_account_name: accountName ?? null,
       plate: plate ?? null,
     };
