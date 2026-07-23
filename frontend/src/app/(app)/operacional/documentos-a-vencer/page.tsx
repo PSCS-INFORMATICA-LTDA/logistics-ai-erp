@@ -92,7 +92,7 @@ export default function DocumentosAVencerOperacionalPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Documentos a vencer</h1>
         <p className="text-sm text-slate-600">
-          Acompanhe vencimentos por placa e da empresa. Cadastro dos tipos e do TA em{" "}
+          Acompanhe vencimentos por placa (Prefixo, CRLV…) e o TA da empresa. Tipos em{" "}
           <Link href="/configuracoes/documentos-licencas" className="text-sky-700 underline">
             Parâmetros → Documentos e licenças
           </Link>

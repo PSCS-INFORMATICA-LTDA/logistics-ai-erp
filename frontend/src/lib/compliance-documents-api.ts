@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  COMPANY_DOCUMENT_TYPES_TO_DEACTIVATE,
   DEFAULT_DOCUMENT_TYPE_SEEDS,
   resolveComplianceSituation,
   thresholdsForDoc,
@@ -71,19 +72,74 @@ export async function seedDefaultDocumentTypes(
   supabase: Sb,
   companyId: string
 ): Promise<string | null> {
-  const { count, error } = await supabase
+  const { data: existing, error } = await supabase
     .from("document_types")
-    .select("id", { count: "exact", head: true })
+    .select("id, acronym, applies_to, name, is_active")
     .eq("company_id", companyId);
   if (error) return error.message;
-  if ((count ?? 0) > 0) return null;
 
-  const rows = DEFAULT_DOCUMENT_TYPE_SEEDS.map((t) => ({
-    company_id: companyId,
-    ...t,
-  }));
-  const { error: insertError } = await supabase.from("document_types").insert(rows);
-  return insertError?.message ?? null;
+  const rows = existing ?? [];
+  if (rows.length === 0) {
+    const insertRows = DEFAULT_DOCUMENT_TYPE_SEEDS.map((t) => ({
+      company_id: companyId,
+      ...t,
+    }));
+    const { error: insertError } = await supabase.from("document_types").insert(insertRows);
+    return insertError?.message ?? null;
+  }
+
+  // Empresas já seedadas: garante Prefixo (por placa) e TA só da empresa.
+  const byAcronym = new Map(
+    rows
+      .filter((r) => r.acronym)
+      .map((r) => [String(r.acronym).toUpperCase(), r] as const)
+  );
+
+  const prefixSeed = DEFAULT_DOCUMENT_TYPE_SEEDS.find((t) => t.acronym === "PREFIXO");
+  if (prefixSeed && !byAcronym.has("PREFIXO")) {
+    const { error: prefixErr } = await supabase.from("document_types").insert({
+      company_id: companyId,
+      ...prefixSeed,
+    });
+    if (prefixErr) return prefixErr.message;
+  }
+
+  const ta = byAcronym.get("TA");
+  if (ta) {
+    const { error: taErr } = await supabase
+      .from("document_types")
+      .update({
+        applies_to: "company",
+        is_active: true,
+        is_required: true,
+        name: "Termo de Autorização (TA)",
+      })
+      .eq("id", ta.id)
+      .eq("company_id", companyId);
+    if (taErr) return taErr.message;
+  } else {
+    const taSeed = DEFAULT_DOCUMENT_TYPE_SEEDS.find((t) => t.acronym === "TA");
+    if (taSeed) {
+      const { error: taIns } = await supabase.from("document_types").insert({
+        company_id: companyId,
+        ...taSeed,
+      });
+      if (taIns) return taIns.message;
+    }
+  }
+
+  for (const acronym of COMPANY_DOCUMENT_TYPES_TO_DEACTIVATE) {
+    const row = byAcronym.get(acronym);
+    if (!row || row.is_active === false) continue;
+    const { error: deactErr } = await supabase
+      .from("document_types")
+      .update({ is_active: false })
+      .eq("id", row.id)
+      .eq("company_id", companyId);
+    if (deactErr) return deactErr.message;
+  }
+
+  return null;
 }
 
 export async function listDocumentTypes(
@@ -167,11 +223,20 @@ export async function listCompanyDocumentsForVehicleView(
   supabase: Sb,
   companyId: string
 ): Promise<{ rows: ComplianceDocument[]; error: string | null }> {
-  return listComplianceDocuments(supabase, companyId, {
+  const res = await listComplianceDocuments(supabase, companyId, {
     ownerType: "company",
     ownerId: companyId,
     currentOnly: true,
   });
+  // Na placa, só o TA da empresa (consulta) — Prefixo e demais são por veículo.
+  return {
+    ...res,
+    rows: res.rows.filter(
+      (d) =>
+        d.document_type?.acronym?.toUpperCase() === "TA" &&
+        d.document_type?.is_active !== false
+    ),
+  };
 }
 
 export type ComplianceDocInput = {

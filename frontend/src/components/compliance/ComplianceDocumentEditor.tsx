@@ -75,6 +75,14 @@ export function ComplianceDocumentEditor({
     }
   }, [selectedType, initial, issuingBody]);
 
+  useEffect(() => {
+    if (initial || !selectedType) return;
+    if (!selectedType.requires_expiry) {
+      setNoExpiry(true);
+      setExpiresAt("");
+    }
+  }, [selectedType, initial]);
+
   const title =
     mode === "renew" ? "Renovar documento" : mode === "edit" ? "Editar documento" : "Novo documento";
 
@@ -124,12 +132,22 @@ export function ComplianceDocumentEditor({
           Documento sem vencimento
         </label>
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-slate-700">Número</span>
+          <span className="text-sm font-medium text-slate-700">
+            {selectedType?.acronym === "PREFIXO" ? "Número do prefixo" : "Número"}
+          </span>
           <input
             className={glassField()}
             value={documentNumber}
+            placeholder={
+              selectedType?.acronym === "PREFIXO" ? "Ex.: 0123" : undefined
+            }
             onChange={(e) => setDocumentNumber(e.target.value)}
           />
+          {selectedType?.acronym === "PREFIXO" ? (
+            <span className="text-xs text-slate-500">
+              Cada veículo/placa tem o seu prefixo — anexe a digitalização pelo clipe.
+            </span>
+          ) : null}
         </label>
         <label className="block space-y-1">
           <span className="text-sm font-medium text-slate-700">Órgão emissor</span>

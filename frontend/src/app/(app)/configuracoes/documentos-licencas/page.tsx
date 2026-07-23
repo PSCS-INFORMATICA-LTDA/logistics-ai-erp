@@ -93,6 +93,9 @@ export default function DocumentosLicencasPage() {
   }, [load, supabase.auth]);
 
   const companyTypes = types.filter((t) => t.applies_to === "company" && t.is_active);
+  const companyDocsVisible = companyDocs.filter(
+    (d) => d.document_type?.is_active !== false
+  );
 
   const saveType = async () => {
     if (!companyId || !canEdit) return;
@@ -142,9 +145,9 @@ export default function DocumentosLicencasPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Documentos e licenças</h1>
         <p className="text-sm text-slate-600">
-          Aqui você parametriza os tipos e cadastra documentos da empresa.           Tipos com aplicação Veículo são preenchidos por placa em Cadastros → Veículos →
-          Documentos. Tipos com aplicação Empresa ficam só nesta tela (um por empresa, não por
-          placa). Acompanhar vencimentos:{" "}
+          Aqui você parametriza os tipos e cadastra documentos da empresa.           Por orientação GRX: só o TA é documento da empresa. Prefixo e demais tipos são por
+          placa (Cadastros → Veículos → Documentos), com upload da digitalização. Acompanhar
+          vencimentos:{" "}
           <Link href="/operacional/documentos-a-vencer" className="text-sky-700 underline">
             Operacional → Documentos a vencer
           </Link>
@@ -225,8 +228,8 @@ export default function DocumentosLicencasPage() {
                   ]}
                 />
                 <p className="text-xs text-slate-500">
-                  Veículo: cada placa cadastra o seu (CRLV, seguro…). Empresa: um registro
-                  para a empresa inteira (TA, CADASTUR…) — não se repete por placa.
+                  Veículo: cada placa cadastra o seu (Prefixo, CRLV, seguro…). Empresa: só o
+                  TA — um registro da empresa, sem repetir por placa.
                 </p>
               </div>
               <label className="block space-y-1">
@@ -409,8 +412,10 @@ export default function DocumentosLicencasPage() {
             />
           ) : null}
 
-          {companyDocs.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum documento da empresa.</p>
+          {companyDocsVisible.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nenhum documento da empresa. Cadastre o TA (Termo de Autorização).
+            </p>
           ) : (
             <div className={`overflow-x-auto ${glassFilterPanel()}`}>
               <table className="min-w-full text-left text-sm">
@@ -427,7 +432,7 @@ export default function DocumentosLicencasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {companyDocs.map((doc) => {
+                  {companyDocsVisible.map((doc) => {
                     const view = resolveComplianceSituation(doc, doc.document_type);
                     return (
                       <tr key={doc.id} className="border-t border-slate-100">

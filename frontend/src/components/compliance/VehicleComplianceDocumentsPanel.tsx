@@ -310,7 +310,7 @@ export function VehicleComplianceDocumentsPanel({
       <section className={`space-y-3 ${glassFilterPanel()}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-900">
-            B. Documentos da empresa (consulta)
+            B. Documento da empresa — TA (consulta)
           </h3>
           <Link
             href="/configuracoes/documentos-licencas"
@@ -320,7 +320,8 @@ export function VehicleComplianceDocumentsPanel({
           </Link>
         </div>
         <p className="text-xs text-slate-500">
-          TA, CADASTUR e demais licenças da empresa aparecem aqui sem duplicar em cada veículo.
+          Só o Termo de Autorização (TA) é da empresa — não se cadastra por placa. Prefixo e
+          demais documentos ficam na seção A, por veículo.
         </p>
         {companyDocs.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhum documento da empresa cadastrado.</p>
