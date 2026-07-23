@@ -136,9 +136,10 @@ export default function DreDespesasMotoristaPage() {
           <section className={`space-y-3 p-4 ${glassFilterPanel()}`}>
             <Alert variant="info">
               <strong>{legacyManualPayments.length}</strong> OS legado/importada sem valor de
-              motorista/ajudante na designação. Autorizado lançar manualmente em{" "}
-              <strong>DRE → Lançamentos da empresa</strong> (conta Motorista ou Ajudante), até as
-              novas OS usarem o fluxo do sistema.
+              motorista/ajudante na designação. Autorizado lançar em{" "}
+              <strong>DRE → Lançamentos da empresa</strong> (conta Motorista ou Ajudante).{" "}
+              <strong>Informe sempre o nº da OS</strong> — sem isso o rateio por sócios (quadro de
+              participações) não aloca a despesa.
             </Alert>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="min-w-full text-sm">
@@ -163,6 +164,7 @@ export default function DreDespesasMotoristaPage() {
                       <td className="px-3 py-2">
                         <Link
                           href={companyLedgerDriverExpenseHref({
+                            orderId: row.id,
                             code: row.code,
                             legacyNumber: row.legacy_number,
                             serviceDate: row.service_date,

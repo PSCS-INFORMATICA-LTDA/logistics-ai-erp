@@ -164,6 +164,7 @@ export function ServiceOrderRowActions({
   const showDriverVoucher = canViewDriverVoucher(row) || completed;
   const manualCompanyDriverExpense = needsManualCompanyDriverExpense(row);
   const manualLedgerHref = companyLedgerDriverExpenseHref({
+    orderId: row.id,
     code: row.code,
     legacyNumber: row.legacy_number,
     serviceDate: row.service_date,
@@ -364,7 +365,7 @@ export function ServiceOrderRowActions({
     onServiceOrderCompleted?.(row.id, completedAt);
     if (manualCompanyDriverExpense) {
       window.alert(
-        `Frete concluído (OS ${row.code}).\n\nEsta OS é legado/importada e não tem valor de motorista/ajudante na designação.\n\nAutorizado: lançar manualmente em DRE → Lançamentos da empresa, na conta Motorista (ou Ajudante), citando a OS.\nNovas OS devem seguir o fluxo do sistema (valores na designação).`
+        `Frete concluído (OS ${row.code}).\n\nEsta OS é legado/importada e não tem valor de motorista/ajudante na designação.\n\nAutorizado: lançar em DRE → Lançamentos da empresa (conta Motorista/Ajudante).\nObrigatório informar o nº da OS — sem isso o rateio por sócios não aloca a despesa.\nNovas OS devem seguir o fluxo do sistema (valores na designação).`
       );
       return;
     }

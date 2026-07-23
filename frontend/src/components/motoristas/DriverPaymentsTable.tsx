@@ -349,6 +349,7 @@ export function DriverPaymentsTable({
                     ) : row.needs_manual_company_expense ? (
                       <Link
                         href={companyLedgerDriverExpenseHref({
+                          orderId: row.id,
                           code: row.code,
                           legacyNumber: row.legacy_number,
                           serviceDate: row.service_date,

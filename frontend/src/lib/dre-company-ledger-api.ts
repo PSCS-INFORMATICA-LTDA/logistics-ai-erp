@@ -18,6 +18,9 @@ export type CompanyLedgerRow = {
   supplier_name: string | null;
   entry_source: string | null;
   approval_status?: string | null;
+  service_order_id: string | null;
+  service_order_code: string | null;
+  legacy_number: string | null;
 };
 
 export type CompanyLedgerSummary = {
@@ -33,6 +36,9 @@ export type CreateCompanyLedgerInput = {
   chartOfAccountId: string;
   description?: string | null;
   supplierId?: string | null;
+  /** Obrigatório para contas Motorista/Ajudante (rateio por OS/sócios). */
+  serviceOrderId?: string | null;
+  legacyNumber?: string | null;
 };
 
 function monthBounds(year: number, month: number) {
@@ -96,6 +102,9 @@ export async function createCompanyLedgerEntry(
     COMPANY_LEDGER_ENTRY_SOURCE
   );
 
+  const serviceOrderId = input.serviceOrderId?.trim() || null;
+  const legacyNumber = input.legacyNumber?.trim() || null;
+
   const payload: Record<string, unknown> = {
     company_id: companyId,
     transaction_date: input.transactionDate,
@@ -106,22 +115,29 @@ export async function createCompanyLedgerEntry(
     supplier_id:
       account.transaction_type === "Despesa" && input.supplierId ? input.supplierId : null,
     client_id: null,
+    service_order_id: serviceOrderId,
     description,
     entry_source: COMPANY_LEDGER_ENTRY_SOURCE,
     ...approvalFields,
   };
 
+  if (legacyNumber) {
+    payload.legacy_number = legacyNumber;
+  }
+
   let { data, error } = await supabase
     .from("financial_transactions")
     .insert(payload)
     .select(
-      "id, transaction_date, amount, transaction_type, classification, description, entry_source, supplier_id, approval_status"
+      "id, transaction_date, amount, transaction_type, classification, description, entry_source, supplier_id, approval_status, service_order_id, legacy_number"
     )
     .single();
 
   if (
     error?.message.includes("entry_source") ||
-    error?.message.includes("approval_status")
+    error?.message.includes("approval_status") ||
+    error?.message.includes("legacy_number") ||
+    error?.message.includes("service_order_id")
   ) {
     if (error.message.includes("approval_status")) {
       delete payload.approval_status;
@@ -131,11 +147,17 @@ export async function createCompanyLedgerEntry(
     if (error.message.includes("entry_source")) {
       delete payload.entry_source;
     }
+    if (error.message.includes("legacy_number")) {
+      delete payload.legacy_number;
+    }
+    if (error.message.includes("service_order_id")) {
+      delete payload.service_order_id;
+    }
     const retry = await supabase
       .from("financial_transactions")
       .insert(payload)
       .select(
-        "id, transaction_date, amount, transaction_type, classification, description, supplier_id"
+        "id, transaction_date, amount, transaction_type, classification, description, supplier_id, service_order_id"
       )
       .single();
     data = retry.data as typeof data;
@@ -153,6 +175,18 @@ export async function createCompanyLedgerEntry(
     return { row: null, error: "Falha ao gravar lancamento." };
   }
 
+  let serviceOrderCode: string | null = null;
+  const savedOrderId = (data.service_order_id as string | null) ?? serviceOrderId;
+  if (savedOrderId) {
+    const { data: order } = await supabase
+      .from("service_orders")
+      .select("code")
+      .eq("company_id", companyId)
+      .eq("id", savedOrderId)
+      .maybeSingle();
+    serviceOrderCode = (order?.code as string | null) ?? null;
+  }
+
   return {
     row: {
       id: data.id as string,
@@ -165,6 +199,9 @@ export async function createCompanyLedgerEntry(
       supplier_id: (data.supplier_id as string | null) ?? null,
       supplier_name: null,
       entry_source: (data.entry_source as string | null) ?? COMPANY_LEDGER_ENTRY_SOURCE,
+      service_order_id: savedOrderId,
+      service_order_code: serviceOrderCode,
+      legacy_number: (data.legacy_number as string | null) ?? legacyNumber,
     },
     error: null,
   };
@@ -245,6 +282,8 @@ export async function fetchCompanyLedger(
       entry_source,
       supplier_id,
       approval_status,
+      service_order_id,
+      legacy_number,
       chart_of_account:chart_of_accounts!financial_transactions_chart_of_account_id_fkey (name)
     `
     )
@@ -262,6 +301,35 @@ export async function fetchCompanyLedger(
   }
 
   let { data, error } = await query;
+
+  if (
+    error &&
+    (error.message.includes("service_order_id") || error.message.includes("legacy_number"))
+  ) {
+    const retry = await supabase
+      .from("financial_transactions")
+      .select(
+        `
+        id,
+        transaction_date,
+        amount,
+        transaction_type,
+        classification,
+        description,
+        entry_source,
+        supplier_id,
+        approval_status,
+        chart_of_account:chart_of_accounts!financial_transactions_chart_of_account_id_fkey (name)
+      `
+      )
+      .eq("company_id", companyId)
+      .in("entry_source", [...COMPANY_LEDGER_ENTRY_SOURCES])
+      .gte("transaction_date", start)
+      .lt("transaction_date", end)
+      .order("transaction_date", { ascending: false });
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
 
   if (error?.message.includes("entry_source")) {
     // Fallback: lançamentos manuais sem placa e sem motorista (legado)
@@ -319,6 +387,25 @@ export async function fetchCompanyLedger(
     }
   }
 
+  const orderIds = [
+    ...new Set(
+      (data ?? [])
+        .map((r) => (r as { service_order_id?: string | null }).service_order_id)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const orderCodeById = new Map<string, string>();
+  if (orderIds.length) {
+    const { data: orders } = await supabase
+      .from("service_orders")
+      .select("id, code")
+      .eq("company_id", companyId)
+      .in("id", orderIds);
+    for (const o of orders ?? []) {
+      orderCodeById.set(o.id as string, o.code as string);
+    }
+  }
+
   const rows: CompanyLedgerRow[] = [];
   let totalRevenue = 0;
   let totalExpense = 0;
@@ -342,6 +429,8 @@ export async function fetchCompanyLedger(
     }
 
     const supplierId = (item.supplier_id as string | null) ?? null;
+    const serviceOrderId =
+      ((item as { service_order_id?: string | null }).service_order_id as string | null) ?? null;
     rows.push({
       id: item.id as string,
       transaction_date: item.transaction_date as string,
@@ -353,6 +442,10 @@ export async function fetchCompanyLedger(
       supplier_id: supplierId,
       supplier_name: supplierId ? supplierNameById.get(supplierId) ?? null : null,
       entry_source: (item.entry_source as string | null) ?? COMPANY_LEDGER_ENTRY_SOURCE,
+      service_order_id: serviceOrderId,
+      service_order_code: serviceOrderId ? orderCodeById.get(serviceOrderId) ?? null : null,
+      legacy_number:
+        ((item as { legacy_number?: string | null }).legacy_number as string | null) ?? null,
       approval_status: approvalStatus,
     });
   }

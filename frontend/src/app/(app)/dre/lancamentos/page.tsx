@@ -21,12 +21,13 @@ import { createDeletionApprovalRequest } from "@/lib/deletion-approvals";
 import { enqueueDeletionAlert } from "@/lib/deletion-alerts";
 import { assertCriticalDeleteGate } from "@/lib/deletion-gate";
 import {
+  isDriverOrAssistantDreAccount,
   pickDreAccountIdForDriverExpense,
 } from "@/lib/legacy-driver-expense";
 import { isMasterSessionUnlocked } from "@/lib/master-password";
 import { glassAction, glassField, glassFilterPanel, glassStatCard } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateBR } from "@/lib/utils";
 
 function formatDate(value: string): string {
   if (!value) return "—";
@@ -68,6 +69,9 @@ function DreLancamentosPageContent() {
 
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [suppliers, setSuppliers] = useState<{ value: string; label: string }[]>([]);
+  const [orderOptions, setOrderOptions] = useState<{ value: string; label: string; legacy?: string | null }[]>(
+    []
+  );
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -87,6 +91,7 @@ function DreLancamentosPageContent() {
   const [amount, setAmount] = useState("");
   const [chartOfAccountId, setChartOfAccountId] = useState("");
   const [supplierId, setSupplierId] = useState("");
+  const [serviceOrderId, setServiceOrderId] = useState("");
   const [description, setDescription] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -98,10 +103,12 @@ function DreLancamentosPageContent() {
 
   const selectedAccount = accounts.find((a) => a.value === chartOfAccountId);
   const isExpense = selectedAccount?.transaction_type === "Despesa";
+  const requiresServiceOrder =
+    Boolean(selectedAccount && isDriverOrAssistantDreAccount(selectedAccount.label)) || legacyPay;
 
   const loadLookups = useCallback(async () => {
     if (!companyId) return;
-    const [accRes, supRes] = await Promise.all([
+    const [accRes, supRes, ordersRes] = await Promise.all([
       supabase
         .from("chart_of_accounts")
         .select("id, name, transaction_type")
@@ -116,6 +123,14 @@ function DreLancamentosPageContent() {
         .is("deleted_at", null)
         .eq("status", "Ativo")
         .order("name"),
+      supabase
+        .from("service_orders")
+        .select("id, code, legacy_number, service_date, plate, client_name")
+        .eq("company_id", companyId)
+        .in("service_type", ["Frete", "Transporte"])
+        .neq("status", "Cancelado")
+        .order("service_date", { ascending: false })
+        .limit(500),
     ]);
 
     setAccounts(
@@ -132,6 +147,25 @@ function DreLancamentosPageContent() {
         label: s.name as string,
       })),
     ]);
+    setOrderOptions(
+      (ordersRes.data ?? []).map((o) => {
+        const dateLabel = o.service_date ? formatDateBR(String(o.service_date).slice(0, 10)) : "";
+        const legacy = (o.legacy_number as string | null) ?? null;
+        return {
+          value: o.id as string,
+          legacy,
+          label: [
+            o.code,
+            legacy ? `legado ${legacy}` : null,
+            o.plate,
+            dateLabel,
+            o.client_name,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        };
+      })
+    );
   }, [companyId, supabase]);
 
   const load = useCallback(async () => {
@@ -186,22 +220,51 @@ function DreLancamentosPageContent() {
     setTypeFilter("Despesa");
   }, [accounts, legacyPay, searchParams]);
 
+  /** Vincula a OS do deep-link (obrigatória para rateio). */
+  useEffect(() => {
+    if (!legacyPay || orderOptions.length === 0 || serviceOrderId) return;
+    const orderIdParam = searchParams.get("orderId")?.trim();
+    if (orderIdParam && orderOptions.some((o) => o.value === orderIdParam)) {
+      setServiceOrderId(orderIdParam);
+      return;
+    }
+    const codeParam = searchParams.get("os")?.trim().toLowerCase();
+    if (!codeParam) return;
+    const hit = orderOptions.find((o) =>
+      o.label.toLowerCase().startsWith(codeParam) || o.label.toLowerCase().includes(` ${codeParam} `)
+    );
+    // Match by code prefix in label "00000001 · ..."
+    const byCode = orderOptions.find((o) => o.label.toLowerCase().startsWith(`${codeParam} ·`))
+      ?? orderOptions.find((o) => o.label.toLowerCase().startsWith(codeParam));
+    if (byCode) setServiceOrderId(byCode.value);
+    else if (hit) setServiceOrderId(hit.value);
+  }, [legacyPay, orderOptions, searchParams, serviceOrderId]);
+
   const submit = async () => {
     if (!companyId) return;
     if (!canEdit) {
       setError("Seu acesso é só visualização. Peça permissão de Alteração para lançar.");
       return;
     }
+    if (requiresServiceOrder && !serviceOrderId) {
+      setError(
+        "Informe o nº da OS. Sem a OS vinculada o rateio por sócios (participações do quadro) não consegue alocar esta despesa."
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     setMsg(null);
 
+    const selectedOrder = orderOptions.find((o) => o.value === serviceOrderId);
     const result = await createCompanyLedgerEntry(supabase, companyId, {
       transactionDate,
       amount: Number(amount),
       chartOfAccountId,
       description: description || null,
       supplierId: isExpense ? supplierId || null : null,
+      serviceOrderId: serviceOrderId || null,
+      legacyNumber: selectedOrder?.legacy ?? searchParams.get("legacy"),
     });
 
     if (result.error) {
@@ -210,9 +273,14 @@ function DreLancamentosPageContent() {
       return;
     }
 
-    setMsg("Lançamento registrado no DRE da empresa.");
+    setMsg(
+      requiresServiceOrder
+        ? "Lançamento registrado com OS vinculada — disponível para rateio por sócios."
+        : "Lançamento registrado no DRE da empresa."
+    );
     setAmount("");
     setDescription("");
+    if (!legacyPay) setServiceOrderId("");
     setSaving(false);
     await load();
   };
@@ -321,14 +389,15 @@ function DreLancamentosPageContent() {
     <Card>
       <CardHeader
         title="Lançamentos da Empresa"
-        description="Controle mensal da GRX: receitas e despesas gerais (geladeira, material de escritório, aluguel, etc.) — sem vínculo obrigatório com veículo. Use as contas do plano DRE. OS importadas sem valor de motorista/ajudante: lançar aqui na conta Motorista ou Ajudante (autorização legado)."
+        description="Controle mensal da GRX: receitas e despesas gerais (geladeira, material de escritório, aluguel, etc.). Contas Motorista/Ajudante exigem o nº da OS para o rateio por sócios (participações do quadro)."
       />
       <CardBody className="space-y-6">
         {legacyPay ? (
-          <Alert variant="info">
-            Lançamento autorizado para OS legado/importada sem valor na designação. Confira a conta{" "}
-            <strong>Motorista</strong> ou <strong>Ajudante</strong>, informe o valor pago, mantenha a
-            OS na observação e salve. Novas OS devem usar o fluxo de designação com valores.
+          <Alert variant="warning">
+            OS legado/importada: escolha a conta <strong>Motorista</strong> ou <strong>Ajudante</strong>,
+            informe o valor e <strong>obrigatoriamente o nº da OS</strong>. Sem a OS vinculada o{" "}
+            <strong>rateio por sócios</strong> (conforme o quadro de participações) não consegue
+            alocar a despesa. Novas OS usam o fluxo com valores na designação.
           </Alert>
         ) : null}
         <div className="flex flex-wrap items-end gap-3">
@@ -432,10 +501,17 @@ function DreLancamentosPageContent() {
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Novo lançamento</h2>
             <p className="text-xs text-slate-600">
-              Escolha a conta DRE (Receita ou Despesa). O sistema bloqueia duplicata da mesma data +
-              conta + valor.
+              Escolha a conta DRE (Receita ou Despesa). Em Motorista/Ajudante, informe o nº da OS
+              para o rateio. O sistema bloqueia duplicata da mesma data + conta + valor.
             </p>
           </div>
+
+          {requiresServiceOrder ? (
+            <Alert variant="warning">
+              Conta Motorista/Ajudante: o <strong>nº da OS é obrigatório</strong> para o rateio por
+              sócios (participações do quadro na data da OS).
+            </Alert>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1 text-sm">
@@ -473,6 +549,33 @@ function DreLancamentosPageContent() {
                 required
               />
             </div>
+            <div className="sm:col-span-2">
+              <GlassSelect
+                label={
+                  requiresServiceOrder
+                    ? "Nº da OS * (obrigatório para rateio por sócios)"
+                    : "OS (opcional)"
+                }
+                value={serviceOrderId}
+                onChange={setServiceOrderId}
+                options={[
+                  {
+                    value: "",
+                    label: requiresServiceOrder
+                      ? "— Selecione o nº da OS (rateio) —"
+                      : "— Sem OS (lançamento geral) —",
+                  },
+                  ...orderOptions.map((o) => ({ value: o.value, label: o.label })),
+                ]}
+                searchable
+                required={requiresServiceOrder}
+              />
+              {requiresServiceOrder ? (
+                <p className="mt-1 text-xs text-amber-800">
+                  Sem a OS vinculada esta despesa não entra no rateio por membros/sócios.
+                </p>
+              ) : null}
+            </div>
             {isExpense ? (
               <div className="sm:col-span-2">
                 <GlassSelect
@@ -490,12 +593,16 @@ function DreLancamentosPageContent() {
                 className={glassField()}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex.: NF 123 · reposição geladeira · papel A4"
+                placeholder="Ex.: NF 123 · OS 00000012 · pagamento motorista"
               />
             </label>
           </div>
 
-          <Button type="button" onClick={() => void submit()} disabled={saving || !chartOfAccountId}>
+          <Button
+            type="button"
+            onClick={() => void submit()}
+            disabled={saving || !chartOfAccountId || (requiresServiceOrder && !serviceOrderId)}
+          >
             {saving ? "Salvando…" : "Lançar no DRE da empresa"}
           </Button>
         </section>
@@ -517,6 +624,7 @@ function DreLancamentosPageContent() {
                     <th className="px-3 py-2 font-medium text-slate-600">Data</th>
                     <th className="px-3 py-2 font-medium text-slate-600">Tipo</th>
                     <th className="px-3 py-2 font-medium text-slate-600">Conta</th>
+                    <th className="px-3 py-2 font-medium text-slate-600">OS</th>
                     <th className="px-3 py-2 font-medium text-slate-600">Fornecedor</th>
                     <th className="px-3 py-2 font-medium text-slate-600">Obs.</th>
                     <th className="px-3 py-2 font-medium text-slate-600">Valor</th>
@@ -539,6 +647,9 @@ function DreLancamentosPageContent() {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-slate-700">{row.dre_account_name}</td>
+                      <td className="px-3 py-2 font-medium text-slate-800">
+                        {row.service_order_code ?? "—"}
+                      </td>
                       <td className="px-3 py-2 text-slate-600">{row.supplier_name ?? "—"}</td>
                       <td className="max-w-[220px] truncate px-3 py-2 text-slate-600">
                         {row.description ?? "—"}

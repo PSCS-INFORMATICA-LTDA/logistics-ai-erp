@@ -643,9 +643,10 @@ function OrdensServicoPageContent() {
             {blockedReason ? <Alert variant="info">{blockedReason}</Alert> : null}
             {listRow && needsManualCompanyDriverExpense(listRow) ? (
               <Alert variant="info">
-                OS legado/importada sem valor de motorista/ajudante. Após concluir, lance o pagamento
-                manualmente em <strong>DRE → Lançamentos da empresa</strong> (conta Motorista ou
-                Ajudante). Novas OS usam o fluxo com valores na designação.
+                OS legado/importada sem valor de motorista/ajudante. Após concluir, lance em{" "}
+                <strong>DRE → Lançamentos da empresa</strong> (conta Motorista ou Ajudante) e{" "}
+                <strong>informe o nº desta OS</strong> para o rateio por sócios. Novas OS usam o
+                fluxo com valores na designação.
               </Alert>
             ) : null}
             <p className="text-xs text-slate-600">

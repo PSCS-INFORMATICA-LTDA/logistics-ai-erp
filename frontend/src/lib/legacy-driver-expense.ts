@@ -56,6 +56,7 @@ export function needsManualCompanyDriverExpense(row: LegacyDriverExpenseRow): bo
 }
 
 export type CompanyLedgerDriverExpensePrefill = {
+  orderId?: string | null;
   code?: string | null;
   legacyNumber?: string | null;
   serviceDate?: string | null;
@@ -64,6 +65,19 @@ export type CompanyLedgerDriverExpensePrefill = {
   account?: "motorista" | "ajudante";
 };
 
+function normalizeLabel(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/** Conta DRE de pagamento Motorista / Ajudante — exige OS para rateio por sócios. */
+export function isDriverOrAssistantDreAccount(label: string): boolean {
+  const n = normalizeLabel(label);
+  return n.includes("motorista") || n.includes("ajudante") || n.includes("assistente");
+}
+
 /** Deep-link para pré-preencher Lançamentos da empresa. */
 export function companyLedgerDriverExpenseHref(
   prefill: CompanyLedgerDriverExpensePrefill
@@ -71,6 +85,7 @@ export function companyLedgerDriverExpenseHref(
   const params = new URLSearchParams();
   params.set("legacyPay", "1");
   if (prefill.account) params.set("account", prefill.account);
+  if (prefill.orderId?.trim()) params.set("orderId", prefill.orderId.trim());
   if (prefill.code?.trim()) params.set("os", prefill.code.trim());
   if (prefill.legacyNumber?.trim()) params.set("legacy", prefill.legacyNumber.trim());
   if (prefill.serviceDate?.trim()) params.set("date", prefill.serviceDate.trim().slice(0, 10));
@@ -80,7 +95,7 @@ export function companyLedgerDriverExpenseHref(
     prefill.code?.trim() ? `OS ${prefill.code.trim()}` : null,
     prefill.legacyNumber?.trim() ? `legado ${prefill.legacyNumber.trim()}` : null,
     prefill.driverName?.trim() ? prefill.driverName.trim() : null,
-    "pagamento motorista/ajudante (OS importada — lançamento manual autorizado)",
+    "pagamento motorista/ajudante (OS importada — informar nº da OS para rateio)",
   ].filter(Boolean);
   params.set("desc", parts.join(" · "));
 
@@ -92,11 +107,6 @@ export function pickDreAccountIdForDriverExpense(
   preference: "motorista" | "ajudante" = "motorista"
 ): string {
   const expense = accounts.filter((a) => a.transaction_type === "Despesa");
-  const norm = (s: string) =>
-    s
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
 
   const prefer =
     preference === "ajudante"
@@ -104,11 +114,10 @@ export function pickDreAccountIdForDriverExpense(
       : [/motorista/, /pagamento.?motorista/];
 
   for (const re of prefer) {
-    const hit = expense.find((a) => re.test(norm(a.label)));
+    const hit = expense.find((a) => re.test(normalizeLabel(a.label)));
     if (hit) return hit.value;
   }
 
-  // Fallback: qualquer despesa com o termo na preferência
-  const fallback = expense.find((a) => norm(a.label).includes(preference));
+  const fallback = expense.find((a) => normalizeLabel(a.label).includes(preference));
   return fallback?.value ?? "";
 }
