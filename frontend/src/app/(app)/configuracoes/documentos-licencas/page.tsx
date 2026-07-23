@@ -40,7 +40,7 @@ export default function DocumentosLicencasPage() {
   const { canEditScreen } = useAccess();
   const canEdit = canEditScreen("configuracoes.documentos-licencas");
   const supabase = useMemo(() => createClient(), []);
-  const [tab, setTab] = useState<Tab>("empresa");
+  const [tab, setTab] = useState<Tab>("tipos");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -140,19 +140,21 @@ export default function DocumentosLicencasPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Documentos e licenças</h1>
         <p className="text-sm text-slate-600">
-          Tipos configuráveis e documentos da empresa (TA, CADASTUR…). Nos veículos, estes
-          aparecem só para consulta.{" "}
-          <Link href="/configuracoes/documentos-a-vencer" className="text-sky-700 underline">
-            Relatório a vencer
+          Aqui você parametriza os tipos e cadastra documentos da empresa.           Tipos com aplicação Veículo são preenchidos por placa em Cadastros → Veículos →
+          Documentos. Tipos com aplicação Empresa ficam só nesta tela (um por empresa, não por
+          placa). Acompanhar vencimentos:{" "}
+          <Link href="/operacional/documentos-a-vencer" className="text-sky-700 underline">
+            Operacional → Documentos a vencer
           </Link>
+          .
         </p>
       </div>
 
       <div className="flex gap-2">
         {(
           [
-            ["empresa", "Documentos da empresa"],
             ["tipos", "Tipos de documento"],
+            ["empresa", "Documentos da empresa"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -203,17 +205,23 @@ export default function DocumentosLicencasPage() {
                   onChange={(e) => setTypeForm((f) => ({ ...f, issuing_body: e.target.value }))}
                 />
               </label>
-              <GlassSelect
-                label="Aplicação"
-                value={typeForm.applies_to}
-                onChange={(v) =>
-                  setTypeForm((f) => ({ ...f, applies_to: v as DocumentAppliesTo }))
-                }
-                options={[
-                  { value: "vehicle", label: "Veículo" },
-                  { value: "company", label: "Empresa" },
-                ]}
-              />
+              <div className="space-y-1">
+                <GlassSelect
+                  label="Aplicação"
+                  value={typeForm.applies_to}
+                  onChange={(v) =>
+                    setTypeForm((f) => ({ ...f, applies_to: v as DocumentAppliesTo }))
+                  }
+                  options={[
+                    { value: "vehicle", label: "Veículo (por placa)" },
+                    { value: "company", label: "Empresa (único)" },
+                  ]}
+                />
+                <p className="text-xs text-slate-500">
+                  Veículo: cada placa cadastra o seu (CRLV, seguro…). Empresa: um registro
+                  para a empresa inteira (TA, CADASTUR…) — não se repete por placa.
+                </p>
+              </div>
               <label className="block space-y-1">
                 <span className="text-sm font-medium">1º alerta (dias)</span>
                 <input

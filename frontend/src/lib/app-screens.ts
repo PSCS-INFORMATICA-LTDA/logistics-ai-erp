@@ -46,6 +46,12 @@ export const APP_SCREENS: AppScreen[] = [
     href: "/operacional/infracoes",
   },
   {
+    key: "operacional.documentos-a-vencer",
+    label: "Documentos a vencer",
+    group: "Operacional",
+    href: "/operacional/documentos-a-vencer",
+  },
+  {
     key: "dre.lancamentos",
     label: "Lançamentos da Empresa",
     group: "DRE",
@@ -119,12 +125,6 @@ export const APP_SCREENS: AppScreen[] = [
     label: "Documentos e licenças",
     group: "Parâmetros",
     href: "/configuracoes/documentos-licencas",
-  },
-  {
-    key: "configuracoes.documentos-a-vencer",
-    label: "Documentos a vencer",
-    group: "Parâmetros",
-    href: "/configuracoes/documentos-a-vencer",
   },
   {
     key: "configuracoes.parametros",

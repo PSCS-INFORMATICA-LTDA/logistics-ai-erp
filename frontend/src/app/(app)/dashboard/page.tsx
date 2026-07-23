@@ -510,7 +510,7 @@ export default function DashboardPage() {
                       : ""}
                   </p>
                   <Link
-                    href="/configuracoes/documentos-a-vencer"
+                    href="/operacional/documentos-a-vencer"
                     className="text-sm font-medium text-sky-700 underline"
                   >
                     Ver relatório

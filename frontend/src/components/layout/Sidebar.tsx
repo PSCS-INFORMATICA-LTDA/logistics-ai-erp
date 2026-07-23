@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
       { href: "/operacional/estacionamento", label: "Estacionamento" },
       { href: "/operacional/lava-rapido", label: "Lava-rápido" },
       { href: "/operacional/infracoes", label: "Infrações de Trânsito" },
+      { href: "/operacional/documentos-a-vencer", label: "Documentos a vencer" },
     ],
   },
   {
@@ -57,10 +58,6 @@ const NAV: NavItem[] = [
       {
         href: "/configuracoes/documentos-licencas",
         label: "Documentos e licenças",
-      },
-      {
-        href: "/configuracoes/documentos-a-vencer",
-        label: "Documentos a vencer",
       },
       {
         href: "/configuracoes/parametros",
