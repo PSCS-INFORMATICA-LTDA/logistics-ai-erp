@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ExcelJS from "exceljs";
 import { createClient } from "@supabase/supabase-js";
+import { fingerprintFromParts } from "./lib/import-financeiro-fingerprint.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const COMPANY_ID = "4787a893-6b62-4d36-87ce-57c15338ea11";
@@ -195,9 +196,11 @@ async function main() {
 
   const gaps = [];
   const ready = [];
+  const seenFp = new Set();
   let skippedLava = 0;
   let skippedNot2026 = 0;
   let skippedInvalid = 0;
+  let skippedDup = 0;
 
   for (let r = 2; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
@@ -311,6 +314,33 @@ async function main() {
       continue;
     }
 
+    const fp = fingerprintFromParts({
+      cashDate,
+      amount: Math.abs(amount),
+      accountId: account.id,
+      party,
+      serviceDate,
+      cot,
+      desc,
+    });
+    if (seenFp.has(fp)) {
+      skippedDup++;
+      gaps.push({
+        linha: r,
+        motivo: "Duplicata na própria planilha GRX",
+        data_caixa: cashDate,
+        data_servico: serviceDate || "",
+        valor: amount,
+        conta: contaName,
+        rateio,
+        descricao: desc,
+        parte: party,
+        acao: "Excluído do import",
+      });
+      continue;
+    }
+    seenFp.add(fp);
+
     if (missing.length) {
       gaps.push({
         linha: r,
@@ -336,6 +366,7 @@ async function main() {
     skippedLava,
     skippedNot2026,
     skippedInvalid,
+    skippedDup,
   });
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -391,8 +422,9 @@ async function main() {
   sum.addRow(["Prontos", ready.length]);
   sum.addRow(["Gaps (com ou sem bloqueio)", gaps.length]);
   sum.addRow(["Pulados Lava", skippedLava]);
+  sum.addRow(["Pulados duplicata", skippedDup]);
   sum.addRow(["Modo", CONFIRM ? "CONFIRM" : "DRY-RUN"]);
-  sum.addRow(["Obs", "Histórico incompleto de propósito — teste inicial (sobe/apaga)"]);
+  sum.addRow(["Obs", "Histórico incompleto de propósito — teste inicial (sobe/apaga); sem duplicata"]);
 
   await report.xlsx.writeFile(OUT_REPORT);
   await report.xlsx.writeFile(OUT_GAPS);
