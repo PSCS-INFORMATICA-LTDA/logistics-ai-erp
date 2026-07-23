@@ -290,31 +290,79 @@ export async function recognizeCnhImages(
   };
 }
 
+export type ApplyCnhOcrOptions = {
+  /**
+   * Renovação / nova CNH: sobrescreve número, validade e categorias quando o OCR ler.
+   * Nome e CPF continuam só preenchendo campos vazios.
+   */
+  renewCnh?: boolean;
+};
+
+function formatCnhNumberForForm(value: string): string {
+  const formatted = normalizeCnh(value);
+  return `${formatted.slice(0, 3)}.${formatted.slice(3, 6)}.${formatted.slice(6, 9)}-${formatted.slice(9)}`;
+}
+
+/** Aplica OCR no formulário. Em renovação, a nova validade substitui a antiga (limpa alerta). */
 export function applyCnhOcrToForm(
   current: Record<string, unknown>,
-  result: CnhOcrResult
+  result: CnhOcrResult,
+  options?: ApplyCnhOcrOptions
 ): Record<string, unknown> {
+  const renewCnh = options?.renewCnh !== false;
   const next = { ...current };
 
   if (result.name && !String(current.name ?? "").trim()) next.name = result.name;
   if (result.document && !String(current.document ?? "").trim()) next.document = result.document;
+
   if (result.cnh_number) {
-    const formatted = normalizeCnh(result.cnh_number);
-    if (!String(current.cnh_number ?? "").trim()) {
-      next.cnh_number = `${formatted.slice(0, 3)}.${formatted.slice(3, 6)}.${formatted.slice(6, 9)}-${formatted.slice(9)}`;
+    const formatted = formatCnhNumberForForm(result.cnh_number);
+    if (renewCnh || !String(current.cnh_number ?? "").trim()) {
+      next.cnh_number = formatted;
     }
   }
-  if (result.cnh_expiry_date && !String(current.cnh_expiry_date ?? "").trim()) {
-    next.cnh_expiry_date = result.cnh_expiry_date;
+
+  if (result.cnh_expiry_date) {
+    const currentExpiry = String(current.cnh_expiry_date ?? "").trim();
+    if (renewCnh || !currentExpiry) {
+      next.cnh_expiry_date = result.cnh_expiry_date;
+    }
   }
+
   if (result.cnh_categories.length) {
-    const currentCategories = Array.isArray(current.cnh_categories)
-      ? (current.cnh_categories as string[])
-      : [];
-    next.cnh_categories = sortCnhCategories([
-      ...new Set([...currentCategories, ...result.cnh_categories]),
-    ]);
+    if (renewCnh) {
+      next.cnh_categories = sortCnhCategories(result.cnh_categories);
+    } else {
+      const currentCategories = Array.isArray(current.cnh_categories)
+        ? (current.cnh_categories as string[])
+        : [];
+      next.cnh_categories = sortCnhCategories([
+        ...new Set([...currentCategories, ...result.cnh_categories]),
+      ]);
+    }
   }
 
   return next;
+}
+
+/** Campos de CNH que mudaram (para mensagem de alerta limpo). */
+export function cnhFieldsUpdatedByOcr(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>
+): string[] {
+  const changed: string[] = [];
+  if (String(before.cnh_number ?? "") !== String(after.cnh_number ?? "")) {
+    changed.push("número");
+  }
+  if (String(before.cnh_expiry_date ?? "") !== String(after.cnh_expiry_date ?? "")) {
+    changed.push("vencimento");
+  }
+  const beforeCats = Array.isArray(before.cnh_categories)
+    ? (before.cnh_categories as string[]).join(",")
+    : "";
+  const afterCats = Array.isArray(after.cnh_categories)
+    ? (after.cnh_categories as string[]).join(",")
+    : "";
+  if (beforeCats !== afterCats) changed.push("categorias");
+  return changed;
 }
