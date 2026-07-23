@@ -2,7 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { COMPANY_LEDGER_ENTRY_SOURCE } from "@/lib/company-ledger";
 import { VEHICLE_EXPENSE_ENTRY_SOURCE } from "@/lib/vehicle-expense-categories";
 import { isMasterSessionUnlocked, verifyMasterPassword } from "@/lib/master-password";
-import { validateDeletionReason } from "@/lib/deletion-audit";
+import {
+  recordDeletion,
+  summarizeDeletedRow,
+  validateDeletionReason,
+} from "@/lib/deletion-audit";
 
 export type ApprovalStatus =
   | "draft"
@@ -383,6 +387,57 @@ export function entrySourceLabel(source: string | null): string {
   if (source === VEHICLE_EXPENSE_ENTRY_SOURCE) return "Veículo";
   if (!source) return "Sistema";
   return source;
+}
+
+/**
+ * Exclui lançamento pendente (errado / por engano) com registro no histórico de exclusões.
+ * Diferente de rejeitar: remove o registro e permite restauração hard pelo histórico.
+ */
+export async function deleteSubmittedFinancialTransaction(input: {
+  supabase: SupabaseClient;
+  companyId: string;
+  transactionId: string;
+  reason: string;
+  reasonCode?: string | null;
+}): Promise<{ error: string | null }> {
+  const { data: existing, error: fetchErr } = await input.supabase
+    .from("financial_transactions")
+    .select("*")
+    .eq("company_id", input.companyId)
+    .eq("id", input.transactionId)
+    .eq("approval_status", "submitted")
+    .maybeSingle();
+
+  if (fetchErr) return { error: fetchErr.message };
+  if (!existing) {
+    return { error: "Lançamento pendente não encontrado (já aprovado, rejeitado ou excluído)." };
+  }
+
+  const row = existing as Record<string, unknown>;
+  const { entityCode, summary } = summarizeDeletedRow(row, "financial_transactions");
+  const logged = await recordDeletion({
+    supabase: input.supabase,
+    companyId: input.companyId,
+    entityType: "financial_transactions",
+    entityId: input.transactionId,
+    entityCode,
+    summary,
+    reason: input.reason,
+    reasonCode: input.reasonCode,
+    screenKey: "dre.aprovacoes",
+    deleteMode: "hard",
+    payload: row,
+  });
+  if (logged.error) return { error: logged.error };
+
+  const { error } = await input.supabase
+    .from("financial_transactions")
+    .delete()
+    .eq("company_id", input.companyId)
+    .eq("id", input.transactionId)
+    .eq("approval_status", "submitted");
+
+  return { error: error?.message ?? null };
 }
 
 /** Filtro PostgREST: só aprovados (totais DRE/dashboard). */

@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
+import { enqueueDeletionAlert } from "@/lib/deletion-alerts";
 import {
   approveFinancialTransaction,
+  deleteSubmittedFinancialTransaction,
   entrySourceLabel,
   listPendingFinancialApprovals,
   loadFinancialApprovalSettings,
@@ -54,6 +58,8 @@ export default function DreAprovacoesPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [masterPassword, setMasterPassword] = useState("");
   const [needMaster, setNeedMaster] = useState(false);
 
@@ -112,12 +118,32 @@ export default function DreAprovacoesPage() {
         <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Aprovações de lançamentos</h1>
         <p className="mt-1 text-sm text-slate-500">
           Despesas manuais (empresa / veículo) aguardando aprovação. Frete concluído, pagamento ao
-          motorista e receitas de OS/pátio entram aprovados automaticamente.
+          motorista e receitas de OS/pátio entram aprovados automaticamente. Lançamento errado:
+          use Excluir (vai para o{" "}
+          <Link
+            href="/configuracoes/historico-exclusoes"
+            className="font-medium text-brand-700 underline"
+          >
+            Histórico de Exclusões
+          </Link>
+          ).
         </p>
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
-      {msg ? <Alert variant="info">{msg}</Alert> : null}
+      {msg ? (
+        <Alert variant="info">
+          {msg}{" "}
+          {msg.toLowerCase().includes("exclu") ? (
+            <Link
+              href="/configuracoes/historico-exclusoes"
+              className="font-medium text-brand-700 underline"
+            >
+              Abrir histórico
+            </Link>
+          ) : null}
+        </Alert>
+      ) : null}
 
       <Card>
         <CardHeader
@@ -285,13 +311,27 @@ export default function DreAprovacoesPage() {
                       type="button"
                       size="sm"
                       variant="danger"
-                      disabled={busyId === row.id}
+                      disabled={busyId === row.id || deleting}
                       onClick={() => {
                         setRejectId(row.id);
                         setRejectNote("");
                       }}
                     >
                       Rejeitar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === row.id || deleting}
+                      onClick={() => {
+                        setError(null);
+                        setMsg(null);
+                        setPendingDeleteId(row.id);
+                      }}
+                      title="Remove o lançamento e registra no Histórico de Exclusões"
+                    >
+                      Excluir
                     </Button>
                   </div>
                 </td>
@@ -313,7 +353,9 @@ export default function DreAprovacoesPage() {
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/50 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <h2 className="text-lg font-semibold text-slate-900">Rejeitar lançamento</h2>
-            <p className="mt-1 text-sm text-slate-600">Informe o motivo (mín. 8 caracteres).</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Mantém o registro como rejeitado (não entra no DRE). Para apagar de vez, use Excluir.
+            </p>
             <textarea
               className={`${glassField(true)} mt-3 min-h-[6rem] resize-y`}
               value={rejectNote}
@@ -357,6 +399,51 @@ export default function DreAprovacoesPage() {
           </div>
         </div>
       ) : null}
+
+      <DeleteReasonModal
+        open={Boolean(pendingDeleteId)}
+        title="Excluir lançamento pendente"
+        description="Use quando o lançamento foi criado errado. O registro sai da fila e fica no Histórico de Exclusões (com possibilidade de restauração)."
+        critical
+        confirming={deleting}
+        confirmLabel="Excluir e registrar"
+        onCancel={() => {
+          if (deleting) return;
+          setPendingDeleteId(null);
+        }}
+        onConfirm={async (payload) => {
+          if (!companyId || !pendingDeleteId) return;
+          setDeleting(true);
+          setError(null);
+          setMsg(null);
+          const deleteId = pendingDeleteId;
+          const result = await deleteSubmittedFinancialTransaction({
+            supabase,
+            companyId,
+            transactionId: deleteId,
+            reason: payload.reason,
+            reasonCode: payload.reasonCode,
+          });
+          if (result.error) {
+            setDeleting(false);
+            setError(result.error);
+            return;
+          }
+          await enqueueDeletionAlert({
+            supabase,
+            companyId,
+            alertType: "critical_deleted",
+            title: "Exclusão: lançamento pendente de aprovação",
+            body: `Lançamento excluído na fila de aprovações. Motivo: ${payload.reason}`,
+            entityType: "financial_transactions",
+            entityId: deleteId,
+          });
+          setDeleting(false);
+          setPendingDeleteId(null);
+          setMsg("Lançamento excluído e registrado no histórico.");
+          await load();
+        }}
+      />
     </div>
   );
 }
