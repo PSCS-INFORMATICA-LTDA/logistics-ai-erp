@@ -231,67 +231,76 @@ export default function DreAprovacoesPage() {
       {loading ? <Loading /> : null}
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-3 py-2">Data do lançamento</th>
-              <th className="px-3 py-2">Lançado por</th>
-              <th className="px-3 py-2">Origem</th>
-              <th className="px-3 py-2">Conta DRE</th>
-              <th className="px-3 py-2">Placa</th>
-              <th className="px-3 py-2">Descrição</th>
-              <th className="px-3 py-2">Tipo</th>
-              <th className="px-3 py-2">Valor</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Ações</th>
+              <th className="whitespace-nowrap px-2 py-2">Data</th>
+              <th className="whitespace-nowrap px-2 py-2">Quem</th>
+              <th className="whitespace-nowrap px-2 py-2">Origem</th>
+              <th className="min-w-[7.5rem] px-2 py-2">Conta DRE</th>
+              <th className="whitespace-nowrap px-2 py-2">Placa</th>
+              <th className="px-2 py-2">Descrição</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right">Valor</th>
+              <th className="whitespace-nowrap px-2 py-2">Ações</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 align-top">
-                <td className="whitespace-nowrap px-3 py-2">
-                  <div className="font-medium text-slate-900">
-                    {formatDate(row.transaction_date)}
-                  </div>
-                  {row.submitted_at ? (
-                    <div className="text-xs text-slate-500">
-                      Enviado {formatSubmittedAt(row.submitted_at)}
-                    </div>
-                  ) : null}
+              <tr key={row.id} className="border-t border-slate-100 align-middle">
+                <td
+                  className="whitespace-nowrap px-2 py-2 font-medium text-slate-900"
+                  title={
+                    row.submitted_at
+                      ? `Enviado ${formatSubmittedAt(row.submitted_at)}`
+                      : undefined
+                  }
+                >
+                  {formatDate(row.transaction_date)}
                 </td>
-                <td className="px-3 py-2">
+                <td
+                  className="max-w-[7rem] truncate px-2 py-2 text-slate-700"
+                  title={row.submitted_by_name || undefined}
+                >
                   {row.submitted_by_name || (
-                    <span className="text-slate-400">
-                      {row.submitted_by ? "Usuário sem nome" : "—"}
-                    </span>
+                    <span className="text-slate-400">{row.submitted_by ? "—" : "—"}</span>
                   )}
                 </td>
-                <td className="px-3 py-2">{entrySourceLabel(row.entry_source)}</td>
-                <td className="px-3 py-2">
-                  <div className="font-semibold text-slate-900">
+                <td className="whitespace-nowrap px-2 py-2 text-slate-600">
+                  {entrySourceLabel(row.entry_source)}
+                </td>
+                <td className="px-2 py-2">
+                  <div
+                    className="font-semibold leading-snug text-slate-900"
+                    title={
+                      [row.dre_account_name, row.classification, row.transaction_type]
+                        .filter(Boolean)
+                        .join(" · ") || undefined
+                    }
+                  >
                     {row.dre_account_name || (
-                      <span className="font-normal text-amber-700">Conta não informada</span>
+                      <span className="font-normal text-amber-700">Sem conta</span>
                     )}
                   </div>
-                  {row.classification ? (
-                    <div className="text-xs text-slate-500">{row.classification}</div>
-                  ) : null}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                <td className="whitespace-nowrap px-2 py-2 text-slate-700">
                   {row.plate || <span className="text-slate-400">—</span>}
                 </td>
-                <td className="max-w-xs px-3 py-2">{row.description || "—"}</td>
-                <td className="px-3 py-2">{row.transaction_type}</td>
-                <td className="px-3 py-2 font-medium">{formatCurrency(row.amount)}</td>
-                <td className="px-3 py-2">
-                  <Badge variant="warning">Pendente</Badge>
+                <td
+                  className="max-w-[10rem] truncate px-2 py-2 text-slate-700"
+                  title={row.description || undefined}
+                >
+                  {row.description || "—"}
                 </td>
-                <td className="px-3 py-2">
-                  <div className="flex flex-col gap-1.5">
+                <td className="whitespace-nowrap px-2 py-2 text-right font-medium text-slate-900">
+                  {formatCurrency(row.amount)}
+                </td>
+                <td className="px-2 py-2">
+                  <div className="flex flex-nowrap items-center gap-1.5">
                     <Button
                       type="button"
                       size="sm"
                       variant="moss"
+                      className="shrink-0 !px-2.5 !py-1 text-xs"
                       disabled={busyId === row.id}
                       onClick={() => {
                         void (async () => {
@@ -321,6 +330,7 @@ export default function DreAprovacoesPage() {
                       type="button"
                       size="sm"
                       variant="danger"
+                      className="shrink-0 !px-2.5 !py-1 text-xs"
                       disabled={busyId === row.id || deleting}
                       onClick={() => {
                         setRejectId(row.id);
@@ -333,6 +343,7 @@ export default function DreAprovacoesPage() {
                       type="button"
                       size="sm"
                       variant="ink"
+                      className="shrink-0 !px-2.5 !py-1 text-xs"
                       disabled={busyId === row.id || deleting}
                       onClick={() => {
                         setError(null);
@@ -349,7 +360,7 @@ export default function DreAprovacoesPage() {
             ))}
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                   Nenhum lançamento pendente. Se acabou de aplicar o SQL 056, novos manuais
                   aparecerão aqui.
                 </td>
