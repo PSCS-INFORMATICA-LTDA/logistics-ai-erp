@@ -24,7 +24,9 @@ export default function DocumentosAVencerOperacionalPage() {
   const { companyId } = useCompany();
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<ComplianceDocument[]>([]);
-  const [plates, setPlates] = useState<Map<string, string>>(new Map());
+  const [vehicles, setVehicles] = useState<
+    Map<string, { plate: string; brandModel: string | null }>
+  >(new Map());
   const [alerts, setAlerts] = useState<
     Array<{ id: string; title: string; body: string; alert_tier: string; created_at: string }>
   >([]);
@@ -41,16 +43,20 @@ export default function DocumentosAVencerOperacionalPage() {
     const [rep, al, veh] = await Promise.all([
       listExpiringDocumentsReport(supabase, companyId),
       listUnreadComplianceAlerts(supabase, companyId),
-      supabase.from("vehicles").select("id, plate").eq("company_id", companyId),
+      supabase.from("vehicles").select("id, plate, model").eq("company_id", companyId),
     ]);
     if (rep.error) setError(rep.error);
     setRows(rep.rows);
     setAlerts(al.rows);
-    const map = new Map<string, string>();
+    const map = new Map<string, { plate: string; brandModel: string | null }>();
     for (const v of veh.data ?? []) {
-      map.set(String(v.id), String(v.plate ?? ""));
+      const model = v.model == null || String(v.model).trim() === "" ? null : String(v.model).trim();
+      map.set(String(v.id), {
+        plate: String(v.plate ?? ""),
+        brandModel: model,
+      });
     }
-    setPlates(map);
+    setVehicles(map);
     setLoading(false);
   }, [companyId, supabase]);
 
@@ -63,27 +69,29 @@ export default function DocumentosAVencerOperacionalPage() {
     return rows.filter((doc) => {
       if (scope !== "all" && doc.owner_type !== scope) return false;
       if (plateFilter && doc.owner_type === "vehicle") {
-        const plate = plates.get(doc.owner_id) ?? "";
+        const plate = vehicles.get(doc.owner_id)?.plate ?? "";
         if (plate !== plateFilter) return false;
       }
       if (plateFilter && doc.owner_type === "company") return false;
       return true;
     });
-  }, [rows, scope, plateFilter, plates]);
+  }, [rows, scope, plateFilter, vehicles]);
 
   const plateOptions = useMemo(() => {
     const opts = [{ value: "", label: "Todas as placas" }];
     const seen = new Set<string>();
-    for (const [id, plate] of plates) {
-      if (!plate || seen.has(plate)) continue;
-      // só placas que têm doc em atenção
+    for (const [id, info] of vehicles) {
+      if (!info.plate || seen.has(info.plate)) continue;
       if (rows.some((r) => r.owner_type === "vehicle" && r.owner_id === id)) {
-        seen.add(plate);
-        opts.push({ value: plate, label: plate });
+        seen.add(info.plate);
+        opts.push({
+          value: info.plate,
+          label: info.brandModel ? `${info.plate} · ${info.brandModel}` : info.plate,
+        });
       }
     }
     return opts.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [plates, rows]);
+  }, [vehicles, rows]);
 
   if (!companyId || loading) return <Loading />;
 
@@ -114,7 +122,7 @@ export default function DocumentosAVencerOperacionalPage() {
           ]}
         />
         <GlassSelect
-          label="Placa"
+          label="Placa (marca / modelo)"
           value={plateFilter}
           onChange={setPlateFilter}
           options={plateOptions}
@@ -156,6 +164,7 @@ export default function DocumentosAVencerOperacionalPage() {
           <thead className="text-xs uppercase text-slate-500">
             <tr>
               <th className="px-2 py-2">Placa / Escopo</th>
+              <th className="px-2 py-2">Marca / modelo</th>
               <th className="px-2 py-2">Documento</th>
               <th className="px-2 py-2">Nº</th>
               <th className="px-2 py-2">Validade</th>
@@ -165,20 +174,23 @@ export default function DocumentosAVencerOperacionalPage() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-2 py-4 text-slate-500">
+                <td colSpan={6} className="px-2 py-4 text-slate-500">
                   Nenhum documento vencido ou a vencer neste filtro.
                 </td>
               </tr>
             ) : (
               filtered.map((doc) => {
                 const view = resolveComplianceSituation(doc, doc.document_type);
+                const veh =
+                  doc.owner_type === "vehicle" ? vehicles.get(doc.owner_id) : null;
                 const plate =
-                  doc.owner_type === "vehicle"
-                    ? plates.get(doc.owner_id) || "Veículo"
-                    : "Empresa";
+                  doc.owner_type === "vehicle" ? veh?.plate || "Veículo" : "Empresa";
+                const brandModel =
+                  doc.owner_type === "vehicle" ? veh?.brandModel || "—" : "—";
                 return (
                   <tr key={doc.id} className="border-t border-slate-100">
                     <td className="px-2 py-2 font-medium">{plate}</td>
+                    <td className="px-2 py-2 text-slate-700">{brandModel}</td>
                     <td className="px-2 py-2">
                       {documentDisplayName(doc.document_type)}
                     </td>

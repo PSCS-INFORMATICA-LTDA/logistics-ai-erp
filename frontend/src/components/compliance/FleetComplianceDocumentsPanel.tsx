@@ -27,7 +27,13 @@ import { formatExpiryDateBR } from "@/lib/expiry-status";
 import { glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
 
-type VehicleOption = { id: string; plate: string; code: string | null };
+type VehicleOption = {
+  id: string;
+  plate: string;
+  code: string | null;
+  /** Cadastro do veículo — campo “Marca / modelo”. */
+  brandModel: string | null;
+};
 
 type Props = {
   companyId: string;
@@ -61,7 +67,7 @@ export function FleetComplianceDocumentsPanel({
     const [vehRes, docsRes] = await Promise.all([
       supabase
         .from("vehicles")
-        .select("id, plate, code, deleted_at")
+        .select("id, plate, code, model, deleted_at")
         .eq("company_id", companyId)
         .order("plate", { ascending: true }),
       listVehicleFleetDocuments(supabase, companyId),
@@ -75,6 +81,7 @@ export function FleetComplianceDocumentsPanel({
           id: String(v.id),
           plate: String(v.plate ?? ""),
           code: v.code == null ? null : String(v.code),
+          brandModel: v.model == null || String(v.model).trim() === "" ? null : String(v.model).trim(),
         }))
     );
     setDocs(docsRes.rows);
@@ -87,22 +94,34 @@ export function FleetComplianceDocumentsPanel({
     void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, [load, supabase.auth]);
 
-  const plateById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const v of vehicles) map.set(v.id, v.plate || v.code || v.id.slice(0, 8));
+  const vehicleById = useMemo(() => {
+    const map = new Map<string, VehicleOption>();
+    for (const v of vehicles) map.set(v.id, v);
     return map;
   }, [vehicles]);
 
-  const vehicleOptions = useMemo(
-    () => [
-      { value: "", label: "Selecione a placa" },
+  const formatVehicleLabel = (v: VehicleOption) => {
+    const parts = [v.plate || "Sem placa"];
+    if (v.brandModel) parts.push(v.brandModel);
+    if (v.code) parts.push(v.code);
+    return parts.join(" · ");
+  };
+
+  const vehicleOptions = useMemo(() => {
+    const labelOf = (v: VehicleOption) => {
+      const parts = [v.plate || "Sem placa"];
+      if (v.brandModel) parts.push(v.brandModel);
+      if (v.code) parts.push(v.code);
+      return parts.join(" · ");
+    };
+    return [
+      { value: "", label: "Selecione a placa (marca / modelo)" },
       ...vehicles.map((v) => ({
         value: v.id,
-        label: v.code ? `${v.plate} · ${v.code}` : v.plate,
+        label: labelOf(v),
       })),
-    ],
-    [vehicles]
-  );
+    ];
+  }, [vehicles]);
 
   const filtered = useMemo(() => {
     return docs.filter((d) => {
@@ -190,12 +209,12 @@ export function FleetComplianceDocumentsPanel({
 
       <div className={`grid gap-3 sm:grid-cols-3 ${glassFilterPanel()}`}>
         <GlassSelect
-          label="Filtrar placa"
+          label="Filtrar por placa / veículo"
           value={plateFilter}
           onChange={setPlateFilter}
           options={[
             { value: "", label: "Todas as placas" },
-            ...vehicles.map((v) => ({ value: v.id, label: v.plate })),
+            ...vehicles.map((v) => ({ value: v.id, label: formatVehicleLabel(v) })),
           ]}
         />
         <GlassSelect
@@ -238,14 +257,16 @@ export function FleetComplianceDocumentsPanel({
           leadingSlot={
             <div className="space-y-2">
               <GlassSelect
-                label="Placa do veículo"
+                label="Placa do veículo (marca / modelo)"
                 value={editor.vehicleId}
                 onChange={(v) => setEditor((e) => (e ? { ...e, vehicleId: v } : e))}
                 disabled={editor.mode !== "create"}
                 options={vehicleOptions}
               />
               {!editor.vehicleId && editor.mode === "create" ? (
-                <Alert variant="warning">Selecione a placa antes de salvar.</Alert>
+                <Alert variant="warning">
+                  Selecione a placa do veículo (com marca / modelo) antes de salvar.
+                </Alert>
               ) : null}
             </div>
           }
@@ -259,6 +280,7 @@ export function FleetComplianceDocumentsPanel({
           <thead className="text-xs uppercase text-slate-500">
             <tr>
               <th className="px-2 py-2">Placa</th>
+              <th className="px-2 py-2">Marca / modelo</th>
               <th className="px-2 py-2">Tipo de documento</th>
               <th className="px-2 py-2">Nº</th>
               <th className="px-2 py-2">Data de vencimento</th>
@@ -272,19 +294,23 @@ export function FleetComplianceDocumentsPanel({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-2 py-4 text-slate-500">
+                <td colSpan={8} className="px-2 py-4 text-slate-500">
                   Nenhum documento ainda. Clique em &quot;Novo documento por placa&quot;,
-                  selecione a placa e anexe a digitalização no formulário. O ícone de clipe
-                  aparece na coluna Anexo depois que o documento for salvo.
+                  selecione a placa (marca / modelo) e anexe a digitalização no formulário.
+                  O ícone de clipe aparece na coluna Anexo depois que o documento for salvo.
                 </td>
               </tr>
             ) : (
               filtered.map((doc) => {
                 const view = resolveComplianceSituation(doc, doc.document_type);
+                const veh = vehicleById.get(doc.owner_id);
                 return (
                   <tr key={doc.id} className="border-t border-slate-100">
                     <td className="px-2 py-2 font-medium">
-                      {plateById.get(doc.owner_id) || "—"}
+                      {veh?.plate || "—"}
+                    </td>
+                    <td className="px-2 py-2 text-slate-700">
+                      {veh?.brandModel || "—"}
                     </td>
                     <td className="px-2 py-2">
                       {documentDisplayName(doc.document_type)}

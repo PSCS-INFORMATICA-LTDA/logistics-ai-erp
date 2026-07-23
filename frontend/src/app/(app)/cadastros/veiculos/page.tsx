@@ -66,7 +66,7 @@ export default function VeiculosPage() {
       columns={[
         { key: "code", label: "Código" },
         { key: "plate", label: "Placa" },
-        { key: "model", label: "Modelo" },
+        { key: "model", label: "Marca / modelo" },
         { key: "vehicle_category", label: "Categoria" },
         {
           key: "docs",
@@ -285,7 +285,7 @@ function VehicleForm({
                   fields={[
                     { name: "plate", label: "Placa", required: true },
                     { name: "plate_display", label: "Placa (exibição)" },
-                    { name: "model", label: "Modelo" },
+                    { name: "model", label: "Marca / modelo", placeholder: "Ex.: Mercedes Sprinter" },
                     { name: "year", label: "Ano", type: "number" },
                     {
                       name: "vehicle_category",
