@@ -194,7 +194,7 @@ export async function listComplianceDocuments(
   companyId: string,
   opts: {
     ownerType: DocumentAppliesTo;
-    ownerId: string;
+    ownerId?: string;
     currentOnly?: boolean;
     rootId?: string;
   }
@@ -204,10 +204,10 @@ export async function listComplianceDocuments(
     .select("*, document_types(*)")
     .eq("company_id", companyId)
     .eq("owner_type", opts.ownerType)
-    .eq("owner_id", opts.ownerId)
     .is("deleted_at", null)
     .order("version_number", { ascending: false });
 
+  if (opts.ownerId) q = q.eq("owner_id", opts.ownerId);
   if (opts.currentOnly !== false && !opts.rootId) q = q.eq("is_current", true);
   if (opts.rootId) q = q.eq("root_id", opts.rootId);
 
@@ -217,6 +217,17 @@ export async function listComplianceDocuments(
     rows: ((data as unknown[]) ?? []).map((r) => mapDoc(r as Record<string, unknown>)),
     error: null,
   };
+}
+
+/** Documentos vigentes por placa (frota inteira) — controle de licenças. */
+export async function listVehicleFleetDocuments(
+  supabase: Sb,
+  companyId: string
+): Promise<{ rows: ComplianceDocument[]; error: string | null }> {
+  return listComplianceDocuments(supabase, companyId, {
+    ownerType: "vehicle",
+    currentOnly: true,
+  });
 }
 
 export async function listCompanyDocumentsForVehicleView(

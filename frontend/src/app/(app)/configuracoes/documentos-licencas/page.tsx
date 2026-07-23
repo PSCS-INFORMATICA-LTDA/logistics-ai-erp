@@ -7,6 +7,7 @@ import {
   attachComplianceFile,
   ComplianceDocumentEditor,
 } from "@/components/compliance/ComplianceDocumentEditor";
+import { FleetComplianceDocumentsPanel } from "@/components/compliance/FleetComplianceDocumentsPanel";
 import { AttachmentGallery } from "@/components/drivers/AttachmentGallery";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -34,14 +35,14 @@ import { formatExpiryDateBR } from "@/lib/expiry-status";
 import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
 
-type Tab = "tipos" | "empresa";
+type Tab = "frota" | "empresa" | "tipos";
 
 export default function DocumentosLicencasPage() {
   const { companyId } = useCompany();
   const { canEditScreen } = useAccess();
   const canEdit = canEditScreen("configuracoes.documentos-licencas");
   const supabase = useMemo(() => createClient(), []);
-  const [tab, setTab] = useState<Tab>("tipos");
+  const [tab, setTab] = useState<Tab>("frota");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export default function DocumentosLicencasPage() {
   }, [load, supabase.auth]);
 
   const companyTypes = types.filter((t) => t.applies_to === "company" && t.is_active);
+  const vehicleTypes = types.filter((t) => t.applies_to === "vehicle");
   const companyDocsVisible = companyDocs.filter(
     (d) => d.document_type?.is_active !== false
   );
@@ -145,9 +147,8 @@ export default function DocumentosLicencasPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Documentos e licenças</h1>
         <p className="text-sm text-slate-600">
-          Aqui você parametriza os tipos e cadastra documentos da empresa.           Por orientação GRX: só o TA é documento da empresa. Prefixo e demais tipos são por
-          placa (Cadastros → Veículos → Documentos), com upload da digitalização. Acompanhar
-          vencimentos:{" "}
+          Controle de licenças: vincule documentos às placas, informe a data de vencimento e
+          anexe a digitalização (clipe). Só o TA é da empresa. Relatório:{" "}
           <Link href="/operacional/documentos-a-vencer" className="text-sky-700 underline">
             Operacional → Documentos a vencer
           </Link>
@@ -155,11 +156,12 @@ export default function DocumentosLicencasPage() {
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(
           [
+            ["frota", "Documentos por placa"],
+            ["empresa", "Documento da empresa (TA)"],
             ["tipos", "Tipos de documento"],
-            ["empresa", "Documentos da empresa"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -179,12 +181,20 @@ export default function DocumentosLicencasPage() {
       {msg ? <Alert variant="success">{msg}</Alert> : null}
       {loading ? <Loading /> : null}
 
+      {tab === "frota" && !loading ? (
+        <FleetComplianceDocumentsPanel
+          companyId={companyId}
+          vehicleTypes={vehicleTypes}
+          canEdit={canEdit}
+        />
+      ) : null}
+
       {tab === "tipos" && !loading ? (
         <div className="space-y-4">
           <Alert variant="info">
-            Tipos só definem o catálogo (nome, aplicação, se exige vencimento). A{" "}
-            data de vencimento e a digitalização (ícone de clipe) são cadastradas em cada
-            documento — aba Documentos da empresa ou Cadastros → Veículos → Documentos.
+            Tipos só definem o catálogo (nome, Prefixo/CRLV…, se exige vencimento). Placa,
+            data de vencimento e clipe ficam na aba Documentos por placa (ou no TA da
+            empresa).
           </Alert>
           <div className={`space-y-3 ${glassFilterPanel()}`}>
             <h2 className="text-sm font-semibold">
