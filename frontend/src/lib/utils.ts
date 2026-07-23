@@ -26,8 +26,38 @@ export function formatDateBR(value: string | null | undefined): string {
   if (!value) return "—";
   const datePart = String(value).slice(0, 10);
   const [y, m, d] = datePart.split("-");
-  if (!y || !m || !d) return String(value);
+  if (!y || !m || !d || y.length !== 4) return String(value);
+  if (!/^\d{4}$/.test(y) || !/^\d{2}$/.test(m) || !/^\d{2}$/.test(d)) {
+    return String(value);
+  }
   return `${d}/${m}/${y}`;
+}
+
+/** True se o valor parece data ISO (só data ou datetime). */
+export function isIsoDateString(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const s = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return true;
+  if (/^\d{4}-\d{2}-\d{2}[T\s]/.test(s)) return true;
+  return false;
+}
+
+/**
+ * Formata valores de célula/lista para exibição BR.
+ * Datas ISO → DD/MM/AAAA; demais valores inalterados.
+ */
+export function formatDisplayValueBR(value: unknown): string {
+  if (value == null || value === "") return "—";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
+  const s = String(value);
+  if (isIsoDateString(s)) {
+    const dateLabel = formatDateBR(s);
+    const timeMatch = s.match(/[T\s](\d{2}:\d{2})/);
+    if (timeMatch && dateLabel !== "—") return `${dateLabel} ${timeMatch[1]}`;
+    return dateLabel;
+  }
+  return s;
 }
 
 /** Data + hora: `14/07/2026 17:00`. */

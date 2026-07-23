@@ -27,7 +27,7 @@ import {
   isPartyDocumentTaken,
   isVehiclePlateTaken,
 } from "@/lib/party-document-uniqueness";
-import { normalizePlate } from "@/lib/utils";
+import { formatDisplayValueBR, normalizePlate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Loading, Alert } from "@/components/ui/Badge";
@@ -544,7 +544,9 @@ export function CrudPage<T extends { id: string }>({
                       <td key={String(col.key)} className="px-3 py-3 text-slate-700 sm:px-4">
                         {col.render
                           ? col.render(row)
-                          : String((row as Record<string, unknown>)[col.key as string] ?? "—")}
+                          : formatDisplayValueBR(
+                              (row as Record<string, unknown>)[col.key as string]
+                            )}
                       </td>
                     ))}
                     <td className="sticky right-0 bg-white/95 px-3 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:px-4 sm:backdrop-blur-none">

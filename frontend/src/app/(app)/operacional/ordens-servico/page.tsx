@@ -15,6 +15,7 @@ import { VehiclePhotoPreview } from "@/components/vehicles/VehiclePhotoPreview";
 import { Badge, Alert } from "@/components/ui/Badge";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import { nextCode } from "@/lib/codes";
+import { formatDateBR } from "@/lib/utils";
 import { useCompany } from "@/lib/company-context";
 import {
   categoriesForServiceType,
@@ -501,7 +502,11 @@ function OrdensServicoPageContent() {
           label: "Nº legado",
           render: (r) => r.legacy_number || "—",
         },
-        { key: "service_date", label: "Data" },
+        {
+          key: "service_date",
+          label: "Data",
+          render: (r) => formatDateBR(r.service_date),
+        },
         { key: "plate", label: "Placa" },
         {
           key: "service_type",
