@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CrudPage } from "@/components/crud/CrudPage";
 import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { FreightCalculatorPanel } from "@/components/operacional/FreightCalculatorPanel";
@@ -29,6 +29,7 @@ import {
   canEditServiceOrder,
   canDeleteServiceOrder,
   serviceOrderDeleteBlockedReason,
+  serviceOrderEditBlockedReason,
   isPendingClientProposal,
   isPendingDriverAssignment,
   isDriverAssignmentRejected,
@@ -36,7 +37,6 @@ import {
   matchesServiceOrderStatusFilter,
   resolveServiceOrderDisplayStatus,
   resolveServiceOrderDriverColumnLabel,
-  serviceOrderEditBlockedReason,
   serviceOrderStatusVariant,
 } from "@/lib/service-order-display-status";
 import {
@@ -94,21 +94,25 @@ function SuggestedOsCode({
 
 function OrdensServicoPageContent() {
   const { companyId } = useCompany();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("q") ?? "";
   const initialEditId = searchParams.get("edit") ?? searchParams.get("id");
   const initialEditCode = searchParams.get("code");
   const wantsNewFromSchedule = searchParams.get("new") === "1";
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const fromAgenda = Boolean(initialEditId || initialEditCode);
+  const [searchQuery, setSearchQuery] = useState(
+    initialEditCode?.trim() || initialSearch
+  );
   const [statusFilter, setStatusFilter] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
   const [pendingProposalsFilter, setPendingProposalsFilter] = useState(false);
   const defaultDates = useMemo(() => defaultServiceOrderDateRange(), []);
   const [dateFrom, setDateFrom] = useState(defaultDates.dateFrom);
   const [dateTo, setDateTo] = useState(defaultDates.dateTo);
-  const [allDates, setAllDates] = useState(false);
+  const [allDates, setAllDates] = useState(fromAgenda);
   /** Padrão ligado: novas OS não se perdem no meio do legado importado. */
-  const [hideImportedHistory, setHideImportedHistory] = useState(true);
+  const [hideImportedHistory, setHideImportedHistory] = useState(!fromAgenda);
   const [listRows, setListRows] = useState<ServiceOrderListRow[]>([]);
   const [listRefreshKey, setListRefreshKey] = useState(0);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -116,6 +120,24 @@ function OrdensServicoPageContent() {
   const [vehiclesError, setVehiclesError] = useState<string | null>(null);
   const [dreAccounts, setDreAccounts] = useState<DreAccount[]>([]);
   const supabase = useMemo(() => createClient(), []);
+
+  /** Agenda → OS: não esconder a linha nem filtrar por data (libera ações + Fechar). */
+  useEffect(() => {
+    if (!fromAgenda) return;
+    setHideImportedHistory(false);
+    setAllDates(true);
+    if (initialEditCode?.trim()) setSearchQuery(initialEditCode.trim());
+  }, [fromAgenda, initialEditCode]);
+
+  const clearAgendaDeepLink = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("edit");
+    params.delete("id");
+    params.delete("code");
+    params.delete("new");
+    const qs = params.toString();
+    router.replace(qs ? `/operacional/ordens-servico?${qs}` : "/operacional/ordens-servico");
+  }, [router, searchParams]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -601,10 +623,47 @@ function OrdensServicoPageContent() {
           },
         },
       ]}
-      renderForm={({ item, onSave, onCancel, saving }) => (
+      renderForm={({ item, onSave, onCancel, saving }) => {
+        const listRow =
+          (item?.id ? listRows.find((r) => r.id === item.id) : null) ??
+          (item as ServiceOrderListRow | null);
+        const readOnly = Boolean(listRow?.id && !canEditServiceOrder(listRow));
+        const blockedReason = listRow ? serviceOrderEditBlockedReason(listRow) : null;
+
+        const handleClose = () => {
+          onCancel();
+          if (fromAgenda) clearAgendaDeepLink();
+        };
+
+        return (
+        <>
+        {readOnly ? (
+          <div className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+            {blockedReason ? <Alert variant="info">{blockedReason}</Alert> : null}
+            <p className="text-xs text-slate-600">
+              Ações disponíveis nesta OS (concluir, voucher, etc.). Depois use <strong>Fechar</strong>.
+            </p>
+            {listRow?.id ? (
+              <div className="flex flex-wrap gap-2">
+                <ServiceOrderRowActions
+                  row={listRow}
+                  onFollowUpRegistered={handleFollowUpRegistered}
+                  onProposalResponseChanged={handleProposalResponseChanged}
+                  onDriverAssigned={handleDriverAssigned}
+                  onAssignmentSent={handleAssignmentSent}
+                  onDriverAssignmentReset={handleDriverAssignmentReset}
+                  onDriverAssignmentResponded={handleDriverAssignmentResponded}
+                  onServiceFollowUpRegistered={handleServiceFollowUpRegistered}
+                  onServiceOrderCompleted={handleServiceOrderCompleted}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <EntityForm
           saving={saving}
-          onCancel={onCancel}
+          readOnly={readOnly}
+          onCancel={handleClose}
           initial={{
             code: item?.code ?? "",
             legacy_number: item?.legacy_number ?? "",
@@ -654,6 +713,7 @@ function OrdensServicoPageContent() {
             freight_transport_km_rate: item?.freight_transport_km_rate ?? "",
           }}
           onSubmit={async (data) => {
+            if (readOnly) return;
             const categories = Array.isArray(data.service_categories)
               ? (data.service_categories as string[])
               : [];
@@ -1120,7 +1180,9 @@ function OrdensServicoPageContent() {
             );
           }}
         </EntityForm>
-      )}
+        </>
+        );
+      }}
     />
   );
 }

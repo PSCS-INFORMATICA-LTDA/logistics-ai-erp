@@ -502,14 +502,26 @@ export function CrudPage<T extends { id: string }>({
       {toolbar}
 
       {(isNew || editing) && screenCanEdit && (
-        <div ref={formPanelRef} id="crud-form-panel" className="relative z-20 scroll-mt-20">
+        <div ref={formPanelRef} id="crud-form-panel" className="relative scroll-mt-20">
           <Card key={formPanelKey} className="overflow-visible">
-            <CardHeader title={editing?.id ? "Editar" : "Novo registro"} />
+            <CardHeader
+              title={
+                editing?.id
+                  ? canEditRow && !canEditRow(editing as T)
+                    ? "Consultar OS"
+                    : "Editar"
+                  : "Novo registro"
+              }
+            />
             <CardBody>
               {renderForm({
                 item: editing,
                 onSave: handleSave,
-                onCancel: () => { setEditing(null); setIsNew(false); },
+                onCancel: () => {
+                  setEditing(null);
+                  setIsNew(false);
+                  setInfoMsg(null);
+                },
                 saving,
               })}
             </CardBody>

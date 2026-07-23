@@ -225,7 +225,25 @@ export function serviceOrderEditBlockedReason(row: ServiceOrderStatusRow): strin
   if (canEditServiceOrder(row)) return null;
 
   const label = resolveServiceOrderDisplayStatus(row);
-  return `Edição indisponível com status «${label}». Use «Reabrir proposta» para alterar.`;
+  if (label === DRIVER_ASSIGNMENT_RESPONSE_LABELS.accepted) {
+    return `Consulta — status «${label}». Use as ações da OS (acompanhamento / concluir frete). A ficha não edita neste status.`;
+  }
+  if (label === "Concluido") {
+    return `Consulta — OS concluída. Use Voucher / Pagamento DRE nas ações.`;
+  }
+  if (
+    label === DRIVER_ASSIGNMENT_RESPONSE_LABELS.pending ||
+    label === "Aguardando designação motorista"
+  ) {
+    return `Consulta — status «${label}». Use as ações de designação do motorista na lista.`;
+  }
+  if (
+    label === PROPOSAL_RESPONSE_LABELS.accepted ||
+    label === PROPOSAL_RESPONSE_LABELS.rejected
+  ) {
+    return `Consulta — status «${label}». Use «Reabrir proposta» nas ações se precisar alterar.`;
+  }
+  return `Consulta — status «${label}». Edição da ficha indisponível; use as ações da OS.`;
 }
 
 /** Impede exclusão após proposta enviada ou fluxo operacional iniciado — preserva histórico. */

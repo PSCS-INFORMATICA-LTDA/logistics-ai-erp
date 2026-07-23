@@ -16,15 +16,28 @@ type Props = {
   onCancel: () => void;
   saving: boolean;
   initial?: Record<string, unknown>;
+  /** Consulta (Agenda / status bloqueado): sem Salvar; botão Fechar. */
+  readOnly?: boolean;
 };
 
-export function EntityForm({ children, onSubmit, onCancel, saving, initial = {} }: Props) {
+export function EntityForm({
+  children,
+  onSubmit,
+  onCancel,
+  saving,
+  initial = {},
+  readOnly = false,
+}: Props) {
   const [form, setForm] = useState<Record<string, unknown>>(initial);
 
-  const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
+  const set = (key: string, value: unknown) => {
+    if (readOnly) return;
+    setForm((f) => ({ ...f, [key]: value }));
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     await onSubmit(form);
   };
 
@@ -32,11 +45,13 @@ export function EntityForm({ children, onSubmit, onCancel, saving, initial = {} 
     <form onSubmit={handleSubmit} className="space-y-4">
       {typeof children === "function" ? children({ form, set }) : children}
       <div className="entity-form-actions sticky bottom-0 z-10 -mx-1 mt-2 flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-white/95 px-1 py-3 backdrop-blur-md sm:static sm:flex-row sm:gap-3 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2 sm:backdrop-blur-none">
-        <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
-          {saving ? "Salvando..." : "Salvar"}
-        </Button>
-        <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onCancel}>
-          Cancelar
+        {!readOnly ? (
+          <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
+            {saving ? "Salvando..." : "Salvar"}
+          </Button>
+        ) : null}
+        <Button type="button" variant={readOnly ? "primary" : "secondary"} className="w-full sm:w-auto" onClick={onCancel}>
+          {readOnly ? "Fechar" : "Cancelar"}
         </Button>
       </div>
     </form>
