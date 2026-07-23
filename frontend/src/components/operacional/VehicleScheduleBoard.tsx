@@ -9,7 +9,6 @@ import {
   formatMinutes,
   newOsFromScheduleHref,
   orderHref,
-  routeSummary,
   scheduleSegmentLabel,
   serviceTypeColor,
   SCHEDULE_WORK_END_MIN,
@@ -48,30 +47,24 @@ function segmentsForCell(
     .sort((a, b) => a.startMin - b.startMin);
 }
 
+/** No quadro: só horário + nº da OS. Detalhes ao abrir a OS. */
 function SegmentCard({ seg, compact = false }: { seg: ScheduleSegment; compact?: boolean }) {
-  const route = routeSummary(seg);
+  const time = `${formatMinutes(seg.startMin)}–${formatMinutes(seg.endMin)}`;
   return (
     <Link
       href={orderHref(seg.orderId)}
       onClick={(e) => e.stopPropagation()}
       className={cn(
-        "block rounded-md border px-1.5 py-1 leading-tight transition hover:ring-2 hover:ring-brand-300",
-        compact ? "text-[0.68rem]" : "px-3 py-2 text-sm",
+        "block rounded-md border leading-tight transition hover:ring-2 hover:ring-brand-300",
+        compact ? "px-1.5 py-1 text-[0.68rem]" : "px-3 py-2 text-sm",
         serviceTypeColor(seg.serviceType, seg.isHistorical)
       )}
-      title={`Abrir OS ${seg.orderCode}`}
+      title={`Abrir OS ${seg.orderCode} · ${time}`}
     >
-      <span className={cn("font-semibold", !compact && "text-base")}>
-        {formatMinutes(seg.startMin)}–{formatMinutes(seg.endMin)}
+      <span className={cn("block font-semibold tabular-nums", !compact && "text-base")}>
+        {time}
       </span>
-      <span className="block truncate font-medium underline-offset-2 hover:underline">
-        {seg.orderCode} → abrir OS
-      </span>
-      {seg.isHistorical ? (
-        <span className="block text-[0.62rem] uppercase tracking-wide opacity-75">Concluído</span>
-      ) : null}
-      {seg.clientName ? <span className="block truncate opacity-80">{seg.clientName}</span> : null}
-      {route ? <span className="mt-0.5 block truncate text-[0.62rem] opacity-80">{route}</span> : null}
+      <span className="block truncate font-medium">{seg.orderCode}</span>
     </Link>
   );
 }
@@ -123,7 +116,9 @@ export function VehicleScheduleBoard({
           <span className="h-3 w-6 rounded border border-emerald-200 bg-emerald-50" />
           Horário livre (pode usar de novo)
         </span>
-        <span className="text-slate-500">Clique no código da OS para abrir o cadastro.</span>
+        <span className="text-slate-500">
+          No quadro: horário + nº da OS. Clique para abrir e ver os detalhes.
+        </span>
       </div>
 
       {focusVehicle ? (
@@ -269,8 +264,8 @@ export function VehicleScheduleBoard({
                 {dayLabel(selection.dayKey).date}
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                Clique em <strong>abrir OS</strong> para ver origem, destino, cliente e demais dados.
-                Frete concluído não bloqueia; só registra o uso.
+                Clique no nº da OS para abrir origem, destino, cliente e demais dados. Frete
+                concluído não bloqueia; só registra o uso.
               </p>
             </div>
             <Link href="/operacional/ordens-servico" className={glassAction("brand", true)}>
