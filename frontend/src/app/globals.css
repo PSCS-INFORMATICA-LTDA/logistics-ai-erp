@@ -1415,6 +1415,37 @@ body {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /** Lista OS: ações podem quebrar linha no scroll horizontal. */
+  .data-table-scroll--compact.data-table-scroll--fit th,
+  .data-table-scroll--compact.data-table-scroll--fit td {
+    white-space: normal;
+  }
+
+  .data-table-scroll--compact.data-table-scroll--fit table {
+    width: max(100%, 36rem);
+    min-width: 36rem;
+  }
+}
+
+/** Lista densa (OS): cabe em 100% no desktop; coluna Ações com wrap. */
+.data-table-scroll--compact.data-table-scroll--fit.data-table-scroll--sticky-last thead th:last-child,
+.data-table-scroll--compact.data-table-scroll--fit.data-table-scroll--sticky-last tbody td:last-child {
+  width: 12.5rem;
+  min-width: 10.5rem;
+  max-width: 14rem;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.os-row-actions {
+  max-width: 13.5rem;
+}
+
+.os-row-actions .liquid-glass-action {
+  font-size: 0.65rem;
+  line-height: 1.15;
+  padding: 0.2rem 0.4rem;
 }
 
 /**

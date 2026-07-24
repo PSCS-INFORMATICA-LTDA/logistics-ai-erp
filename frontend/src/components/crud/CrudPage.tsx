@@ -38,6 +38,8 @@ export type Column<T> = {
   key: keyof T | string;
   label: string;
   render?: (row: T) => ReactNode;
+  /** Classes no <th>/<td> (ex.: hidden xl:table-cell para caber em 100%). */
+  className?: string;
 };
 
 type CrudPageProps<T extends { id: string }> = {
@@ -74,6 +76,8 @@ type CrudPageProps<T extends { id: string }> = {
   initialEditCode?: string | null;
   /** Abre «Novo» com campos pré-preenchidos (ex.: placa/data da agenda). */
   initialNewDraft?: Partial<T> | null;
+  /** Lista mais densa (fonte −1pt, padding menor) — útil na OS com muitas ações. */
+  compactTable?: boolean;
 };
 
 export function CrudPage<T extends { id: string }>({
@@ -98,6 +102,7 @@ export function CrudPage<T extends { id: string }>({
   initialEditId = null,
   initialEditCode = null,
   initialNewDraft = null,
+  compactTable = false,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const { canEditScreen, canDeleteScreen, isAdmin, loading: accessLoading } = useAccess();
@@ -539,16 +544,37 @@ export function CrudPage<T extends { id: string }>({
               Nenhum registro encontrado.
             </p>
           ) : (
-            <div className={dataTableScroll({ stickyFirst: true, stickyLast: true, fitWidth: true })}>
-            <table className="w-full text-sm">
+            <div
+              className={dataTableScroll({
+                stickyFirst: true,
+                stickyLast: true,
+                fitWidth: true,
+                className: compactTable ? "data-table-scroll--compact" : undefined,
+              })}
+            >
+            <table className={compactTable ? "w-full text-[11px] leading-snug sm:text-xs" : "w-full text-sm"}>
               <thead>
                 <tr className="border-b border-slate-100 text-left">
                   {columns.map((col) => (
-                    <th key={String(col.key)} className="whitespace-nowrap px-3 py-3 font-medium text-slate-600 sm:px-4">
+                    <th
+                      key={String(col.key)}
+                      className={
+                        compactTable
+                          ? `truncate px-1.5 py-2 font-medium text-slate-600 sm:px-2 ${col.className ?? ""}`
+                          : `whitespace-nowrap px-3 py-3 font-medium text-slate-600 sm:px-4 ${col.className ?? ""}`
+                      }
+                      title={col.label}
+                    >
                       {col.label}
                     </th>
                   ))}
-                  <th className="whitespace-nowrap px-3 py-3 font-medium text-slate-600 sm:px-4">
+                  <th
+                    className={
+                      compactTable
+                        ? "px-1.5 py-2 font-medium text-slate-600 sm:px-2"
+                        : "whitespace-nowrap px-3 py-3 font-medium text-slate-600 sm:px-4"
+                    }
+                  >
                     Ações
                   </th>
                 </tr>
@@ -573,7 +599,14 @@ export function CrudPage<T extends { id: string }>({
                   return (
                   <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                     {columns.map((col) => (
-                      <td key={String(col.key)} className="px-3 py-3 text-slate-700 sm:px-4">
+                      <td
+                        key={String(col.key)}
+                        className={
+                          compactTable
+                            ? `truncate px-1.5 py-1.5 text-slate-700 sm:px-2 ${col.className ?? ""}`
+                            : `px-3 py-3 text-slate-700 sm:px-4 ${col.className ?? ""}`
+                        }
+                      >
                         {col.render
                           ? col.render(row)
                           : formatDisplayValueBR(
@@ -581,9 +614,9 @@ export function CrudPage<T extends { id: string }>({
                             )}
                       </td>
                     ))}
-                    <td className="px-3 py-3 sm:px-4">
+                    <td className={compactTable ? "px-1.5 py-1.5 sm:px-2" : "px-3 py-3 sm:px-4"}>
                       {showActions ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div className={compactTable ? "os-row-actions flex flex-wrap gap-1" : "flex flex-wrap gap-2"}>
                         {screenCanEdit ? renderRowActions?.(row) : null}
                         {screenCanEdit ? (
                         <Button

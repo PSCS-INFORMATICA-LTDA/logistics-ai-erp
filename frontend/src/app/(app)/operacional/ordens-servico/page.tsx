@@ -497,6 +497,7 @@ function OrdensServicoPageContent() {
       description="Frete e Transporte — natureza do serviço vinculada às contas DRE (pátio e lava nos módulos próprios)"
       table="service_orders"
       auditScreenKey="operacional.ordens-servico"
+      compactTable
       orderBy="service_date"
       softDelete={false}
       transformItems={transformItems}
@@ -552,6 +553,7 @@ function OrdensServicoPageContent() {
         {
           key: "legacy_number",
           label: "Nº legado",
+          className: "hidden xl:table-cell",
           render: (r) => r.legacy_number || "—",
         },
         {
@@ -568,6 +570,7 @@ function OrdensServicoPageContent() {
         {
           key: "service_categories",
           label: "Natureza",
+          className: "hidden 2xl:table-cell",
           render: (r) =>
             r.service_categories?.length
               ? formatServiceCategories(r.service_categories)
@@ -576,6 +579,7 @@ function OrdensServicoPageContent() {
         {
           key: "dre_account_name",
           label: "Conta DRE",
+          className: "hidden 2xl:table-cell",
           render: (r) => r.dre_account_name ?? "—",
         },
         {
@@ -584,25 +588,34 @@ function OrdensServicoPageContent() {
           render: (r) => {
             const label = resolveServiceOrderDriverColumnLabel(r);
             if (isDriverAssignmentRejected(r)) {
-              return <span className="font-medium text-red-700">{label}</span>;
+              return (
+                <span className="font-medium text-red-700" title={label}>
+                  {label}
+                </span>
+              );
             }
             if (needsDriverAssignment(r) && !isPendingDriverAssignment(r)) {
-              return <span className="font-medium text-amber-700">{label}</span>;
+              return (
+                <span className="font-medium text-amber-700" title={label}>
+                  {label}
+                </span>
+              );
             }
-            return label;
+            return <span title={label}>{label}</span>;
           },
         },
         {
           key: "proposal_sent_at",
-          label: "Dias aguardando",
+          label: "Dias",
+          className: "hidden lg:table-cell",
           render: (r) => {
             if (!isPendingClientProposal(r) || !r.proposal_sent_at) return "—";
             const days = daysWaitingProposal(r.proposal_sent_at);
             const overdue = isProposalFollowUpOverdue(r.proposal_sent_at, r.proposal_response ?? "pending");
             return (
               <span className={overdue ? "font-medium text-amber-700" : undefined}>
-                {days != null ? `${days} dia(s)` : "—"}
-                {overdue ? " (+48h)" : ""}
+                {days != null ? `${days}d` : "—"}
+                {overdue ? " +48h" : ""}
               </span>
             );
           },

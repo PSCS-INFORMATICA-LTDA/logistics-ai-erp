@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AssignDriverModal } from "@/components/operacional/AssignDriverModal";
 import { glassAction } from "@/lib/liquid-glass-styles";
 import { cn } from "@/lib/utils";
-import { companyLedgerDriverExpenseHref, needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
+import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
 import {
   canAssignDriverToServiceOrder,
   canViewDriverVoucher,
@@ -163,14 +163,6 @@ export function ServiceOrderRowActions({
   const completed = isServiceOrderCompleted(row);
   const showDriverVoucher = canViewDriverVoucher(row) || completed;
   const manualCompanyDriverExpense = needsManualCompanyDriverExpense(row);
-  const manualLedgerHref = companyLedgerDriverExpenseHref({
-    orderId: row.id,
-    code: row.code,
-    legacyNumber: row.legacy_number,
-    serviceDate: row.service_date,
-    driverName: row.driver_name,
-    account: "motorista",
-  });
 
   const requireProposalToken = (): string | null => {
     const token = row.proposal_token?.trim();
@@ -408,154 +400,160 @@ export function ServiceOrderRowActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="os-row-actions flex flex-wrap items-center gap-1">
         <Link
-        href={`/operacional/ordens-servico/${row.id}/proposta`}
-        target="_blank"
-        rel="noreferrer"
-        className={glassAction("sky")}
-      >
-        PDF / {completed ? "OS concluída" : "Proposta"}
-      </Link>
-      {showDriverVoucher && (
-        <Link
-          href={`/operacional/ordens-servico/${row.id}/voucher-motorista`}
+          href={`/operacional/ordens-servico/${row.id}/proposta`}
           target="_blank"
           rel="noreferrer"
-          title="Voucher operacional para enviar ao motorista"
-          className={glassAction("emerald")}
+          title={completed ? "PDF da OS concluída" : "PDF / Proposta"}
+          className={glassAction("sky", true)}
         >
-          Voucher motorista
+          PDF
         </Link>
-      )}
-      {completed && !manualCompanyDriverExpense ? (
-        <Link href="/dre/despesas-motorista" className={glassAction("brand")}>
-          Pagamento DRE
-        </Link>
-      ) : null}
-      {manualCompanyDriverExpense && (completed || canCompleteFreight) ? (
-        <Link
-          href={manualLedgerHref}
-          className={glassAction("amber")}
-          title="OS sem valor na designação — lançar despesa Motorista/Ajudante no DRE da empresa"
-        >
-          Lançar no DRE empresa
-        </Link>
-      ) : null}
-      {canAssignDriver && (
-        <button
-          type="button"
-          title={
-            driverRejected
-              ? "Designar outro motorista (anterior recusou)"
-              : "Designar motorista disponível"
-          }
-          onClick={() => setAssignOpen(true)}
-          className={glassAction(driverRejected ? "red" : "brand")}
-        >
-          {driverRejected ? "Designar outro motorista" : "Designar motorista"}
-        </button>
-      )}
-      {canDriverPhoneResponse && (
-        <>
-          <button
-            type="button"
-            disabled={cancellingAssignment || driverAccepting || driverRejecting || accepting || rejecting}
-            title="Cancelar designação pendente (ex.: fechou o WhatsApp sem enviar)"
-            onClick={() => void handleCancelDriverAssignment()}
-            className={glassAction("neutral")}
-          >
-            {cancellingAssignment ? "Cancelando…" : "Cancelar designação"}
-          </button>
-          <button
-            type="button"
-            disabled={driverAccepting || driverRejecting || accepting || rejecting}
-            title="Registrar aceite do motorista (telefone)"
-            aria-label={`Motorista aceitou por telefone — OS ${row.code}`}
-            onClick={() => void handleDriverPhoneResponse("accept")}
+        {showDriverVoucher && (
+          <Link
+            href={`/operacional/ordens-servico/${row.id}/voucher-motorista`}
+            target="_blank"
+            rel="noreferrer"
+            title="Voucher operacional para enviar ao motorista"
             className={glassAction("emerald", true)}
           >
-            <PhoneAcceptIcon />
-          </button>
+            Voucher
+          </Link>
+        )}
+        {completed && !manualCompanyDriverExpense ? (
+          <Link
+            href="/dre/despesas-motorista"
+            title="Pagamento motorista/ajudante no DRE"
+            className={glassAction("brand", true)}
+          >
+            DRE
+          </Link>
+        ) : null}
+        {manualCompanyDriverExpense && (completed || canCompleteFreight) ? (
+          <Link
+            href="/dre/despesas-motorista"
+            className={glassAction("amber", true)}
+            title="OS legado — lançar Valor motorista/ajudante na linha em Despesas Motorista"
+          >
+            DRE legado
+          </Link>
+        ) : null}
+        {canAssignDriver && (
           <button
             type="button"
-            disabled={driverAccepting || driverRejecting || accepting || rejecting}
-            title="Registrar recusa do motorista (telefone)"
-            aria-label={`Motorista recusou por telefone — OS ${row.code}`}
-            onClick={() => void handleDriverPhoneResponse("reject")}
-            className={glassAction("orange", true)}
+            title={
+              driverRejected
+                ? "Designar outro motorista (anterior recusou)"
+                : "Designar motorista disponível"
+            }
+            onClick={() => setAssignOpen(true)}
+            className={glassAction(driverRejected ? "red" : "brand", true)}
           >
-            <PhoneRejectIcon />
+            {driverRejected ? "Outro motorista" : "Designar"}
           </button>
-        </>
-      )}
-      {canOperationalFollowUp && (
-        <>
+        )}
+        {canDriverPhoneResponse && (
+          <>
+            <button
+              type="button"
+              disabled={cancellingAssignment || driverAccepting || driverRejecting || accepting || rejecting}
+              title="Cancelar designação pendente (ex.: fechou o WhatsApp sem enviar)"
+              onClick={() => void handleCancelDriverAssignment()}
+              className={glassAction("neutral", true)}
+            >
+              {cancellingAssignment ? "…" : "Cancelar"}
+            </button>
+            <button
+              type="button"
+              disabled={driverAccepting || driverRejecting || accepting || rejecting}
+              title="Registrar aceite do motorista (telefone)"
+              aria-label={`Motorista aceitou por telefone — OS ${row.code}`}
+              onClick={() => void handleDriverPhoneResponse("accept")}
+              className={glassAction("emerald", true)}
+            >
+              <PhoneAcceptIcon />
+            </button>
+            <button
+              type="button"
+              disabled={driverAccepting || driverRejecting || accepting || rejecting}
+              title="Registrar recusa do motorista (telefone)"
+              aria-label={`Motorista recusou por telefone — OS ${row.code}`}
+              onClick={() => void handleDriverPhoneResponse("reject")}
+              className={glassAction("orange", true)}
+            >
+              <PhoneRejectIcon />
+            </button>
+          </>
+        )}
+        {canOperationalFollowUp && (
+          <>
+            <button
+              type="button"
+              disabled={operationalLoading || completing}
+              title="Registrar acompanhamento do frete em execução"
+              onClick={() => void handleOperationalFollowUp()}
+              className={glassAction("amber", true)}
+            >
+              {operationalLoading ? "…" : "Acompanhar"}
+            </button>
+            <button
+              type="button"
+              disabled={completing || operationalLoading}
+              title="Concluir frete e liberar PDF da OS"
+              onClick={() => void handleCompleteFreight()}
+              className={glassAction("emerald", true)}
+            >
+              {completing ? "…" : "Concluir"}
+            </button>
+          </>
+        )}
+        {canPhoneResponse && (
+          <>
+            <button
+              type="button"
+              disabled={accepting || rejecting || resetting}
+              title="Registrar aceite (telefone)"
+              aria-label={`Registrar aceite por telefone — OS ${row.code}`}
+              onClick={() => void handlePhoneResponse("accept")}
+              className={glassAction("green", true)}
+            >
+              <PhoneAcceptIcon />
+            </button>
+            <button
+              type="button"
+              disabled={accepting || rejecting || resetting}
+              title="Registrar recusa (telefone)"
+              aria-label={`Registrar recusa por telefone — OS ${row.code}`}
+              onClick={() => void handlePhoneResponse("reject")}
+              className={glassAction("red-soft", true)}
+            >
+              <PhoneRejectIcon />
+            </button>
+          </>
+        )}
+        {canPhoneResponse && (
           <button
             type="button"
-            disabled={operationalLoading || completing}
-            title="Registrar acompanhamento do frete em execução"
-            onClick={() => void handleOperationalFollowUp()}
-            className={glassAction("amber")}
+            disabled={loading || resetting}
+            title="Registrar follow-up da proposta"
+            onClick={() => void handleFollowUp()}
+            className={glassAction("amber", true)}
           >
-            {operationalLoading ? "Registrando…" : "Registrar acompanhamento"}
+            Follow-up
           </button>
+        )}
+        {canResetProposal && (
           <button
             type="button"
-            disabled={completing || operationalLoading}
-            title="Concluir frete e liberar PDF da OS"
-            onClick={() => void handleCompleteFreight()}
-            className={glassAction("emerald")}
+            disabled={resetting || accepting || rejecting}
+            title="Reabrir proposta para novo aceite ou recusa"
+            onClick={() => void handleResetProposal()}
+            className={glassAction("sky", true)}
           >
-            {completing ? "Concluindo…" : "Concluir frete"}
+            Reabrir
           </button>
-        </>
-      )}
-      {canPhoneResponse && (
-        <>
-          <button
-            type="button"
-            disabled={accepting || rejecting || resetting}
-            title="Registrar aceite (telefone)"
-            aria-label={`Registrar aceite por telefone — OS ${row.code}`}
-            onClick={() => void handlePhoneResponse("accept")}
-            className={glassAction("green", true)}
-          >
-            <PhoneAcceptIcon />
-          </button>
-          <button
-            type="button"
-            disabled={accepting || rejecting || resetting}
-            title="Registrar recusa (telefone)"
-            aria-label={`Registrar recusa por telefone — OS ${row.code}`}
-            onClick={() => void handlePhoneResponse("reject")}
-            className={glassAction("red-soft", true)}
-          >
-            <PhoneRejectIcon />
-          </button>
-        </>
-      )}
-      {canPhoneResponse && (
-        <button
-          type="button"
-          disabled={loading || resetting}
-          onClick={() => void handleFollowUp()}
-          className={glassAction("amber")}
-        >
-          Registrar follow-up
-        </button>
-      )}
-      {canResetProposal && (
-        <button
-          type="button"
-          disabled={resetting || accepting || rejecting}
-          title="Reabrir proposta para novo aceite ou recusa"
-          onClick={() => void handleResetProposal()}
-          className={glassAction("sky")}
-        >
-          Reabrir proposta
-        </button>
-      )}
+        )}
       </div>
 
       <AssignDriverModal
