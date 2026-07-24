@@ -267,7 +267,7 @@ export default function DreRateioOsPage() {
           <div className={`space-y-2 p-4 ${glassFilterPanel()}`}>
             <h3 className="text-sm font-semibold text-slate-900">Totais por sócio</h3>
             <DataTableScroll stickyFirst maxHeight="min(40vh, 22rem)">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-slate-600">
                     <th className="px-2 py-1.5 font-medium">Sócio</th>
@@ -307,14 +307,15 @@ export default function DreRateioOsPage() {
               fitWidth
               hint={
                 <>
-                  Em 100% a tabela cabe na tela (cliente abreviado — passe o mouse para ver o nome
-                  completo). OS com <strong>mais de um sócio</strong> ficam dentro do mesmo
-                  retângulo. Cabeçalho e coluna OS ficam fixos ao rolar para baixo.
+                  No computador a tabela cabe em 100% (cliente abreviado — passe o mouse para o nome
+                  completo). No celular, role na horizontal para ler todas as colunas; a coluna{" "}
+                  <strong>OS</strong> fica fixa. OS com <strong>mais de um sócio</strong> ficam no
+                  mesmo retângulo.
                 </>
               }
             >
               <table className="w-full text-[11px] leading-snug sm:text-xs">
-                <colgroup>
+                <colgroup className="hidden sm:table-column-group">
                   <col className="w-[7%]" />
                   <col className="w-[6%]" />
                   <col className="w-[7%]" />
@@ -371,7 +372,10 @@ export default function DreRateioOsPage() {
                             <>
                               <div className="truncate tabular-nums">{row.order.code || "—"}</div>
                               {row.order.warnings.length ? (
-                                <p className="mt-0.5 text-[10px] leading-snug text-amber-700">
+                                <p
+                                  className="data-row-warn mt-0.5 text-[10px] leading-snug text-amber-700"
+                                  title={row.order.warnings.join(" ")}
+                                >
                                   {row.order.warnings.join(" ")}
                                 </p>
                               ) : null}
