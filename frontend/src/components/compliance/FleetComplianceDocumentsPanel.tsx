@@ -307,140 +307,235 @@ export function FleetComplianceDocumentsPanel({
       ) : null}
 
       <div className={glassFilterPanel()}>
-        <DataTableScroll stickyFirst stickyLast compact>
-          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-          <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
-            <tr>
-              <th className="px-1.5 py-2">Placa</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">Marca / modelo</th>
-              <th className="px-1.5 py-2">Tipo de documento</th>
-              <th className="hidden px-1.5 py-2 lg:table-cell">Nº</th>
-              <th className="hidden px-1.5 py-2 lg:table-cell">Data de vencimento</th>
-              <th className="px-1.5 py-2">Situação</th>
-              <th className="hidden px-1.5 py-2 xl:table-cell" title="Anexo da digitalização (por linha)">
-                Anexo
-              </th>
-              <th className="px-1.5 py-2" />
-            </tr>
-          </thead>
-          {docGroups.length === 0 ? (
-            <tbody>
-              <tr>
-                <td colSpan={8} className="px-2 py-4 text-slate-500">
-                  Nenhum documento ainda. Clique em &quot;Novo documento por placa&quot;,
-                  selecione a placa (marca / modelo) e anexe a digitalização no formulário.
-                  O ícone de clipe aparece na coluna Anexo depois que o documento for salvo.
-                </td>
-              </tr>
-            </tbody>
-          ) : (
-            <GroupedTableBodies groups={docGroups} colSpan={8}>
-              {(group) =>
-                group.rows.map((doc, index) => {
-                  const view = resolveComplianceSituation(doc, doc.document_type);
-                  const veh = vehicleById.get(doc.owner_id);
-                  return (
-                    <tr
-                      key={doc.id}
-                      className={group.multi ? "align-top" : "border-t border-slate-100"}
-                    >
-                      <td className="whitespace-nowrap px-1.5 py-2 font-medium">
-                        {index === 0 ? (
-                          veh?.plate || "—"
-                        ) : group.multi ? (
-                          <span className="text-slate-300" aria-hidden>
-                            ↳
-                          </span>
-                        ) : (
-                          veh?.plate || "—"
-                        )}
-                      </td>
-                      <td className="hidden px-1.5 py-2 text-slate-700 md:table-cell">
-                        {index === 0 || !group.multi ? veh?.brandModel || "—" : ""}
-                      </td>
-                      <td
-                        className="max-w-[7rem] truncate px-1.5 py-2 sm:max-w-[10rem]"
-                        title={documentDisplayName(doc.document_type)}
-                      >
-                        {documentDisplayName(doc.document_type)}
-                      </td>
-                      <td className="hidden px-1.5 py-2 lg:table-cell">{doc.document_number || "—"}</td>
-                      <td className="hidden whitespace-nowrap px-1.5 py-2 lg:table-cell">
-                        {doc.no_expiry
-                          ? "Sem vencimento"
-                          : formatExpiryDateBR(doc.expires_at)}
-                      </td>
-                      <td className="px-1.5 py-2">
-                        <Badge variant={view.badge}>{view.label}</Badge>
-                      </td>
-                      <td className="hidden px-1.5 py-2 xl:table-cell">
-                        <ComplianceDocumentClip
-                          companyId={companyId}
-                          documentId={doc.id}
-                          canUpload={canEdit}
-                          refreshKey={clipRefresh}
-                          onUploaded={() => setClipRefresh((k) => k + 1)}
-                        />
-                      </td>
-                      <td className="px-1.5 py-2">
-                        {canEdit ? (
-                          <div className="os-row-actions flex flex-wrap gap-1">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="action-icon-btn"
-                              title="Editar"
-                              onClick={() =>
-                                setEditor({
-                                  mode: "edit",
-                                  doc,
-                                  vehicleId: doc.owner_id,
-                                })
-                              }
-                            >
-                              <span className="sm:hidden">Edit</span>
-                              <span className="hidden sm:inline">Editar</span>
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="action-icon-btn"
-                              title="Renovar"
-                              onClick={() =>
-                                setEditor({
-                                  mode: "renew",
-                                  doc,
-                                  vehicleId: doc.owner_id,
-                                })
-                              }
-                            >
-                              <span className="sm:hidden">Ren.</span>
-                              <span className="hidden sm:inline">Renovar</span>
-                            </Button>
-                          </div>
+        {filtered.length === 0 ? (
+          <p className="py-4 text-sm text-slate-500">
+            Nenhum documento ainda. Clique em &quot;Novo documento por placa&quot;,
+            selecione a placa (marca / modelo) e anexe a digitalização no formulário.
+            O ícone de clipe aparece na coluna Anexo depois que o documento for salvo.
+          </p>
+        ) : (
+          <>
+            {/* Mobile: cartão legível por documento. */}
+            <ul className="space-y-3 md:hidden">
+              {filtered.map((doc) => {
+                const view = resolveComplianceSituation(doc, doc.document_type);
+                const veh = vehicleById.get(doc.owner_id);
+                return (
+                  <li
+                    key={doc.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {veh?.plate || "—"}
+                        </p>
+                        {veh?.brandModel ? (
+                          <p className="text-sm text-slate-600">{veh.brandModel}</p>
                         ) : null}
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="action-icon-btn"
-                          title="Histórico"
-                          onClick={() => void openHistory(doc)}
-                        >
-                          <span className="sm:hidden">Hist.</span>
-                          <span className="hidden sm:inline">Histórico</span>
-                        </Button>
-                      </td>
+                        <p className="mt-1 text-base font-semibold leading-snug break-words text-slate-900">
+                          {documentDisplayName(doc.document_type)}
+                        </p>
+                      </div>
+                      <Badge variant={view.badge}>{view.label}</Badge>
+                    </div>
+
+                    <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Nº</dt>
+                        <dd className="break-words text-slate-800">{doc.document_number || "—"}</dd>
+                      </div>
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Vencimento</dt>
+                        <dd className="text-slate-800">
+                          {doc.no_expiry ? "Sem vencimento" : formatExpiryDateBR(doc.expires_at)}
+                        </dd>
+                      </div>
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Anexo</dt>
+                        <dd>
+                          <ComplianceDocumentClip
+                            companyId={companyId}
+                            documentId={doc.id}
+                            canUpload={canEdit}
+                            refreshKey={clipRefresh}
+                            onUploaded={() => setClipRefresh((k) => k + 1)}
+                          />
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                      {canEdit ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() =>
+                              setEditor({
+                                mode: "edit",
+                                doc,
+                                vehicleId: doc.owner_id,
+                              })
+                            }
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() =>
+                              setEditor({
+                                mode: "renew",
+                                doc,
+                                vehicleId: doc.owner_id,
+                              })
+                            }
+                          >
+                            Renovar
+                          </Button>
+                        </>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className={canEdit ? "flex-1" : "w-full"}
+                        onClick={() => void openHistory(doc)}
+                      >
+                        Histórico
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: tabela agrupada por placa. */}
+            <div className="hidden md:block">
+              <DataTableScroll stickyFirst stickyLast>
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2.5">Placa</th>
+                      <th className="px-3 py-2.5">Marca / modelo</th>
+                      <th className="px-3 py-2.5">Tipo de documento</th>
+                      <th className="px-3 py-2.5">Nº</th>
+                      <th className="px-3 py-2.5">Data de vencimento</th>
+                      <th className="px-3 py-2.5">Situação</th>
+                      <th className="px-3 py-2.5" title="Anexo da digitalização (por linha)">
+                        Anexo
+                      </th>
+                      <th className="px-3 py-2.5" />
                     </tr>
-                  );
-                })
-              }
-            </GroupedTableBodies>
-          )}
-        </table>
-        </DataTableScroll>
+                  </thead>
+                  <GroupedTableBodies groups={docGroups} colSpan={8}>
+                    {(group) =>
+                      group.rows.map((doc, index) => {
+                        const view = resolveComplianceSituation(doc, doc.document_type);
+                        const veh = vehicleById.get(doc.owner_id);
+                        return (
+                          <tr
+                            key={doc.id}
+                            className={group.multi ? "align-top" : "border-t border-slate-100"}
+                          >
+                            <td className="whitespace-nowrap px-3 py-3 font-medium">
+                              {index === 0 ? (
+                                veh?.plate || "—"
+                              ) : group.multi ? (
+                                <span className="text-slate-300" aria-hidden>
+                                  ↳
+                                </span>
+                              ) : (
+                                veh?.plate || "—"
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-slate-700">
+                              {index === 0 || !group.multi ? veh?.brandModel || "—" : ""}
+                            </td>
+                            <td className="px-3 py-3">
+                              {documentDisplayName(doc.document_type)}
+                            </td>
+                            <td className="px-3 py-3">{doc.document_number || "—"}</td>
+                            <td className="whitespace-nowrap px-3 py-3">
+                              {doc.no_expiry
+                                ? "Sem vencimento"
+                                : formatExpiryDateBR(doc.expires_at)}
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variant={view.badge}>{view.label}</Badge>
+                            </td>
+                            <td className="px-3 py-3">
+                              <ComplianceDocumentClip
+                                companyId={companyId}
+                                documentId={doc.id}
+                                canUpload={canEdit}
+                                refreshKey={clipRefresh}
+                                onUploaded={() => setClipRefresh((k) => k + 1)}
+                              />
+                            </td>
+                            <td className="px-3 py-3">
+                              {canEdit ? (
+                                <div className="os-row-actions flex flex-wrap gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="action-icon-btn"
+                                    title="Editar"
+                                    onClick={() =>
+                                      setEditor({
+                                        mode: "edit",
+                                        doc,
+                                        vehicleId: doc.owner_id,
+                                      })
+                                    }
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="action-icon-btn"
+                                    title="Renovar"
+                                    onClick={() =>
+                                      setEditor({
+                                        mode: "renew",
+                                        doc,
+                                        vehicleId: doc.owner_id,
+                                      })
+                                    }
+                                  >
+                                    Renovar
+                                  </Button>
+                                </div>
+                              ) : null}
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Histórico"
+                                onClick={() => void openHistory(doc)}
+                              >
+                                Histórico
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    }
+                  </GroupedTableBodies>
+                </table>
+              </DataTableScroll>
+            </div>
+          </>
+        )}
       </div>
 
       <ComplianceDocumentHistory

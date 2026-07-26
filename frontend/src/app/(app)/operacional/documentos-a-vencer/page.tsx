@@ -232,87 +232,142 @@ export default function DocumentosAVencerOperacionalPage() {
 
           <section className={glassFilterPanel()}>
             <h2 className="mb-2 text-sm font-semibold">Documentos em atenção</h2>
-            <DataTableScroll stickyFirst compact>
-              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
-                <tr>
-                  <th className="px-1.5 py-2">Placa / Escopo</th>
-                  <th className="hidden px-1.5 py-2 md:table-cell">Marca / modelo</th>
-                  <th className="px-1.5 py-2">Documento</th>
-                  <th className="hidden px-1.5 py-2 lg:table-cell">Nº</th>
-                  <th className="hidden px-1.5 py-2 xl:table-cell">Validade</th>
-                  <th className="px-1.5 py-2">Situação</th>
-                </tr>
-              </thead>
-              {docGroups.length === 0 ? (
-                <tbody>
-                  <tr>
-                    <td colSpan={6} className="px-2 py-4 text-slate-500">
-                      Nenhum documento vencido ou a vencer neste filtro.
-                    </td>
-                  </tr>
-                </tbody>
-              ) : (
-                <GroupedTableBodies groups={docGroups} colSpan={6}>
-                  {(group) =>
-                    group.rows.map((doc, index) => {
-                      const view = resolveComplianceSituation(doc, doc.document_type);
-                      const veh =
-                        doc.owner_type === "vehicle" ? vehicles.get(doc.owner_id) : null;
-                      const plate =
-                        doc.owner_type === "vehicle" ? veh?.plate || "Veículo" : "Empresa";
-                      const brandModel =
-                        doc.owner_type === "vehicle" ? veh?.brandModel || "—" : "—";
-                      return (
-                        <tr
-                          key={doc.id}
-                          className={group.multi ? "align-top" : "border-t border-slate-100"}
-                        >
-                          <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">
-                            {index === 0 ? (
-                              plate
-                            ) : group.multi ? (
-                              <span className="text-slate-300" aria-hidden>
-                                ↳
-                              </span>
-                            ) : (
-                              plate
-                            )}
-                          </td>
-                          <td className="hidden px-1.5 py-1.5 text-slate-700 md:table-cell">
-                            {index === 0 || !group.multi ? brandModel : ""}
-                          </td>
-                          <td
-                            className="max-w-[7rem] truncate px-1.5 py-1.5 sm:max-w-[10rem]"
-                            title={documentDisplayName(doc.document_type)}
-                          >
-                            {documentDisplayName(doc.document_type)}
-                          </td>
-                          <td className="hidden px-1.5 py-1.5 lg:table-cell">
-                            {doc.document_number || "—"}
-                          </td>
-                          <td className="hidden whitespace-nowrap px-1.5 py-1.5 xl:table-cell">
-                            {doc.no_expiry
-                              ? "Sem vencimento"
-                              : formatExpiryDateBR(doc.expires_at) || "—"}
-                            {view.daysLeft != null ? ` (${view.daysLeft}d)` : ""}
-                            {view.renewalNote || view.situation === "suspended" ? (
-                              <span className="block text-[11px] text-slate-500">
-                                Validade original mantida
-                              </span>
+            {filtered.length === 0 ? (
+              <p className="py-4 text-sm text-slate-500">
+                Nenhum documento vencido ou a vencer neste filtro.
+              </p>
+            ) : (
+              <>
+                {/* Mobile: cartão legível por documento. */}
+                <ul className="space-y-3 md:hidden">
+                  {filtered.map((doc) => {
+                    const view = resolveComplianceSituation(doc, doc.document_type);
+                    const veh =
+                      doc.owner_type === "vehicle" ? vehicles.get(doc.owner_id) : null;
+                    const plate =
+                      doc.owner_type === "vehicle" ? veh?.plate || "Veículo" : "Empresa";
+                    const brandModel =
+                      doc.owner_type === "vehicle" ? veh?.brandModel || "—" : "—";
+                    return (
+                      <li
+                        key={doc.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex flex-col gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              {plate}
+                            </p>
+                            {brandModel !== "—" ? (
+                              <p className="text-sm text-slate-600">{brandModel}</p>
                             ) : null}
-                          </td>
-                          <td className="px-1.5 py-1.5">
+                            <p className="mt-1 text-base font-semibold leading-snug break-words text-slate-900">
+                              {documentDisplayName(doc.document_type)}
+                            </p>
+                          </div>
+                          <div className="w-fit max-w-full">
                             <Badge variant={view.badge}>{view.label}</Badge>
-                          </td>
+                          </div>
+                        </div>
+
+                        <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                          <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                            <dt className="text-xs font-medium text-slate-500">Nº</dt>
+                            <dd className="break-words text-slate-800">
+                              {doc.document_number || "—"}
+                            </dd>
+                          </div>
+                          <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                            <dt className="text-xs font-medium text-slate-500">Validade</dt>
+                            <dd className="text-slate-800">
+                              {doc.no_expiry
+                                ? "Sem vencimento"
+                                : formatExpiryDateBR(doc.expires_at) || "—"}
+                              {view.daysLeft != null ? ` (${view.daysLeft}d)` : ""}
+                              {view.renewalNote || view.situation === "suspended" ? (
+                                <span className="block text-xs text-slate-500">
+                                  Validade original mantida
+                                </span>
+                              ) : null}
+                            </dd>
+                          </div>
+                        </dl>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {/* Desktop: tabela agrupada por placa. */}
+                <div className="hidden md:block">
+                  <DataTableScroll stickyFirst>
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2.5">Placa / Escopo</th>
+                          <th className="px-3 py-2.5">Marca / modelo</th>
+                          <th className="px-3 py-2.5">Documento</th>
+                          <th className="px-3 py-2.5">Nº</th>
+                          <th className="px-3 py-2.5">Validade</th>
+                          <th className="px-3 py-2.5">Situação</th>
                         </tr>
-                      );
-                    })
-                  }
-                </GroupedTableBodies>
-              )}
-            </table>
-            </DataTableScroll>
+                      </thead>
+                      <GroupedTableBodies groups={docGroups} colSpan={6}>
+                        {(group) =>
+                          group.rows.map((doc, index) => {
+                            const view = resolveComplianceSituation(doc, doc.document_type);
+                            const veh =
+                              doc.owner_type === "vehicle" ? vehicles.get(doc.owner_id) : null;
+                            const plate =
+                              doc.owner_type === "vehicle" ? veh?.plate || "Veículo" : "Empresa";
+                            const brandModel =
+                              doc.owner_type === "vehicle" ? veh?.brandModel || "—" : "—";
+                            return (
+                              <tr
+                                key={doc.id}
+                                className={group.multi ? "align-top" : "border-t border-slate-100"}
+                              >
+                                <td className="whitespace-nowrap px-3 py-3 font-medium">
+                                  {index === 0 ? (
+                                    plate
+                                  ) : group.multi ? (
+                                    <span className="text-slate-300" aria-hidden>
+                                      ↳
+                                    </span>
+                                  ) : (
+                                    plate
+                                  )}
+                                </td>
+                                <td className="px-3 py-3 text-slate-700">
+                                  {index === 0 || !group.multi ? brandModel : ""}
+                                </td>
+                                <td className="px-3 py-3">
+                                  {documentDisplayName(doc.document_type)}
+                                </td>
+                                <td className="px-3 py-3">{doc.document_number || "—"}</td>
+                                <td className="whitespace-nowrap px-3 py-3">
+                                  {doc.no_expiry
+                                    ? "Sem vencimento"
+                                    : formatExpiryDateBR(doc.expires_at) || "—"}
+                                  {view.daysLeft != null ? ` (${view.daysLeft}d)` : ""}
+                                  {view.renewalNote || view.situation === "suspended" ? (
+                                    <span className="block text-xs text-slate-500">
+                                      Validade original mantida
+                                    </span>
+                                  ) : null}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <Badge variant={view.badge}>{view.label}</Badge>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        }
+                      </GroupedTableBodies>
+                    </table>
+                  </DataTableScroll>
+                </div>
+              </>
+            )}
           </section>
         </>
       )}

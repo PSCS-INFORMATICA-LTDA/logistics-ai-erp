@@ -246,147 +246,279 @@ export function DriverPaymentsTable({
         <FilterTabs filter={filter} onFilterChange={onFilterChange} />
       ) : null}
 
-      <DataTableScroll stickyFirst stickyLast compact>
-        <table className="w-full text-[11px] leading-snug sm:text-xs">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-600">
-              <th className="px-1.5 py-2 font-medium">OS</th>
-              <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Status OS</th>
-              <th className="px-1.5 py-2 font-medium">Data</th>
-              <th className="truncate px-1.5 py-2 font-medium">Motorista</th>
-              <th className="px-1.5 py-2 font-medium" title="Valor motorista">
-                Mot. R$
-              </th>
-              <th className="hidden px-1.5 py-2 font-medium md:table-cell" title="Valor ajudante">
-                Aj. R$
-              </th>
-              <th className="px-1.5 py-2 font-medium">Total</th>
-              <th className="hidden px-1.5 py-2 font-medium xl:table-cell">Pix</th>
-              <th className="hidden px-1.5 py-2 font-medium xl:table-cell">Banco</th>
-              <th className="hidden px-1.5 py-2 font-medium xl:table-cell">Agência</th>
-              <th className="hidden px-1.5 py-2 font-medium xl:table-cell">Conta</th>
-              <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Comp.</th>
-              <th className="px-1.5 py-2 font-medium">Status</th>
-              <th className="px-1.5 py-2 font-medium">Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => {
-              const paid = Boolean(row.driver_payment_paid_at);
-              const canMarkPaid =
-              canEdit && !paid && (row.driver_assignment_pay_amount ?? 0) > 0;
+      {/* Mobile: cartão legível por pagamento. */}
+      <ul className="space-y-3 md:hidden">
+        {visibleRows.map((row) => {
+          const paid = Boolean(row.driver_payment_paid_at);
+          const canMarkPaid =
+            canEdit && !paid && (row.driver_assignment_pay_amount ?? 0) > 0;
 
-              return (
-                <tr key={row.id} className="border-b border-slate-100">
-                  <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
-                    {row.code}
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 lg:table-cell">
-                    {row.status === "Concluido" ? (
-                      <span className="font-medium text-green-700">Concluído</span>
-                    ) : (
-                      <span className="text-slate-600">Confirmado</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-1.5 py-1.5">{formatDate(row.service_date)}</td>
-                  <td
-                    className="max-w-[7rem] truncate px-1.5 py-1.5"
-                    title={`${row.driver_code} — ${row.driver_name}`}
-                  >
+          return (
+            <li
+              key={row.id}
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    OS {row.code}
+                  </p>
+                  <p className="text-base font-semibold leading-snug break-words text-slate-900">
                     {row.driver_code} — {row.driver_name}
-                  </td>
-                  <td className="whitespace-nowrap px-1.5 py-1.5">
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">Data: {formatDate(row.service_date)}</p>
+                </div>
+                {paid ? <Badge variant="success">Pago</Badge> : <Badge variant="warning">Pendente</Badge>}
+              </div>
+
+              <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Status OS</dt>
+                  <dd className="text-slate-800">
+                    {row.status === "Concluido" ? "Concluído" : "Confirmado"}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Motorista R$</dt>
+                  <dd className="text-slate-800">
                     {formatDriverPayAmount(row.driver_assignment_pay_amount)}
-                  </td>
-                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Ajudante R$</dt>
+                  <dd className="text-slate-800">
                     {formatDriverPayAmount(row.driver_assignment_assistant_pay_amount)}
-                  </td>
-                  <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Total</dt>
+                  <dd className="font-semibold text-slate-900">
                     {driverPaymentTotal(row) > 0 ? formatCurrency(driverPaymentTotal(row)) : "—"}
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    <BankingCell value={row.pix_key} />
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    <BankingCell value={row.bank_code} />
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    <BankingCell value={row.bank_agency} />
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    <BankingCell value={row.bank_account} />
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 lg:table-cell">
-                    {canEdit ? (
-                    <DriverPaymentProofUpload
-                      companyId={companyId}
-                      orderId={row.id}
-                      orderCode={row.code}
-                      proofCount={row.payment_proof_count}
-                      onUploaded={() =>
-                        onRowsChange?.(
-                          rows.map((item) =>
-                            item.id === row.id
-                              ? { ...item, payment_proof_count: item.payment_proof_count + 1 }
-                              : item
-                          )
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Pix</dt>
+                  <dd className="break-words font-medium text-slate-900">
+                    {row.pix_key?.trim() || "—"}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Banco</dt>
+                  <dd className="font-medium text-slate-900">{row.bank_code?.trim() || "—"}</dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Agência</dt>
+                  <dd className="font-medium text-slate-900">{row.bank_agency?.trim() || "—"}</dd>
+                </div>
+                <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                  <dt className="text-xs font-medium text-slate-500">Conta</dt>
+                  <dd className="font-medium text-slate-900">{row.bank_account?.trim() || "—"}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                {canEdit ? (
+                  <DriverPaymentProofUpload
+                    companyId={companyId}
+                    orderId={row.id}
+                    orderCode={row.code}
+                    proofCount={row.payment_proof_count}
+                    onUploaded={() =>
+                      onRowsChange?.(
+                        rows.map((item) =>
+                          item.id === row.id
+                            ? { ...item, payment_proof_count: item.payment_proof_count + 1 }
+                            : item
                         )
-                      }
-                    />
-                    ) : (
-                      <span className="text-xs text-slate-500">
-                        {row.payment_proof_count > 0 ? `${row.payment_proof_count}` : "—"}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    {paid ? <Badge variant="success">Pago</Badge> : <Badge variant="warning">Pend.</Badge>}
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    <div className="os-row-actions">
-                    {canMarkPaid ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="!px-2 !py-0.5 text-[10px] sm:text-xs"
-                        disabled={markingId === row.id}
-                        onClick={() => void handleMarkPaid(row)}
-                      >
-                        {markingId === row.id ? "…" : "Pago"}
-                      </Button>
-                    ) : paid ? (
-                      <span className="text-[10px] text-slate-500 sm:text-xs">
-                        {row.driver_payment_paid_at
-                          ? new Date(row.driver_payment_paid_at).toLocaleDateString("pt-BR")
-                          : "—"}
-                      </span>
-                    ) : row.needs_manual_company_expense ? (
-                      <Link
-                        href={companyLedgerDriverExpenseHref({
-                          orderId: row.id,
-                          code: row.code,
-                          legacyNumber: row.legacy_number,
-                          serviceDate: row.service_date,
-                          driverName: row.driver_name,
-                          account: "motorista",
-                        })}
-                        className={glassAction("amber", true)}
-                        title="Lançar no DRE empresa"
-                      >
-                        DRE
-                      </Link>
-                    ) : (
-                      <span className="text-[10px] text-amber-700 sm:text-xs">Sem valor</span>
-                    )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </DataTableScroll>
+                      )
+                    }
+                  />
+                ) : row.payment_proof_count > 0 ? (
+                  <span className="text-xs text-slate-500">
+                    {row.payment_proof_count} comprovante(s)
+                  </span>
+                ) : null}
+                {canMarkPaid ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="flex-1"
+                    disabled={markingId === row.id}
+                    onClick={() => void handleMarkPaid(row)}
+                  >
+                    {markingId === row.id ? "Registrando…" : "Marcar pago"}
+                  </Button>
+                ) : paid ? (
+                  <span className="text-xs text-slate-500">
+                    Pago em{" "}
+                    {row.driver_payment_paid_at
+                      ? new Date(row.driver_payment_paid_at).toLocaleDateString("pt-BR")
+                      : "—"}
+                  </span>
+                ) : row.needs_manual_company_expense ? (
+                  <Link
+                    href={companyLedgerDriverExpenseHref({
+                      orderId: row.id,
+                      code: row.code,
+                      legacyNumber: row.legacy_number,
+                      serviceDate: row.service_date,
+                      driverName: row.driver_name,
+                      account: "motorista",
+                    })}
+                    className={`flex-1 text-center ${glassAction("amber", true)}`}
+                    title="Lançar no DRE empresa"
+                  >
+                    Lançar no DRE
+                  </Link>
+                ) : (
+                  <span className="text-xs text-amber-700">Sem valor registrado</span>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop: tabela. */}
+      <div className="hidden md:block">
+        <DataTableScroll stickyFirst stickyLast>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-600">
+                <th className="px-3 py-2.5 font-medium">OS</th>
+                <th className="px-3 py-2.5 font-medium">Status OS</th>
+                <th className="px-3 py-2.5 font-medium">Data</th>
+                <th className="px-3 py-2.5 font-medium">Motorista</th>
+                <th className="px-3 py-2.5 font-medium" title="Valor motorista">
+                  Mot. R$
+                </th>
+                <th className="px-3 py-2.5 font-medium" title="Valor ajudante">
+                  Aj. R$
+                </th>
+                <th className="px-3 py-2.5 font-medium">Total</th>
+                <th className="px-3 py-2.5 font-medium">Pix</th>
+                <th className="px-3 py-2.5 font-medium">Banco</th>
+                <th className="px-3 py-2.5 font-medium">Agência</th>
+                <th className="px-3 py-2.5 font-medium">Conta</th>
+                <th className="px-3 py-2.5 font-medium">Comp.</th>
+                <th className="px-3 py-2.5 font-medium">Status</th>
+                <th className="px-3 py-2.5 font-medium">Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => {
+                const paid = Boolean(row.driver_payment_paid_at);
+                const canMarkPaid =
+                  canEdit && !paid && (row.driver_assignment_pay_amount ?? 0) > 0;
+
+                return (
+                  <tr key={row.id} className="border-b border-slate-100">
+                    <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900">
+                      {row.code}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.status === "Concluido" ? (
+                        <span className="font-medium text-green-700">Concluído</span>
+                      ) : (
+                        <span className="text-slate-600">Confirmado</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">{formatDate(row.service_date)}</td>
+                    <td className="px-3 py-3">
+                      {row.driver_code} — {row.driver_name}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {formatDriverPayAmount(row.driver_assignment_pay_amount)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {formatDriverPayAmount(row.driver_assignment_assistant_pay_amount)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 font-medium">
+                      {driverPaymentTotal(row) > 0 ? formatCurrency(driverPaymentTotal(row)) : "—"}
+                    </td>
+                    <td className="px-3 py-3">
+                      <BankingCell value={row.pix_key} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <BankingCell value={row.bank_code} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <BankingCell value={row.bank_agency} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <BankingCell value={row.bank_account} />
+                    </td>
+                    <td className="px-3 py-3">
+                      {canEdit ? (
+                        <DriverPaymentProofUpload
+                          companyId={companyId}
+                          orderId={row.id}
+                          orderCode={row.code}
+                          proofCount={row.payment_proof_count}
+                          onUploaded={() =>
+                            onRowsChange?.(
+                              rows.map((item) =>
+                                item.id === row.id
+                                  ? { ...item, payment_proof_count: item.payment_proof_count + 1 }
+                                  : item
+                              )
+                            )
+                          }
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-500">
+                          {row.payment_proof_count > 0 ? `${row.payment_proof_count}` : "—"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {paid ? <Badge variant="success">Pago</Badge> : <Badge variant="warning">Pendente</Badge>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="os-row-actions">
+                        {canMarkPaid ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={markingId === row.id}
+                            onClick={() => void handleMarkPaid(row)}
+                          >
+                            {markingId === row.id ? "Registrando…" : "Marcar pago"}
+                          </Button>
+                        ) : paid ? (
+                          <span className="text-xs text-slate-500">
+                            {row.driver_payment_paid_at
+                              ? new Date(row.driver_payment_paid_at).toLocaleDateString("pt-BR")
+                              : "—"}
+                          </span>
+                        ) : row.needs_manual_company_expense ? (
+                          <Link
+                            href={companyLedgerDriverExpenseHref({
+                              orderId: row.id,
+                              code: row.code,
+                              legacyNumber: row.legacy_number,
+                              serviceDate: row.service_date,
+                              driverName: row.driver_name,
+                              account: "motorista",
+                            })}
+                            className={glassAction("amber", true)}
+                            title="Lançar no DRE empresa"
+                          >
+                            DRE
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-amber-700">Sem valor</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </DataTableScroll>
+      </div>
     </div>
   );
 }

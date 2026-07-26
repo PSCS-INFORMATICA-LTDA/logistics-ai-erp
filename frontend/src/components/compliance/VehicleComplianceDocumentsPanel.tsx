@@ -218,103 +218,194 @@ export function VehicleComplianceDocumentsPanel({
         {vehicleDocs.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum documento cadastrado neste veículo.</p>
           ) : (
-            <DataTableScroll stickyFirst stickyLast compact>
-              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
-                <tr>
-                  <th className="px-1.5 py-2">Documento</th>
-                  <th className="hidden px-1.5 py-2 md:table-cell">Nº</th>
-                  <th className="hidden px-1.5 py-2 lg:table-cell">Data de vencimento</th>
-                  <th className="px-1.5 py-2">Situação</th>
-                  <th className="hidden px-1.5 py-2 xl:table-cell" title="Digitalização">
-                    Clipe
-                  </th>
-                  <th className="px-1.5 py-2" />
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Mobile: cartão legível por documento. */}
+              <ul className="space-y-3 md:hidden">
                 {vehicleDocs.map((doc) => {
                   const view = resolveComplianceSituation(doc, doc.document_type);
                   return (
-                    <tr key={doc.id} className="border-t border-slate-100 align-top">
-                      <td className="px-1.5 py-2">
-                        <p className="max-w-[8rem] truncate font-medium text-slate-900 sm:max-w-none">
-                          {documentDisplayName(doc.document_type)}
-                        </p>
-                        <p className="hidden truncate text-[10px] text-slate-500 sm:block sm:text-xs">
-                          {doc.issuing_body || doc.document_type?.issuing_body || "—"}
-                        </p>
-                      </td>
-                      <td className="hidden px-1.5 py-2 md:table-cell">{doc.document_number || "—"}</td>
-                      <td className="hidden whitespace-nowrap px-1.5 py-2 lg:table-cell">
-                        {doc.no_expiry
-                          ? "Sem vencimento"
-                          : formatExpiryDateBR(doc.expires_at)}
-                        {view.daysLeft != null ? (
-                          <span className="block text-[10px] text-slate-500 sm:text-xs">
-                            {view.daysLeft} dia(s)
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-1.5 py-2">
-                        <Badge variant={view.badge}>{view.label}</Badge>
-                      </td>
-                      <td className="hidden px-1.5 py-2 xl:table-cell">
-                        <ComplianceDocumentClip
-                          companyId={companyId}
-                          documentId={doc.id}
-                          canUpload={canEdit}
-                          refreshKey={clipRefresh}
-                          onUploaded={() => setClipRefresh((k) => k + 1)}
-                        />
-                      </td>
-                      <td className="px-1.5 py-2">
-                        <div className="os-row-actions flex flex-wrap gap-1">
-                          {canEdit ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                className="action-icon-btn"
-                                title="Editar"
-                                onClick={() => setEditor({ mode: "edit", doc })}
-                              >
-                                <span className="sm:hidden">Edit</span>
-                                <span className="hidden sm:inline">Editar</span>
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                className="action-icon-btn"
-                                title="Renovar"
-                                onClick={() => setEditor({ mode: "renew", doc })}
-                              >
-                                <span className="sm:hidden">Ren.</span>
-                                <span className="hidden sm:inline">Renovar</span>
-                              </Button>
-                            </>
-                          ) : null}
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="action-icon-btn"
-                            title="Histórico"
-                            onClick={() => void openHistory(doc)}
-                          >
-                            <span className="sm:hidden">Hist.</span>
-                            <span className="hidden sm:inline">Histórico</span>
-                          </Button>
+                    <li
+                      key={doc.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-base font-semibold leading-snug break-words text-slate-900">
+                            {documentDisplayName(doc.document_type)}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {doc.issuing_body || doc.document_type?.issuing_body || "—"}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
+                        <Badge variant={view.badge}>{view.label}</Badge>
+                      </div>
+
+                      <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                        <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                          <dt className="text-xs font-medium text-slate-500">Nº</dt>
+                          <dd className="break-words text-slate-800">{doc.document_number || "—"}</dd>
+                        </div>
+                        <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                          <dt className="text-xs font-medium text-slate-500">Vencimento</dt>
+                          <dd className="text-slate-800">
+                            {doc.no_expiry ? "Sem vencimento" : formatExpiryDateBR(doc.expires_at)}
+                            {view.daysLeft != null ? (
+                              <span className="block text-xs text-slate-500">
+                                {view.daysLeft} dia(s)
+                              </span>
+                            ) : null}
+                          </dd>
+                        </div>
+                        <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                          <dt className="text-xs font-medium text-slate-500">Anexo</dt>
+                          <dd>
+                            <ComplianceDocumentClip
+                              companyId={companyId}
+                              documentId={doc.id}
+                              canUpload={canEdit}
+                              refreshKey={clipRefresh}
+                              onUploaded={() => setClipRefresh((k) => k + 1)}
+                            />
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                        {canEdit ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => setEditor({ mode: "edit", doc })}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => setEditor({ mode: "renew", doc })}
+                            >
+                              Renovar
+                            </Button>
+                          </>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className={canEdit ? "flex-1" : "w-full"}
+                          onClick={() => void openHistory(doc)}
+                        >
+                          Histórico
+                        </Button>
+                      </div>
+                    </li>
                   );
                 })}
-              </tbody>
-            </table>
-            </DataTableScroll>
+              </ul>
+
+              {/* Desktop: tabela. */}
+              <div className="hidden md:block">
+                <DataTableScroll stickyFirst stickyLast>
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2.5">Documento</th>
+                        <th className="px-3 py-2.5">Nº</th>
+                        <th className="px-3 py-2.5">Data de vencimento</th>
+                        <th className="px-3 py-2.5">Situação</th>
+                        <th className="px-3 py-2.5" title="Digitalização">
+                          Clipe
+                        </th>
+                        <th className="px-3 py-2.5" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleDocs.map((doc) => {
+                        const view = resolveComplianceSituation(doc, doc.document_type);
+                        return (
+                          <tr key={doc.id} className="border-t border-slate-100 align-top">
+                            <td className="px-3 py-3">
+                              <p className="font-medium text-slate-900">
+                                {documentDisplayName(doc.document_type)}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {doc.issuing_body || doc.document_type?.issuing_body || "—"}
+                              </p>
+                            </td>
+                            <td className="px-3 py-3">{doc.document_number || "—"}</td>
+                            <td className="whitespace-nowrap px-3 py-3">
+                              {doc.no_expiry
+                                ? "Sem vencimento"
+                                : formatExpiryDateBR(doc.expires_at)}
+                              {view.daysLeft != null ? (
+                                <span className="block text-xs text-slate-500">
+                                  {view.daysLeft} dia(s)
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variant={view.badge}>{view.label}</Badge>
+                            </td>
+                            <td className="px-3 py-3">
+                              <ComplianceDocumentClip
+                                companyId={companyId}
+                                documentId={doc.id}
+                                canUpload={canEdit}
+                                refreshKey={clipRefresh}
+                                onUploaded={() => setClipRefresh((k) => k + 1)}
+                              />
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="os-row-actions flex flex-wrap gap-1">
+                                {canEdit ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      className="action-icon-btn"
+                                      title="Editar"
+                                      onClick={() => setEditor({ mode: "edit", doc })}
+                                    >
+                                      Editar
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      className="action-icon-btn"
+                                      title="Renovar"
+                                      onClick={() => setEditor({ mode: "renew", doc })}
+                                    >
+                                      Renovar
+                                    </Button>
+                                  </>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="action-icon-btn"
+                                  title="Histórico"
+                                  onClick={() => void openHistory(doc)}
+                                >
+                                  Histórico
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </DataTableScroll>
+              </div>
+            </>
           )}
       </section>
 
@@ -338,37 +429,71 @@ export function VehicleComplianceDocumentsPanel({
         {companyDocs.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhum documento da empresa cadastrado.</p>
         ) : (
-          <DataTableScroll stickyFirst compact>
-            <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
-                <tr>
-                  <th className="px-1.5 py-2">Documento</th>
-                  <th className="hidden px-1.5 py-2 md:table-cell">Data de vencimento</th>
-                  <th className="px-1.5 py-2">Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {companyDocs.map((doc) => {
-                  const view = resolveComplianceSituation(doc, doc.document_type);
-                  return (
-                    <tr key={doc.id} className="border-t border-slate-100">
-                      <td className="max-w-[8rem] truncate px-1.5 py-2 font-medium sm:max-w-none">
+          <>
+            {/* Mobile: cartão legível por documento. */}
+            <ul className="space-y-3 md:hidden">
+              {companyDocs.map((doc) => {
+                const view = resolveComplianceSituation(doc, doc.document_type);
+                return (
+                  <li
+                    key={doc.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 flex-1 text-base font-semibold leading-snug break-words text-slate-900">
                         {documentDisplayName(doc.document_type)}
-                      </td>
-                      <td className="hidden whitespace-nowrap px-1.5 py-2 md:table-cell">
-                        {doc.no_expiry
-                          ? "Sem vencimento"
-                          : formatExpiryDateBR(doc.expires_at)}
-                      </td>
-                      <td className="px-1.5 py-2">
-                        <Badge variant={view.badge}>{view.label}</Badge>
-                      </td>
+                      </p>
+                      <Badge variant={view.badge}>{view.label}</Badge>
+                    </div>
+
+                    <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Vencimento</dt>
+                        <dd className="text-slate-800">
+                          {doc.no_expiry ? "Sem vencimento" : formatExpiryDateBR(doc.expires_at)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: tabela. */}
+            <div className="hidden md:block">
+              <DataTableScroll stickyFirst>
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2.5">Documento</th>
+                      <th className="px-3 py-2.5">Data de vencimento</th>
+                      <th className="px-3 py-2.5">Situação</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </DataTableScroll>
+                  </thead>
+                  <tbody>
+                    {companyDocs.map((doc) => {
+                      const view = resolveComplianceSituation(doc, doc.document_type);
+                      return (
+                        <tr key={doc.id} className="border-t border-slate-100">
+                          <td className="px-3 py-3 font-medium">
+                            {documentDisplayName(doc.document_type)}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3">
+                            {doc.no_expiry
+                              ? "Sem vencimento"
+                              : formatExpiryDateBR(doc.expires_at)}
+                          </td>
+                          <td className="px-3 py-3">
+                            <Badge variant={view.badge}>{view.label}</Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </DataTableScroll>
+            </div>
+          </>
         )}
       </section>
 

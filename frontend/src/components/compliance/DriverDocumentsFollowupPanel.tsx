@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
-import { DataTableScroll } from "@/components/ui/DataTableScroll";
+import { Button } from "@/components/ui/Button";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import {
   driverFollowupBadgeVariant,
@@ -11,7 +11,7 @@ import {
   listDriverDocumentsFollowup,
   type DriverFollowupRow,
 } from "@/lib/driver-documents-followup";
-import { glassAction, glassFilterPanel } from "@/lib/liquid-glass-styles";
+import { glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
 
 type Filter =
@@ -81,15 +81,15 @@ export function DriverDocumentsFollowupPanel({ companyId }: Props) {
   if (loading) return <Loading />;
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-600">
+    <div className="min-w-0 space-y-4">
+      <p className="text-sm leading-relaxed text-slate-600">
         Acompanhe validade da CNH e envio de anexos nas pastas <strong>CNH</strong> e{" "}
         <strong>CNH-AVC</strong>. Abra o cadastro do motorista para renovar ou anexar.
       </p>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
 
-      <div className={`grid gap-3 sm:grid-cols-2 ${glassFilterPanel()}`}>
+      <div className={`grid gap-3 sm:grid-cols-[1fr_auto] ${glassFilterPanel()}`}>
         <GlassSelect
           label="Filtro"
           value={filter}
@@ -103,95 +103,152 @@ export function DriverDocumentsFollowupPanel({ companyId }: Props) {
           ]}
         />
         <div className="flex items-end">
-          <button
-            type="button"
-            className={glassAction("sky", true)}
-            onClick={() => void load()}
-          >
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => void load()}>
             Atualizar lista
-          </button>
+          </Button>
         </div>
       </div>
 
-      <section className={glassFilterPanel()}>
-        <h2 className="mb-2 text-sm font-semibold">Motoristas em acompanhamento</h2>
-        <DataTableScroll stickyFirst stickyLast compact>
-          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-          <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
-            <tr>
-              <th className="px-1.5 py-2">Motorista</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">CNH</th>
-              <th className="hidden px-1.5 py-2 lg:table-cell">Validade</th>
-              <th className="px-1.5 py-2">Situação</th>
-              <th className="hidden px-1.5 py-2 xl:table-cell">Pasta CNH</th>
-              <th className="hidden px-1.5 py-2 xl:table-cell">Pasta CNH-AVC</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">Pendências</th>
-              <th className="px-1.5 py-2">Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-2 py-4 text-slate-500">
-                  Nenhum motorista neste filtro.
-                </td>
-              </tr>
-            ) : (
-              filtered.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100">
-                  <td className="max-w-[9rem] px-1.5 py-1.5 sm:max-w-[14rem]">
-                    <p className="truncate font-medium text-slate-800" title={row.name}>
-                      {row.name}
-                    </p>
-                    {row.code ? (
-                      <p className="text-[10px] text-slate-500 sm:text-xs">{row.code}</p>
-                    ) : null}
-                    <p className="mt-0.5 truncate text-[10px] text-slate-500 md:hidden">
-                      {row.reasons.length ? row.reasons.join(" · ") : row.cnhLabel}
-                    </p>
-                  </td>
-                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
-                    {row.cnhNumber || "—"}
-                  </td>
-                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 lg:table-cell">
-                    {formatDriverFollowupExpiry(row.cnhExpiry)}
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    <Badge variant={driverFollowupBadgeVariant(row.cnhStatus)}>
-                      {row.cnhLabel}
-                    </Badge>
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    <Badge variant={row.hasCnhFolder ? "success" : "warning"}>
-                      {row.hasCnhFolder ? "Com anexo" : "Enviar"}
-                    </Badge>
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    <Badge variant={row.hasCnhAvcFolder ? "success" : "warning"}>
-                      {row.hasCnhAvcFolder ? "Com anexo" : "Enviar"}
-                    </Badge>
-                  </td>
-                  <td className="hidden max-w-[12rem] truncate px-1.5 py-1.5 text-xs text-slate-600 md:table-cell">
-                    {row.reasons.length ? row.reasons.join(" · ") : "—"}
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    <div className="os-row-actions">
-                      <Link
-                        href={`/cadastros/motoristas?edit=${encodeURIComponent(row.id)}`}
-                        className={`${glassAction("sky", true)} action-icon-btn !text-[10px] sm:!text-xs`}
-                        title="Abrir cadastro"
-                      >
-                        <span className="sm:hidden">Abrir</span>
-                        <span className="hidden sm:inline">Abrir cadastro</span>
-                      </Link>
+      <section className={`min-w-0 space-y-3 ${glassFilterPanel()}`}>
+        <h2 className="text-base font-semibold text-slate-900">Motoristas em acompanhamento</h2>
+
+        {filtered.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-500">
+            Nenhum motorista neste filtro.
+          </p>
+        ) : (
+          <>
+            {/* Mobile: cartão legível — nome completo, situação e pendências. */}
+            <ul className="space-y-3 md:hidden">
+              {filtered.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className="min-w-0">
+                      {row.code ? (
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {row.code}
+                        </p>
+                      ) : null}
+                      <p className="text-base font-semibold leading-snug break-words text-slate-900">
+                        {row.name}
+                      </p>
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-        </DataTableScroll>
+                    <div className="w-fit max-w-full">
+                      <Badge variant={driverFollowupBadgeVariant(row.cnhStatus)}>
+                        {row.cnhLabel}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                      <dt className="text-xs font-medium text-slate-500">CNH</dt>
+                      <dd className="break-words text-slate-800">{row.cnhNumber || "—"}</dd>
+                    </div>
+                    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                      <dt className="text-xs font-medium text-slate-500">Validade</dt>
+                      <dd className="text-slate-800">{formatDriverFollowupExpiry(row.cnhExpiry)}</dd>
+                    </div>
+                    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                      <dt className="text-xs font-medium text-slate-500">Pasta CNH</dt>
+                      <dd>
+                        <Badge variant={row.hasCnhFolder ? "success" : "warning"}>
+                          {row.hasCnhFolder ? "Com anexo" : "Enviar"}
+                        </Badge>
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                      <dt className="text-xs font-medium text-slate-500">CNH-AVC</dt>
+                      <dd>
+                        <Badge variant={row.hasCnhAvcFolder ? "success" : "warning"}>
+                          {row.hasCnhAvcFolder ? "Com anexo" : "Enviar"}
+                        </Badge>
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                      <dt className="text-xs font-medium text-slate-500">Pendências</dt>
+                      <dd className="break-words leading-snug text-slate-800">
+                        {row.reasons.length ? row.reasons.join(" · ") : "Nenhuma"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-4 border-t border-slate-100 pt-3">
+                    <Link
+                      href={`/cadastros/motoristas?edit=${encodeURIComponent(row.id)}`}
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-800"
+                    >
+                      Abrir cadastro
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: tabela limpa. */}
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5">Motorista</th>
+                    <th className="px-3 py-2.5">CNH</th>
+                    <th className="px-3 py-2.5">Validade</th>
+                    <th className="px-3 py-2.5">Situação</th>
+                    <th className="px-3 py-2.5">Pasta CNH</th>
+                    <th className="px-3 py-2.5">Pasta CNH-AVC</th>
+                    <th className="px-3 py-2.5">Pendências</th>
+                    <th className="px-3 py-2.5">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => (
+                    <tr key={row.id} className="border-t border-slate-100">
+                      <td className="px-3 py-3">
+                        <p className="font-medium text-slate-900">{row.name}</p>
+                        {row.code ? (
+                          <p className="text-xs text-slate-500">{row.code}</p>
+                        ) : null}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3">{row.cnhNumber || "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-3">
+                        {formatDriverFollowupExpiry(row.cnhExpiry)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <Badge variant={driverFollowupBadgeVariant(row.cnhStatus)}>
+                          {row.cnhLabel}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3">
+                        <Badge variant={row.hasCnhFolder ? "success" : "warning"}>
+                          {row.hasCnhFolder ? "Com anexo" : "Enviar"}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3">
+                        <Badge variant={row.hasCnhAvcFolder ? "success" : "warning"}>
+                          {row.hasCnhAvcFolder ? "Com anexo" : "Enviar"}
+                        </Badge>
+                      </td>
+                      <td className="max-w-[16rem] break-words px-3 py-3 text-slate-700">
+                        {row.reasons.length ? row.reasons.join(" · ") : "—"}
+                      </td>
+                      <td className="px-3 py-3">
+                        <Link
+                          href={`/cadastros/motoristas?edit=${encodeURIComponent(row.id)}`}
+                          className="inline-flex rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800"
+                        >
+                          Abrir cadastro
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );
