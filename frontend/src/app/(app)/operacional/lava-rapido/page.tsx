@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import { GroupedTableBodies } from "@/components/ui/GroupedTableBodies";
 import { GlassSelect } from "@/components/ui/GlassSelect";
+import { SmsIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
+import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { companyDisplayName } from "@/lib/company-logo";
@@ -35,7 +37,6 @@ import {
   buildSmsShareHref,
   buildWashReadyWhatsApp,
   canUseDeviceSms,
-  launchShareHref,
   washReadyWhatsAppHref,
 } from "@/lib/wash-notify";
 import {
@@ -44,9 +45,22 @@ import {
   type PatioWashLoyaltySettings,
   type WashLoyaltyProgress,
 } from "@/lib/wash-loyalty";
-import { copyTextToClipboardSync } from "@/lib/service-order-proposal";
+import {
+  formatPhoneForWhatsApp,
+  formatWhatsAppPhoneDisplay,
+} from "@/lib/service-order-proposal";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
+import {
+  cn,
+  formatCurrency,
+  formatDateBR,
+  normalizePlate,
+  normalizeText,
+} from "@/lib/utils";
+
+type ClientOption = { id: string; name: string; phone: string | null };
+
+const SHARE_ICON_BTN = "h-10 w-10 shrink-0 p-0";
 
 function statusBadgeVariant(status: string): "success" | "danger" | "warning" | "default" {
   if (status === "Concluido") return "success";
@@ -62,6 +76,7 @@ export default function LavaRapidoPage() {
   const supabase = useMemo(() => createClient(), []);
   const companyName = companyDisplayName(company);
   const [types, setTypes] = useState<PatioVehicleType[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [rows, setRows] = useState<CarWashServiceRow[]>([]);
   const [loyaltySettings, setLoyaltySettings] = useState<PatioWashLoyaltySettings | null>(null);
   const [plateLoyalty, setPlateLoyalty] = useState<WashLoyaltyProgress | null>(null);
@@ -70,12 +85,15 @@ export default function LavaRapidoPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [quotedPrice, setQuotedPrice] = useState<number | null>(null);
+  /** Telefone digitado na lista quando a ordem / cadastro não tem. */
+  const [phoneDraftById, setPhoneDraftById] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState<{
     plate: string;
     brand: string;
     model: string;
     vehicle_type_id: string;
+    client_id: string;
     client_name: string;
     phone: string;
     service_date: string;
@@ -88,6 +106,7 @@ export default function LavaRapidoPage() {
     brand: "",
     model: "",
     vehicle_type_id: "",
+    client_id: "",
     client_name: "",
     phone: "",
     service_date: new Date().toISOString().slice(0, 10),
@@ -108,7 +127,7 @@ export default function LavaRapidoPage() {
         seedPatioDefaults(supabase, companyId),
         new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 6000)),
       ]);
-      const [tRes, wRes, settingsRes] = await Promise.all([
+      const [tRes, wRes, settingsRes, clientsRes] = await Promise.all([
         listPatioVehicleTypes(supabase, companyId, true),
         supabase
           .from("car_wash_services")
@@ -117,6 +136,12 @@ export default function LavaRapidoPage() {
           .order("service_date", { ascending: false })
           .limit(100),
         getPatioSettings(supabase, companyId),
+        supabase
+          .from("clients")
+          .select("id, name, phone")
+          .eq("company_id", companyId)
+          .order("name")
+          .limit(500),
       ]);
       if (tRes.error || wRes.error) setError(tRes.error ?? wRes.error?.message ?? null);
       if (settingsRes.error && /apply-063/i.test(settingsRes.error)) {
@@ -125,6 +150,13 @@ export default function LavaRapidoPage() {
       setTypes(tRes.rows);
       setRows((wRes.data as CarWashServiceRow[]) ?? []);
       setLoyaltySettings(settingsRes.settings);
+      setClients(
+        ((clientsRes.data as ClientOption[] | null) ?? []).map((c) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+        }))
+      );
       setForm((f) => {
         if (f.vehicle_type_id) return f;
         const first = tRes.rows.find((r) => allowsWash(r.usage_category));
@@ -257,6 +289,7 @@ export default function LavaRapidoPage() {
       plate: "",
       brand: "",
       model: "",
+      client_id: "",
       client_name: "",
       phone: "",
       notes: "",
@@ -264,81 +297,60 @@ export default function LavaRapidoPage() {
     await load();
   };
 
-  const persistReadyStatus = async (row: CarWashServiceRow) => {
+  const phoneFromClientCadastro = useCallback(
+    (clientName: string | null | undefined) => {
+      const key = normalizeText(clientName || "");
+      if (!key) return "";
+      const exact = clients.find((c) => normalizeText(c.name) === key && c.phone?.trim());
+      if (exact?.phone?.trim()) return exact.phone.trim();
+      const partial = clients.find(
+        (c) => key.length >= 3 && normalizeText(c.name).includes(key) && c.phone?.trim()
+      );
+      return partial?.phone?.trim() || "";
+    },
+    [clients]
+  );
+
+  const resolveNotifyPhone = useCallback(
+    (row: CarWashServiceRow) => {
+      const fromRow = row.phone?.trim() || "";
+      if (fromRow && formatPhoneForWhatsApp(fromRow)) return fromRow;
+      const draft = phoneDraftById[row.id]?.trim() || "";
+      if (draft && formatPhoneForWhatsApp(draft)) return draft;
+      return phoneFromClientCadastro(row.client_name);
+    },
+    [phoneDraftById, phoneFromClientCadastro]
+  );
+
+  const persistReadyStatus = (row: CarWashServiceRow, phoneToSave?: string) => {
     if (!companyId) return;
-    const { error: updError } = await supabase
-      .from("car_wash_services")
-      .update({
-        status: row.status === "Aberto" ? "Pronto" : row.status,
-        ready_notified_at: new Date().toISOString(),
-      })
-      .eq("id", row.id);
-    if (updError) {
-      if (/Pronto|ready_notified/i.test(updError.message)) {
-        setError(
-          "Aviso aberto, mas o status não gravou. Rode apply-063-car-wash-ready-loyalty.sql no Supabase."
-        );
-      } else {
-        setError(`Aviso aberto, mas falhou ao gravar status: ${updError.message}`);
-      }
-      return;
-    }
-    await load();
-  };
-
-  const markReady = (row: CarWashServiceRow, channel: "whatsapp" | "sms") => {
-    if (!companyId || !canEdit) return;
-    if (!row.phone?.trim()) {
-      setError("Informe o telefone do cliente na ordem (DDD + número) para avisar.");
-      return;
-    }
-
-    const share = buildWashReadyWhatsApp({
-      companyName,
-      plate: row.plate,
-      phone: row.phone,
-      clientName: row.client_name,
-      serviceName: row.service_name,
-    });
-
-    if (!share.links.opensDirectChat || !share.links.phoneDigits) {
-      setError(
-        "Telefone inválido para WhatsApp/SMS. Use DDD + número com 10 ou 11 dígitos (ex.: 11999998888)."
-      );
-      return;
-    }
-
-    setError(null);
-    setInfo(null);
-    copyTextToClipboardSync(share.message);
-
-    if (channel === "whatsapp") {
-      const href = washReadyWhatsAppHref(share.links);
-      if (!href) {
-        setError("Não foi possível montar o link do WhatsApp. Verifique o telefone.");
-        return;
-      }
-      void persistReadyStatus(row);
-      // Mesma aba — não usa popup (bloqueado no Chrome/Edge).
-      launchShareHref(href);
-      return;
-    }
-
-    if (!canUseDeviceSms()) {
-      setError(
-        "SMS só funciona no celular. No computador use Pronto (WhatsApp). Mensagem já copiada (Ctrl+V)."
-      );
-      void persistReadyStatus(row);
-      return;
-    }
-
-    const sms = buildSmsShareHref(row.phone, share.message);
-    if (!sms) {
-      setError("Não foi possível abrir o SMS. Verifique o telefone.");
-      return;
-    }
-    void persistReadyStatus(row);
-    launchShareHref(sms);
+    // Adia update para não remountar no meio do whatsapp:// (mesmo padrão da proposta).
+    window.setTimeout(() => {
+      void (async () => {
+        const patch: Record<string, unknown> = {
+          status: row.status === "Aberto" ? "Pronto" : row.status,
+          ready_notified_at: new Date().toISOString(),
+        };
+        if (phoneToSave?.trim() && !row.phone?.trim()) {
+          patch.phone = phoneToSave.trim();
+        }
+        const { error: updError } = await supabase
+          .from("car_wash_services")
+          .update(patch)
+          .eq("id", row.id);
+        if (updError) {
+          if (/Pronto|ready_notified/i.test(updError.message)) {
+            setError(
+              "Aviso aberto, mas o status não gravou. Rode apply-063-car-wash-ready-loyalty.sql no Supabase."
+            );
+          } else {
+            setError(`Aviso aberto, mas falhou ao gravar status: ${updError.message}`);
+          }
+          return;
+        }
+        await load();
+      })();
+    }, 800);
   };
 
   const completeService = async (row: CarWashServiceRow) => {
@@ -403,66 +415,101 @@ export default function LavaRapidoPage() {
     if (!canEdit) return null;
     if (row.status !== "Aberto" && row.status !== "Pronto") return null;
 
+    const phone = resolveNotifyPhone(row);
+    const phoneOk = Boolean(formatPhoneForWhatsApp(phone));
     const share = buildWashReadyWhatsApp({
       companyName,
       plate: row.plate,
-      phone: row.phone,
+      phone,
       clientName: row.client_name,
       serviceName: row.service_name,
     });
-    const waHref = washReadyWhatsAppHref(share.links);
-    const smsHref = canUseDeviceSms() ? buildSmsShareHref(row.phone, share.message) : null;
-    const linkClass = `${glassAction("emerald", true)} inline-flex items-center justify-center`;
+    const waHref =
+      share.links.opensDirectChat && washReadyWhatsAppHref(share.links)
+        ? washReadyWhatsAppHref(share.links)
+        : "";
+    const smsHref = phoneOk && canUseDeviceSms() ? buildSmsShareHref(phone, share.message) : null;
+    const phoneLabel = formatWhatsAppPhoneDisplay(share.links.phoneDigits) || phone;
+    const draftValue = phoneDraftById[row.id] ?? row.phone ?? phoneFromClientCadastro(row.client_name);
 
     return (
-      <>
+      <div className="flex flex-wrap items-center gap-2">
+        {!phoneOk ? (
+          <input
+            className={cn(glassField(true), "min-w-[9.5rem] max-w-[11rem] text-xs")}
+            placeholder="DDD + telefone"
+            value={draftValue}
+            onChange={(e) =>
+              setPhoneDraftById((m) => ({ ...m, [row.id]: e.target.value }))
+            }
+            title="Telefone do cadastro vazio — preencha para avisar"
+          />
+        ) : null}
         {waHref ? (
-          <a
+          <WhatsAppAppAnchor
             href={waHref}
-            className={linkClass}
-            title="Avisar no WhatsApp que o veículo está pronto"
-            onClick={() => {
-              copyTextToClipboardSync(share.message);
-              void persistReadyStatus(row);
-            }}
+            title={
+              phoneLabel
+                ? `WhatsApp — veículo pronto · ${phoneLabel}`
+                : "Avisar no WhatsApp que o veículo está pronto"
+            }
+            aria-label={
+              phoneLabel
+                ? `Avisar no WhatsApp ${phoneLabel} que o veículo está pronto`
+                : "Avisar no WhatsApp que o veículo está pronto"
+            }
+            className={cn(glassAction("green", true), SHARE_ICON_BTN)}
+            onOpen={() => persistReadyStatus(row, phone)}
           >
-            Pronto (WhatsApp)
-          </a>
+            <WhatsAppIcon className="h-5 w-5" />
+          </WhatsAppAppAnchor>
         ) : (
-          <Button
+          <button
             type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => markReady(row, "whatsapp")}
-            title="Informe telefone DDD + número na ordem"
+            className={cn(glassAction("green", true), SHARE_ICON_BTN, "opacity-50")}
+            title="Informe o telefone (cadastro ou manual) para abrir o WhatsApp"
+            aria-label="WhatsApp indisponível — telefone não cadastrado"
+            onClick={() =>
+              setError(
+                "Selecione o cliente cadastrado (puxa o telefone) ou digite DDD + número para avisar."
+              )
+            }
           >
-            Pronto (WhatsApp)
-          </Button>
+            <WhatsAppIcon className="h-5 w-5" />
+          </button>
         )}
         {smsHref ? (
           <a
             href={smsHref}
-            className={linkClass}
-            title="Abrir SMS do aparelho"
-            onClick={() => {
-              copyTextToClipboardSync(share.message);
-              void persistReadyStatus(row);
-            }}
+            title={`SMS — ${phoneLabel}`}
+            aria-label={`Avisar por SMS ${phoneLabel}`}
+            className={cn(glassAction("sky", true), SHARE_ICON_BTN, "inline-flex items-center justify-center")}
+            onClick={() => persistReadyStatus(row, phone)}
           >
-            Pronto (SMS)
+            <SmsIcon className="h-5 w-5" />
           </a>
         ) : (
-          <Button
+          <button
             type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => markReady(row, "sms")}
-            title="SMS só no celular; no PC use WhatsApp"
+            className={cn(glassAction("sky", true), SHARE_ICON_BTN, !phoneOk && "opacity-50")}
+            title={
+              !phoneOk
+                ? "Informe o telefone para SMS"
+                : "SMS só no celular — no PC use o ícone WhatsApp"
+            }
+            aria-label="SMS"
+            onClick={() => {
+              if (!phoneOk) {
+                setError("Informe o telefone (cadastro ou manual) para SMS.");
+                return;
+              }
+              setError("SMS só funciona no celular. No computador use o ícone verde do WhatsApp.");
+            }}
           >
-            Pronto (SMS)
-          </Button>
+            <SmsIcon className="h-5 w-5" />
+          </button>
         )}
-      </>
+      </div>
     );
   }
 
@@ -473,7 +520,8 @@ export default function LavaRapidoPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Lava-rápido</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Aviso de veículo pronto (WhatsApp/SMS), ticket digital e fidelidade por placa. Parâmetros em{" "}
+          Ícones WhatsApp/SMS (mesmo fluxo da proposta), telefone do cadastro do cliente, ticket e
+          fidelidade. Parâmetros em{" "}
           <Link href="/configuracoes/parametros-patio" className="text-brand-700 underline">
             Parâmetros do Pátio
           </Link>
@@ -545,16 +593,51 @@ export default function LavaRapidoPage() {
               onChange={(next) => setForm((f) => ({ ...f, payment_method: next }))}
               options={PATIO_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
             />
+            <GlassSelect
+              label="Cliente (cadastro)"
+              value={form.client_id}
+              onChange={(next) => {
+                if (!next) {
+                  setForm((f) => ({ ...f, client_id: "", client_name: "", phone: "" }));
+                  return;
+                }
+                const client = clients.find((c) => c.id === next);
+                setForm((f) => ({
+                  ...f,
+                  client_id: next,
+                  client_name: client?.name ?? "",
+                  phone: client?.phone?.trim() || f.phone,
+                }));
+              }}
+              options={[
+                { value: "", label: "Avulso / digitar nome" },
+                ...clients.map((c) => ({
+                  value: c.id,
+                  label: c.phone?.trim()
+                    ? `${c.name} · ${c.phone.trim()}`
+                    : `${c.name} · sem telefone`,
+                })),
+              ]}
+            />
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">Cliente</span>
+              <span className="text-sm font-medium text-slate-700">Nome do cliente</span>
               <input
                 className={glassField(false)}
                 value={form.client_name}
-                onChange={(e) => setForm((f) => ({ ...f, client_name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    client_id: "",
+                    client_name: e.target.value,
+                  }))
+                }
+                placeholder="Se não estiver no cadastro"
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">Telefone (WhatsApp/SMS)</span>
+              <span className="text-sm font-medium text-slate-700">
+                Telefone (puxa do cadastro; pode editar)
+              </span>
               <input
                 className={glassField(true)}
                 value={form.phone}
@@ -603,7 +686,7 @@ export default function LavaRapidoPage() {
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   {row.client_name?.trim() || "Cliente —"} ·{" "}
-                  {row.phone?.trim() || (
+                  {resolveNotifyPhone(row) || (
                     <span className="font-medium text-red-600">sem telefone</span>
                   )}
                 </p>

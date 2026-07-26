@@ -1,7 +1,6 @@
 import {
   buildWhatsAppShareLinks,
   formatPhoneForWhatsApp,
-  isWindowsWhatsAppDesktop,
   type WhatsAppShareLinks,
 } from "@/lib/service-order-proposal";
 
@@ -34,13 +33,13 @@ export function buildWashReadyWhatsApp(params: {
   return { message, links: buildWhatsAppShareLinks(message, params.phone) };
 }
 
-/** Href WhatsApp mais confiável por plataforma (mesma aba / ponte no Windows). */
+/**
+ * Mesmo critério da proposta/OS: `primaryHref` (WhatsAppAppAnchor).
+ * Windows → /abrir-whatsapp; mobile → wa.me; outros → whatsapp://.
+ */
 export function washReadyWhatsAppHref(links: WhatsAppShareLinks): string {
   if (!links.opensDirectChat) return "";
-  if (isWindowsWhatsAppDesktop()) {
-    return links.desktopBridgeHref || links.primaryHref || "";
-  }
-  return links.mobileHref || links.primaryHref || links.desktopHref || "";
+  return links.primaryHref || "";
 }
 
 export function canUseDeviceSms(): boolean {
