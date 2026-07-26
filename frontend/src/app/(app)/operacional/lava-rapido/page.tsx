@@ -34,6 +34,7 @@ import {
 import {
   buildSmsShareHref,
   buildWashReadyWhatsApp,
+  launchShareHref,
 } from "@/lib/wash-notify";
 import {
   computeWashLoyaltyProgress,
@@ -41,6 +42,11 @@ import {
   type PatioWashLoyaltySettings,
   type WashLoyaltyProgress,
 } from "@/lib/wash-loyalty";
+import {
+  copyTextToClipboardSync,
+  isWindowsWhatsAppDesktop,
+  openWhatsAppShareHref,
+} from "@/lib/service-order-proposal";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
 
@@ -263,11 +269,45 @@ export default function LavaRapidoPage() {
   const markReady = async (row: CarWashServiceRow, channel: "whatsapp" | "sms") => {
     if (!companyId || !canEdit) return;
     if (!row.phone?.trim()) {
-      setError("Informe o telefone do cliente na ordem para avisar.");
+      setError("Informe o telefone do cliente na ordem (DDD + número) para avisar.");
       return;
     }
-    setSaving(true);
+
+    const share = buildWashReadyWhatsApp({
+      companyName,
+      plate: row.plate,
+      phone: row.phone,
+      clientName: row.client_name,
+      serviceName: row.service_name,
+    });
+
+    if (!share.links.opensDirectChat || !share.links.phoneDigits) {
+      setError(
+        "Telefone inválido para WhatsApp/SMS. Use DDD + número com 10 ou 11 dígitos (ex.: 11999998888)."
+      );
+      return;
+    }
+
     setError(null);
+    setInfo(null);
+    // Copia no gesto do clique (antes do await) — fallback se o app não pré-preencher.
+    copyTextToClipboardSync(share.message);
+
+    if (channel === "whatsapp") {
+      // Windows: ponte /abrir-whatsapp com mensagem completa (primaryHref é só chat).
+      // Mobile/outros: primaryHref (wa.me ou whatsapp:// com texto).
+      const href = isWindowsWhatsAppDesktop()
+        ? share.links.desktopBridgeHref || share.links.primaryHref
+        : share.links.primaryHref;
+      if (href) openWhatsAppShareHref(href);
+      else setInfo("Mensagem copiada. Cole no WhatsApp do cliente.");
+    } else {
+      const sms = buildSmsShareHref(row.phone, share.message);
+      if (sms) launchShareHref(sms);
+      else setInfo("Mensagem copiada. Abra o SMS e cole para o cliente.");
+    }
+
+    setSaving(true);
     const { error: updError } = await supabase
       .from("car_wash_services")
       .update({
@@ -279,36 +319,18 @@ export default function LavaRapidoPage() {
     if (updError) {
       if (/Pronto|ready_notified/i.test(updError.message)) {
         setError(
-          "Banco desatualizado. Rode frontend/scripts/apply-063-car-wash-ready-loyalty.sql no Supabase."
+          "Aviso aberto, mas o status não gravou. Rode apply-063-car-wash-ready-loyalty.sql no Supabase."
         );
       } else {
-        setError(updError.message);
+        setError(`Aviso aberto, mas falhou ao gravar status: ${updError.message}`);
       }
       return;
     }
-
-    const share = buildWashReadyWhatsApp({
-      companyName,
-      plate: row.plate,
-      phone: row.phone,
-      clientName: row.client_name,
-      serviceName: row.service_name,
-    });
-    try {
-      await navigator.clipboard.writeText(share.message);
-    } catch {
-      /* ignore */
-    }
-
-    if (channel === "whatsapp") {
-      const href = share.links.primaryHref;
-      if (href) window.location.href = href;
-      else setInfo("Mensagem copiada. Cole no WhatsApp do cliente.");
-    } else {
-      const sms = buildSmsShareHref(row.phone, share.message);
-      if (sms) window.location.href = sms;
-      else setInfo("Mensagem copiada. Abra o SMS e cole para o cliente.");
-    }
+    setInfo(
+      channel === "whatsapp"
+        ? "WhatsApp aberto. Se a mensagem não preencheu, use Ctrl+V (já copiada)."
+        : "SMS aberto. Se o texto não preencheu, cole a mensagem (já copiada)."
+    );
     await load();
   };
 

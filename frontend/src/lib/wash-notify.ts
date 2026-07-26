@@ -36,5 +36,21 @@ export function buildWashReadyWhatsApp(params: {
 export function buildSmsShareHref(phone: string | null | undefined, text: string): string | null {
   const digits = formatPhoneForWhatsApp(phone);
   if (!digits) return null;
-  return `sms:+${digits}?body=${encodeURIComponent(text)}`;
+  const body = encodeURIComponent(text);
+  // iOS usa &body=; Android/desktop usam ?body=.
+  const isIos =
+    typeof navigator !== "undefined" &&
+    /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  return isIos ? `sms:+${digits}&body=${body}` : `sms:+${digits}?body=${body}`;
+}
+
+/** Dispara sms: / whatsapp: com clique sintético (mais confiável após await). */
+export function launchShareHref(href: string): void {
+  if (!href) return;
+  const anchor = document.createElement("a");
+  anchor.setAttribute("href", href);
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
 }

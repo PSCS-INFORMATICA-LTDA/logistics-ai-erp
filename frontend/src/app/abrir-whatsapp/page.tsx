@@ -88,15 +88,15 @@ export default function AbrirWhatsAppPage() {
       ) : (
         <>
           <p className="text-sm text-slate-600">
-            Motorista: <strong>{phoneLabel}</strong>
+            Contato: <strong>{phoneLabel}</strong>
             <span className="text-slate-500"> ({phone})</span>
           </p>
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
-            1) Compartilhar → <strong>WhatsApp</strong>
+            1) Clique em <strong>Copiar e enviar no WhatsApp</strong>
             <br />
-            2) Pesquise o telefone do motorista: <strong>{phoneLabel}</strong> ({phone})
+            2) Escolha WhatsApp e busque o telefone: <strong>{phoneLabel}</strong> ({phone})
             <br />
-            3) Envie (a mensagem completa já vai no compartilhamento)
+            3) Envie (a mensagem já vai no compartilhamento; se precisar, Ctrl+V)
           </p>
         </>
       )}
