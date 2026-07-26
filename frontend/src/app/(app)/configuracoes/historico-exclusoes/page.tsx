@@ -3,11 +3,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import { useAccess } from "@/lib/access-context";
-import { APP_SCREENS } from "@/lib/app-screens";
 import { useCompany } from "@/lib/company-context";
 import {
   canRestoreDeletionEvent,
@@ -48,11 +46,6 @@ function formatOccurredAt(iso: string): string {
   });
 }
 
-function screenLabel(screenKey: string | null): string {
-  if (!screenKey) return "—";
-  return APP_SCREENS.find((s) => s.key === screenKey)?.label ?? screenKey;
-}
-
 const ENTITY_TYPE_OPTIONS = [
   { value: "", label: "Todos os módulos" },
   { value: "clients", label: "Cliente" },
@@ -74,6 +67,89 @@ async function copyText(value: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function DeletionEventDetail({
+  row,
+  restorable,
+}: {
+  row: DeletionAuditEvent;
+  restorable: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p>
+          <span className="font-semibold">Excluído em:</span> {formatOccurredAt(row.occurred_at)}
+        </p>
+        <p className="mt-1">
+          <span className="font-semibold">Por:</span> {row.actor_name || "—"}
+          {row.actor_email ? ` (${row.actor_email})` : ""}
+        </p>
+        <p className="mt-1 whitespace-pre-wrap break-words">
+          <span className="font-semibold">Motivo:</span> {row.reason || "—"}
+        </p>
+        {row.restored ? (
+          <>
+            <p className="mt-2">
+              <span className="font-semibold">Restaurado em:</span>{" "}
+              {row.restored_at ? formatOccurredAt(row.restored_at) : "—"}
+            </p>
+            <p className="mt-1">
+              <span className="font-semibold">Por:</span> {row.restored_by_name || "—"}
+              {row.restored_by_email ? ` (${row.restored_by_email})` : ""}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words">
+              <span className="font-semibold">Motivo da restauração:</span>{" "}
+              {row.restoration_reason || "—"}
+            </p>
+          </>
+        ) : null}
+        {restorable ? (
+          <p className="mt-2 text-xs text-amber-900">
+            {row.delete_mode === "hard"
+              ? "Exclusão hard: a restauração reinsere o snapshot. Filhos vinculados (ex.: anexos da OS) podem não voltar."
+              : "Registro soft-deleted pode ser restaurado. O histórico permanece."}
+          </p>
+        ) : null}
+      </div>
+
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Conteúdo no momento da exclusão
+      </p>
+      {row.payload_json ? (
+        <dl className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2">
+          {formatSnapshotLines(row.payload_json).map((line) => (
+            <div key={`${row.id}-${line.label}`}>
+              <dt className="text-xs font-medium text-slate-500">{line.label}</dt>
+              <dd className="break-words text-sm text-slate-900">{line.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="text-sm text-slate-500">Snapshot não disponível neste evento.</p>
+      )}
+
+      {row.payload_json ? (
+        <details className="text-xs text-slate-600">
+          <summary className="cursor-pointer font-medium text-slate-700">JSON técnico</summary>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all">
+            {JSON.stringify(row.payload_json, null, 2)}
+          </pre>
+        </details>
+      ) : null}
+
+      <p className="text-xs text-slate-500">
+        ID: {row.entity_id}
+        {row.payload_json &&
+        typeof (row.payload_json as { created_at?: string }).created_at === "string"
+          ? ` · Criado em ${formatDateBR(
+              (row.payload_json as { created_at: string }).created_at
+            )}`
+          : ""}
+      </p>
+    </div>
+  );
 }
 
 export default function HistoricoExclusoesPage() {
@@ -444,20 +520,114 @@ export default function HistoricoExclusoesPage() {
 
       {loading ? <Loading /> : null}
 
-      <DataTableScroll stickyLast compact>
-        <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
+      {!loading && rows.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+          Nenhuma exclusão registrada com estes filtros.
+        </p>
+      ) : null}
+
+      {/* Mobile: cartão por evento — dá para ler motivo, usuário e resumo. */}
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row) => {
+          const restorable = canRestoreDeletionEvent(row);
+          const open = expandedId === row.id;
+          return (
+            <li
+              key={row.id}
+              className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-500">
+                    {formatOccurredAt(row.occurred_at)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-snug break-words text-slate-900">
+                    {row.summary || entityTypeLabel(row.entity_type)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {entityTypeLabel(row.entity_type)}
+                    {row.entity_code ? ` · ${row.entity_code}` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 break-words">
+                    Por {row.actor_name || "—"}
+                    {row.actor_email ? ` (${row.actor_email})` : ""}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-800">
+                    <span className="font-medium text-slate-600">Motivo:</span>{" "}
+                    {row.reason || "Sem observação"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Badge variant={row.restored ? "success" : "danger"}>
+                    {row.restored ? "Restaurado" : "Excluído"}
+                  </Badge>
+                  <Badge variant={row.delete_mode === "soft" ? "warning" : "danger"}>
+                    {row.delete_mode === "soft" ? "Soft" : "Hard"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                {row.entity_code ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      void copyText(row.entity_code!).then((ok) => {
+                        setMsg(ok ? "Código copiado." : "Não foi possível copiar.");
+                      });
+                    }}
+                  >
+                    Copiar código
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setExpandedId((cur) => (cur === row.id ? null : row.id))}
+                >
+                  {open ? "Ocultar detalhe" : "Ver detalhe"}
+                </Button>
+                {restorable ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      setMsg(null);
+                      setPendingRestore(row);
+                    }}
+                  >
+                    Restaurar
+                  </Button>
+                ) : null}
+              </div>
+
+              {open ? (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <DeletionEventDetail row={row} restorable={restorable} />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop: tabela legível (sem truncar motivo/resumo). */}
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-1.5 py-2">Data / hora</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">Usuário</th>
-              <th className="hidden px-1.5 py-2 lg:table-cell">Tela</th>
-              <th className="hidden px-1.5 py-2 lg:table-cell">Módulo</th>
-              <th className="px-1.5 py-2">Código</th>
-              <th className="hidden px-1.5 py-2 xl:table-cell">Resumo</th>
-              <th className="hidden px-1.5 py-2 xl:table-cell">Motivo</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">Modo</th>
-              <th className="px-1.5 py-2">Status</th>
-              <th className="px-1.5 py-2">Ações</th>
+              <th className="px-3 py-2.5">Data / hora</th>
+              <th className="px-3 py-2.5">Usuário</th>
+              <th className="px-3 py-2.5">Módulo</th>
+              <th className="px-3 py-2.5">Código</th>
+              <th className="px-3 py-2.5">Resumo</th>
+              <th className="px-3 py-2.5">Motivo</th>
+              <th className="px-3 py-2.5">Modo</th>
+              <th className="px-3 py-2.5">Status</th>
+              <th className="px-3 py-2.5">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -466,22 +636,19 @@ export default function HistoricoExclusoesPage() {
               return (
                 <Fragment key={row.id}>
                   <tr className="border-t border-slate-100 align-top">
-                    <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
+                    <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900">
                       {formatOccurredAt(row.occurred_at)}
                     </td>
-                    <td className="hidden px-1.5 py-1.5 md:table-cell">
-                      <div className="max-w-[8rem] truncate font-medium text-slate-900 sm:max-w-[12rem]" title={row.actor_name || undefined}>
-                        {row.actor_name || "—"}
-                      </div>
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-slate-900">{row.actor_name || "—"}</div>
                       {row.actor_email ? (
-                        <div className="truncate text-[10px] text-slate-500 sm:text-xs">{row.actor_email}</div>
+                        <div className="text-xs text-slate-500">{row.actor_email}</div>
                       ) : null}
                     </td>
-                    <td className="hidden px-1.5 py-1.5 lg:table-cell">{screenLabel(row.screen_key)}</td>
-                    <td className="hidden px-1.5 py-1.5 lg:table-cell">{entityTypeLabel(row.entity_type)}</td>
-                    <td className="px-1.5 py-1.5">
+                    <td className="px-3 py-3">{entityTypeLabel(row.entity_type)}</td>
+                    <td className="px-3 py-3">
                       {row.entity_code ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{row.entity_code}</span>
                           <button
                             type="button"
@@ -499,67 +666,48 @@ export default function HistoricoExclusoesPage() {
                         "—"
                       )}
                     </td>
-                    <td className="hidden max-w-xs truncate px-1.5 py-1.5 text-slate-700 xl:table-cell" title={row.summary ?? undefined}>
-                      {row.summary || "—"}
+                    <td className="max-w-[14rem] px-3 py-3 text-slate-700">
+                      <p className="break-words">{row.summary || "—"}</p>
                     </td>
-                    <td className="hidden max-w-[8rem] truncate px-1.5 py-1.5 xl:table-cell sm:max-w-md">
+                    <td className="max-w-[16rem] px-3 py-3">
                       {row.reason ? (
-                        <p className="truncate font-medium text-slate-900" title={row.reason}>
-                          {row.reason}
-                        </p>
+                        <p className="break-words font-medium text-slate-900">{row.reason}</p>
                       ) : (
                         <span className="text-slate-400">Sem observação</span>
                       )}
                     </td>
-                    <td className="hidden px-1.5 py-1.5 md:table-cell">
+                    <td className="px-3 py-3">
                       <Badge variant={row.delete_mode === "soft" ? "warning" : "danger"}>
                         {row.delete_mode === "soft" ? "Soft" : "Hard"}
                       </Badge>
                     </td>
-                    <td className="px-1.5 py-1.5">
+                    <td className="px-3 py-3">
                       <Badge variant={row.restored ? "success" : "danger"}>
                         {row.restored ? "Restaurado" : "Excluído"}
                       </Badge>
                     </td>
-                    <td className="px-1.5 py-1.5">
-                      <div className="os-row-actions flex flex-col gap-1">
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col gap-1.5">
                         <Button
                           type="button"
                           size="sm"
                           variant="ghost"
-                          className="action-icon-btn"
-                          title={expandedId === row.id ? "Ocultar detalhe" : "Ver detalhe"}
                           onClick={() =>
                             setExpandedId((cur) => (cur === row.id ? null : row.id))
                           }
                         >
-                          {expandedId === row.id ? (
-                            <>
-                              <span className="sm:hidden">Ocult.</span>
-                              <span className="hidden sm:inline">Ocultar</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="sm:hidden">Det.</span>
-                              <span className="hidden sm:inline">Detalhe</span>
-                            </>
-                          )}
+                          {expandedId === row.id ? "Ocultar" : "Detalhe"}
                         </Button>
                         {restorable ? (
                           <Button
                             type="button"
                             size="sm"
-                            className="action-icon-btn"
-                            title={row.delete_mode === "hard" ? "Restaurar (hard)" : "Restaurar"}
                             onClick={() => {
                               setMsg(null);
                               setPendingRestore(row);
                             }}
                           >
-                            <span className="sm:hidden">Rest.</span>
-                            <span className="hidden sm:inline">
-                              {row.delete_mode === "hard" ? "Restaurar (hard)" : "Restaurar"}
-                            </span>
+                            {row.delete_mode === "hard" ? "Restaurar (hard)" : "Restaurar"}
                           </Button>
                         ) : null}
                       </div>
@@ -567,100 +715,17 @@ export default function HistoricoExclusoesPage() {
                   </tr>
                   {expandedId === row.id ? (
                     <tr className="border-t border-slate-50 bg-slate-50/80">
-                      <td colSpan={10} className="px-3 py-3">
-                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                          <p>
-                            <span className="font-semibold">Excluído em:</span>{" "}
-                            {formatOccurredAt(row.occurred_at)}
-                          </p>
-                          <p className="mt-1">
-                            <span className="font-semibold">Por:</span> {row.actor_name || "—"}
-                            {row.actor_email ? ` (${row.actor_email})` : ""}
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap">
-                            <span className="font-semibold">Motivo:</span> {row.reason || "—"}
-                          </p>
-                          {row.restored ? (
-                            <>
-                              <p className="mt-2">
-                                <span className="font-semibold">Restaurado em:</span>{" "}
-                                {row.restored_at ? formatOccurredAt(row.restored_at) : "—"}
-                              </p>
-                              <p className="mt-1">
-                                <span className="font-semibold">Por:</span>{" "}
-                                {row.restored_by_name || "—"}
-                                {row.restored_by_email ? ` (${row.restored_by_email})` : ""}
-                              </p>
-                              <p className="mt-1 whitespace-pre-wrap">
-                                <span className="font-semibold">Motivo da restauração:</span>{" "}
-                                {row.restoration_reason || "—"}
-                              </p>
-                            </>
-                          ) : null}
-                          {restorable ? (
-                            <p className="mt-2 text-xs text-amber-900">
-                              {row.delete_mode === "hard"
-                                ? "Exclusão hard: a restauração reinsere o snapshot. Filhos vinculados (ex.: anexos da OS) podem não voltar."
-                                : "Registro soft-deleted pode ser restaurado. O histórico permanece."}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Conteúdo no momento da exclusão
-                        </p>
-                        {row.payload_json ? (
-                          <dl className="mb-3 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2">
-                            {formatSnapshotLines(row.payload_json).map((line) => (
-                              <div key={`${row.id}-${line.label}`}>
-                                <dt className="text-xs font-medium text-slate-500">{line.label}</dt>
-                                <dd className="text-sm text-slate-900">{line.value}</dd>
-                              </div>
-                            ))}
-                          </dl>
-                        ) : (
-                          <p className="mb-3 text-sm text-slate-500">
-                            Snapshot não disponível neste evento.
-                          </p>
-                        )}
-
-                        {row.payload_json ? (
-                          <details className="text-xs text-slate-600">
-                            <summary className="cursor-pointer font-medium text-slate-700">
-                              JSON técnico
-                            </summary>
-                            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all">
-                              {JSON.stringify(row.payload_json, null, 2)}
-                            </pre>
-                          </details>
-                        ) : null}
-
-                        <p className="mt-2 text-xs text-slate-500">
-                          ID: {row.entity_id}
-                          {row.payload_json &&
-                          typeof (row.payload_json as { created_at?: string }).created_at ===
-                            "string"
-                            ? ` · Criado em ${formatDateBR(
-                                (row.payload_json as { created_at: string }).created_at
-                              )}`
-                            : ""}
-                        </p>
+                      <td colSpan={9} className="px-3 py-3">
+                        <DeletionEventDetail row={row} restorable={restorable} />
                       </td>
                     </tr>
                   ) : null}
                 </Fragment>
               );
             })}
-            {!loading && rows.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
-                  Nenhuma exclusão registrada com estes filtros.
-                </td>
-              </tr>
-            ) : null}
           </tbody>
         </table>
-      </DataTableScroll>
+      </div>
 
       <DeleteReasonModal
         open={Boolean(pendingRestore)}
