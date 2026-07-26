@@ -28,7 +28,7 @@ import {
   isVehiclePlateTaken,
 } from "@/lib/party-document-uniqueness";
 import { dataTableScroll } from "@/lib/liquid-glass-styles";
-import { formatDisplayValueBR, normalizePlate } from "@/lib/utils";
+import { cn, formatDisplayValueBR, normalizePlate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Loading, Alert } from "@/components/ui/Badge";
@@ -78,6 +78,11 @@ type CrudPageProps<T extends { id: string }> = {
   initialNewDraft?: Partial<T> | null;
   /** Lista mais densa (fonte −1pt, padding menor) — útil na OS com muitas ações. */
   compactTable?: boolean;
+  /**
+   * No celular: cartões legíveis (nome completo + ações).
+   * No desktop: mantém a tabela. Ideal para Contas DRE / listas com nomes longos.
+   */
+  cardsOnMobile?: boolean;
 };
 
 export function CrudPage<T extends { id: string }>({
@@ -104,6 +109,7 @@ export function CrudPage<T extends { id: string }>({
   initialNewDraft = null,
   /** Padrão mobile: tabela densa em todas as listagens CRUD. */
   compactTable = true,
+  cardsOnMobile = false,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const { canEditScreen, canDeleteScreen, isAdmin, loading: accessLoading } = useAccess();
@@ -545,13 +551,113 @@ export function CrudPage<T extends { id: string }>({
               Nenhum registro encontrado.
             </p>
           ) : (
+            <>
+              {cardsOnMobile ? (
+                <ul className="space-y-3 p-3 md:hidden">
+                  {visibleItems.map((row) => {
+                    const canEdit = screenCanEdit && (canEditRow?.(row) ?? true);
+                    const editTitle = !screenCanEdit
+                      ? "Somente visualização"
+                      : canEdit
+                        ? undefined
+                        : (editBlockedReason?.(row) ?? "Edição indisponível para este registro.");
+                    const canDelete = screenCanDelete && (canDeleteRow?.(row) ?? true);
+                    const deleteTitle = !screenCanDelete
+                      ? "Sem permissão de exclusão"
+                      : canDelete
+                        ? undefined
+                        : (deleteBlockedReason?.(row) ?? "Exclusão indisponível para este registro.");
+                    const showActions =
+                      screenCanEdit || screenCanDelete || Boolean(renderRowActions);
+                    const [primaryCol, ...metaCols] = columns;
+                    const primaryValue = primaryCol
+                      ? primaryCol.render
+                        ? primaryCol.render(row)
+                        : formatDisplayValueBR(
+                            (row as Record<string, unknown>)[primaryCol.key as string]
+                          )
+                      : "—";
+
+                    return (
+                      <li
+                        key={row.id}
+                        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold leading-snug break-words text-slate-900">
+                            {primaryValue}
+                          </p>
+                          {metaCols.length ? (
+                            <dl className="mt-2 space-y-1 text-xs text-slate-600">
+                              {metaCols.map((col) => {
+                                const value = col.render
+                                  ? col.render(row)
+                                  : formatDisplayValueBR(
+                                      (row as Record<string, unknown>)[col.key as string]
+                                    );
+                                return (
+                                  <div
+                                    key={String(col.key)}
+                                    className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+                                  >
+                                    <dt className="font-medium text-slate-500">{col.label}:</dt>
+                                    <dd className="min-w-0 break-words text-slate-700">{value}</dd>
+                                  </div>
+                                );
+                              })}
+                            </dl>
+                          ) : null}
+                        </div>
+                        {showActions ? (
+                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                            {screenCanEdit ? renderRowActions?.(row) : null}
+                            {screenCanEdit ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled={!canEdit}
+                                title={editTitle ?? "Editar"}
+                                onClick={() => {
+                                  if (!canEdit) return;
+                                  setEditing(row);
+                                  setIsNew(false);
+                                }}
+                              >
+                                Editar
+                              </Button>
+                            ) : null}
+                            {screenCanDelete ? (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                disabled={!canDelete}
+                                title={deleteTitle ?? "Excluir"}
+                                onClick={() => {
+                                  if (!canDelete) return;
+                                  requestDelete(row.id);
+                                }}
+                              >
+                                Excluir
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+
             <div
-              className={dataTableScroll({
-                stickyFirst: true,
-                stickyLast: true,
-                fitWidth: true,
-                className: compactTable ? "data-table-scroll--compact" : undefined,
-              })}
+              className={cn(
+                dataTableScroll({
+                  stickyFirst: true,
+                  stickyLast: true,
+                  fitWidth: true,
+                  className: compactTable ? "data-table-scroll--compact" : undefined,
+                }),
+                cardsOnMobile && "hidden md:block"
+              )}
             >
             <table className={compactTable ? "w-full text-[11px] leading-snug sm:text-xs" : "w-full text-sm"}>
               <thead>
@@ -675,6 +781,7 @@ export function CrudPage<T extends { id: string }>({
               </tbody>
             </table>
             </div>
+            </>
           )}
         </CardBody>
       </Card>
