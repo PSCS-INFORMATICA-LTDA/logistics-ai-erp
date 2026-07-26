@@ -858,6 +858,7 @@ export function isWhatsAppNativeHref(href: string): boolean {
 }
 
 export function openWhatsAppShareHref(href: string, targetWindow?: Window | null): void {
+  if (!href) return;
   if (isWhatsAppNativeHref(href)) {
     // Não use aba about:blank — o protocolo deve focar o app desktop, sem aba Web.
     if (targetWindow && !targetWindow.closed) {
@@ -868,6 +869,24 @@ export function openWhatsAppShareHref(href: string, targetWindow?: Window | null
       }
     }
     launchCustomProtocol(href);
+    return;
+  }
+  // Ponte same-origin (/abrir-whatsapp): mesma aba — target=_blank é bloqueado pelo navegador.
+  if (href.startsWith("/") || href.startsWith("#")) {
+    if (targetWindow && !targetWindow.closed) {
+      targetWindow.location.href = href;
+      return;
+    }
+    window.location.assign(href);
+    return;
+  }
+  // https://wa.me — também na mesma aba (mais confiável que popup).
+  if (/^https?:\/\//i.test(href)) {
+    if (targetWindow && !targetWindow.closed) {
+      targetWindow.location.href = href;
+      return;
+    }
+    window.location.assign(href);
     return;
   }
   openExternalUrl(href, targetWindow);

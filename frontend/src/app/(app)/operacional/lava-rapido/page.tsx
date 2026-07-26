@@ -34,7 +34,9 @@ import {
 import {
   buildSmsShareHref,
   buildWashReadyWhatsApp,
+  canUseDeviceSms,
   launchShareHref,
+  washReadyWhatsAppHref,
 } from "@/lib/wash-notify";
 import {
   computeWashLoyaltyProgress,
@@ -42,11 +44,7 @@ import {
   type PatioWashLoyaltySettings,
   type WashLoyaltyProgress,
 } from "@/lib/wash-loyalty";
-import {
-  copyTextToClipboardSync,
-  isWindowsWhatsAppDesktop,
-  openWhatsAppShareHref,
-} from "@/lib/service-order-proposal";
+import { copyTextToClipboardSync } from "@/lib/service-order-proposal";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
 
@@ -266,7 +264,29 @@ export default function LavaRapidoPage() {
     await load();
   };
 
-  const markReady = async (row: CarWashServiceRow, channel: "whatsapp" | "sms") => {
+  const persistReadyStatus = async (row: CarWashServiceRow) => {
+    if (!companyId) return;
+    const { error: updError } = await supabase
+      .from("car_wash_services")
+      .update({
+        status: row.status === "Aberto" ? "Pronto" : row.status,
+        ready_notified_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    if (updError) {
+      if (/Pronto|ready_notified/i.test(updError.message)) {
+        setError(
+          "Aviso aberto, mas o status não gravou. Rode apply-063-car-wash-ready-loyalty.sql no Supabase."
+        );
+      } else {
+        setError(`Aviso aberto, mas falhou ao gravar status: ${updError.message}`);
+      }
+      return;
+    }
+    await load();
+  };
+
+  const markReady = (row: CarWashServiceRow, channel: "whatsapp" | "sms") => {
     if (!companyId || !canEdit) return;
     if (!row.phone?.trim()) {
       setError("Informe o telefone do cliente na ordem (DDD + número) para avisar.");
@@ -290,48 +310,35 @@ export default function LavaRapidoPage() {
 
     setError(null);
     setInfo(null);
-    // Copia no gesto do clique (antes do await) — fallback se o app não pré-preencher.
     copyTextToClipboardSync(share.message);
 
     if (channel === "whatsapp") {
-      // Windows: ponte /abrir-whatsapp com mensagem completa (primaryHref é só chat).
-      // Mobile/outros: primaryHref (wa.me ou whatsapp:// com texto).
-      const href = isWindowsWhatsAppDesktop()
-        ? share.links.desktopBridgeHref || share.links.primaryHref
-        : share.links.primaryHref;
-      if (href) openWhatsAppShareHref(href);
-      else setInfo("Mensagem copiada. Cole no WhatsApp do cliente.");
-    } else {
-      const sms = buildSmsShareHref(row.phone, share.message);
-      if (sms) launchShareHref(sms);
-      else setInfo("Mensagem copiada. Abra o SMS e cole para o cliente.");
-    }
-
-    setSaving(true);
-    const { error: updError } = await supabase
-      .from("car_wash_services")
-      .update({
-        status: row.status === "Aberto" ? "Pronto" : row.status,
-        ready_notified_at: new Date().toISOString(),
-      })
-      .eq("id", row.id);
-    setSaving(false);
-    if (updError) {
-      if (/Pronto|ready_notified/i.test(updError.message)) {
-        setError(
-          "Aviso aberto, mas o status não gravou. Rode apply-063-car-wash-ready-loyalty.sql no Supabase."
-        );
-      } else {
-        setError(`Aviso aberto, mas falhou ao gravar status: ${updError.message}`);
+      const href = washReadyWhatsAppHref(share.links);
+      if (!href) {
+        setError("Não foi possível montar o link do WhatsApp. Verifique o telefone.");
+        return;
       }
+      void persistReadyStatus(row);
+      // Mesma aba — não usa popup (bloqueado no Chrome/Edge).
+      launchShareHref(href);
       return;
     }
-    setInfo(
-      channel === "whatsapp"
-        ? "WhatsApp aberto. Se a mensagem não preencheu, use Ctrl+V (já copiada)."
-        : "SMS aberto. Se o texto não preencheu, cole a mensagem (já copiada)."
-    );
-    await load();
+
+    if (!canUseDeviceSms()) {
+      setError(
+        "SMS só funciona no celular. No computador use Pronto (WhatsApp). Mensagem já copiada (Ctrl+V)."
+      );
+      void persistReadyStatus(row);
+      return;
+    }
+
+    const sms = buildSmsShareHref(row.phone, share.message);
+    if (!sms) {
+      setError("Não foi possível abrir o SMS. Verifique o telefone.");
+      return;
+    }
+    void persistReadyStatus(row);
+    launchShareHref(sms);
   };
 
   const completeService = async (row: CarWashServiceRow) => {
@@ -395,28 +402,66 @@ export default function LavaRapidoPage() {
   function renderReadyActions(row: CarWashServiceRow) {
     if (!canEdit) return null;
     if (row.status !== "Aberto" && row.status !== "Pronto") return null;
+
+    const share = buildWashReadyWhatsApp({
+      companyName,
+      plate: row.plate,
+      phone: row.phone,
+      clientName: row.client_name,
+      serviceName: row.service_name,
+    });
+    const waHref = washReadyWhatsAppHref(share.links);
+    const smsHref = canUseDeviceSms() ? buildSmsShareHref(row.phone, share.message) : null;
+    const linkClass = `${glassAction("emerald", true)} inline-flex items-center justify-center`;
+
     return (
       <>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={saving}
-          onClick={() => void markReady(row, "whatsapp")}
-          title="Avisar no WhatsApp que o veículo está pronto"
-        >
-          Pronto (WhatsApp)
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={saving}
-          onClick={() => void markReady(row, "sms")}
-          title="Abrir SMS do aparelho"
-        >
-          Pronto (SMS)
-        </Button>
+        {waHref ? (
+          <a
+            href={waHref}
+            className={linkClass}
+            title="Avisar no WhatsApp que o veículo está pronto"
+            onClick={() => {
+              copyTextToClipboardSync(share.message);
+              void persistReadyStatus(row);
+            }}
+          >
+            Pronto (WhatsApp)
+          </a>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => markReady(row, "whatsapp")}
+            title="Informe telefone DDD + número na ordem"
+          >
+            Pronto (WhatsApp)
+          </Button>
+        )}
+        {smsHref ? (
+          <a
+            href={smsHref}
+            className={linkClass}
+            title="Abrir SMS do aparelho"
+            onClick={() => {
+              copyTextToClipboardSync(share.message);
+              void persistReadyStatus(row);
+            }}
+          >
+            Pronto (SMS)
+          </a>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => markReady(row, "sms")}
+            title="SMS só no celular; no PC use WhatsApp"
+          >
+            Pronto (SMS)
+          </Button>
+        )}
       </>
     );
   }
@@ -555,6 +600,12 @@ export default function LavaRapidoPage() {
                 <p className="mt-1 text-lg font-semibold text-slate-900">{row.plate}</p>
                 <p className="mt-1 text-sm text-slate-600">
                   {formatDateBR(row.service_date)} · {row.vehicle_type ?? "—"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {row.client_name?.trim() || "Cliente —"} ·{" "}
+                  {row.phone?.trim() || (
+                    <span className="font-medium text-red-600">sem telefone</span>
+                  )}
                 </p>
                 <p className="mt-2 text-sm leading-snug break-words text-slate-800">
                   {row.service_name}
