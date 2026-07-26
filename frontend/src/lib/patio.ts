@@ -10,7 +10,7 @@ export const PARKING_BILLING_MODES = ["Diária", "Mensal", "Rotativo"] as const;
 export type ParkingBillingMode = (typeof PARKING_BILLING_MODES)[number];
 
 export const PARKING_STATUSES = ["Aberto", "Finalizado", "Cancelado"] as const;
-export const CAR_WASH_STATUSES = ["Aberto", "Concluido", "Cancelado"] as const;
+export const CAR_WASH_STATUSES = ["Aberto", "Pronto", "Concluido", "Cancelado"] as const;
 
 export const CAR_WASH_SERVICE_NAMES = [
   "Lavagem Simples",
@@ -113,6 +113,9 @@ export type CarWashServiceRow = {
   payment_method: string | null;
   notes: string | null;
   financial_transaction_id: string | null;
+  ready_notified_at?: string | null;
+  is_loyalty_reward?: boolean | null;
+  public_ticket_token?: string | null;
 };
 
 /** RN-082: mínimo 1 diária. */

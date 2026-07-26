@@ -18,6 +18,11 @@ import {
   type PatioVehicleType,
 } from "@/lib/patio";
 import { listPatioPrices, listPatioVehicleTypes, seedPatioDefaults } from "@/lib/patio-api";
+import { getPatioSettings, upsertPatioSettings } from "@/lib/patio-settings-api";
+import {
+  DEFAULT_WASH_LOYALTY_SETTINGS,
+  type PatioWashLoyaltySettings,
+} from "@/lib/wash-loyalty";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 
@@ -42,6 +47,7 @@ export default function ParametrosPatioPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loyalty, setLoyalty] = useState<PatioWashLoyaltySettings | null>(null);
 
   const [typeForm, setTypeForm] = useState({
     name: "",
@@ -72,13 +78,15 @@ export default function ParametrosPatioPage() {
     setLoading(true);
     setError(null);
     await seedPatioDefaults(supabase, companyId);
-    const [t, p] = await Promise.all([
+    const [t, p, s] = await Promise.all([
       listPatioVehicleTypes(supabase, companyId),
       listPatioPrices(supabase, companyId),
+      getPatioSettings(supabase, companyId),
     ]);
     if (t.error || p.error) setError(t.error ?? p.error);
     setTypes(t.rows);
     setPrices(p.rows);
+    setLoyalty(s.settings);
     if (!priceForm.vehicle_type_id && t.rows[0]) {
       setPriceForm((f) => ({ ...f, vehicle_type_id: t.rows[0].id }));
     }
@@ -273,6 +281,96 @@ export default function ParametrosPatioPage() {
         </Alert>
       ) : null}
       {loading ? <Loading /> : null}
+
+      <section className={`space-y-4 ${glassFilterPanel()}`}>
+        <h2 className="text-sm font-semibold text-slate-900">Fidelidade — Lava-rápido</h2>
+        <p className="text-xs text-slate-600">
+          Por placa: a cada N lavagens pagas concluídas, o cliente ganha lavagem(ns) grátis. Ex.: a
+          cada 5 → 1 grátis, ou a cada 10 → 1 grátis.
+        </p>
+        {loyalty ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex items-center gap-2 text-sm text-slate-800">
+              <input
+                type="checkbox"
+                checked={loyalty.wash_loyalty_enabled}
+                disabled={!canEdit}
+                onChange={(e) =>
+                  setLoyalty((s) =>
+                    s
+                      ? { ...s, wash_loyalty_enabled: e.target.checked }
+                      : { company_id: companyId, ...DEFAULT_WASH_LOYALTY_SETTINGS, wash_loyalty_enabled: e.target.checked }
+                  )
+                }
+              />
+              Ativar cartão fidelidade
+            </label>
+            <GlassSelect
+              label="A cada quantas lavagens"
+              value={String(loyalty.wash_loyalty_every_n)}
+              onChange={(next) =>
+                setLoyalty((s) =>
+                  s
+                    ? {
+                        ...s,
+                        wash_loyalty_every_n: Number(next) === 10 ? 10 : 5,
+                      }
+                    : null
+                )
+              }
+              options={[
+                { value: "5", label: "A cada 5 lavagens" },
+                { value: "10", label: "A cada 10 lavagens" },
+              ]}
+            />
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Lavagens grátis ganhas</span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                className={glassField(true)}
+                disabled={!canEdit}
+                value={loyalty.wash_loyalty_reward_qty}
+                onChange={(e) =>
+                  setLoyalty((s) =>
+                    s
+                      ? {
+                          ...s,
+                          wash_loyalty_reward_qty: Math.min(
+                            5,
+                            Math.max(1, Number(e.target.value) || 1)
+                          ),
+                        }
+                      : null
+                  )
+                }
+              />
+            </label>
+          </div>
+        ) : null}
+        {canEdit && loyalty ? (
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={() => {
+              void (async () => {
+                setSaving(true);
+                setError(null);
+                const { error: saveError } = await upsertPatioSettings(supabase, {
+                  ...loyalty,
+                  company_id: companyId,
+                });
+                setSaving(false);
+                if (saveError) setError(saveError);
+                else setMsg("Fidelidade do lava-rápido salva.");
+              })();
+            }}
+          >
+            Salvar fidelidade
+          </Button>
+        ) : null}
+      </section>
 
       <section className={`space-y-4 ${glassFilterPanel()}`}>
         <h2 className="text-sm font-semibold text-slate-900">Portes / tipos de veículo</h2>

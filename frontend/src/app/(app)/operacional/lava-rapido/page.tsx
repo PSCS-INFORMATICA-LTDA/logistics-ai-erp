@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import { GroupedTableBodies } from "@/components/ui/GroupedTableBodies";
 import { GlassSelect } from "@/components/ui/GlassSelect";
+import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
+import { companyDisplayName } from "@/lib/company-logo";
 import { nextCode } from "@/lib/codes";
 import { glassAction, glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { groupByKeySorted } from "@/lib/table-row-groups";
@@ -25,19 +27,43 @@ import {
   resolvePatioPrice,
   seedPatioDefaults,
 } from "@/lib/patio-api";
-import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
+import {
+  getPatioSettings,
+  listWashHistoryForPlate,
+} from "@/lib/patio-settings-api";
+import {
+  buildSmsShareHref,
+  buildWashReadyWhatsApp,
+} from "@/lib/wash-notify";
+import {
+  computeWashLoyaltyProgress,
+  washLoyaltyLabel,
+  type PatioWashLoyaltySettings,
+  type WashLoyaltyProgress,
+} from "@/lib/wash-loyalty";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDateBR, normalizePlate } from "@/lib/utils";
 
+function statusBadgeVariant(status: string): "success" | "danger" | "warning" | "default" {
+  if (status === "Concluido") return "success";
+  if (status === "Cancelado") return "danger";
+  if (status === "Pronto") return "default";
+  return "warning";
+}
+
 export default function LavaRapidoPage() {
-  const { companyId } = useCompany();
+  const { companyId, company } = useCompany();
   const { canEditScreen } = useAccess();
   const canEdit = canEditScreen("operacional.lava-rapido");
   const supabase = useMemo(() => createClient(), []);
+  const companyName = companyDisplayName(company);
   const [types, setTypes] = useState<PatioVehicleType[]>([]);
   const [rows, setRows] = useState<CarWashServiceRow[]>([]);
+  const [loyaltySettings, setLoyaltySettings] = useState<PatioWashLoyaltySettings | null>(null);
+  const [plateLoyalty, setPlateLoyalty] = useState<WashLoyaltyProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [quotedPrice, setQuotedPrice] = useState<number | null>(null);
 
@@ -78,7 +104,7 @@ export default function LavaRapidoPage() {
         seedPatioDefaults(supabase, companyId),
         new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 6000)),
       ]);
-      const [tRes, wRes] = await Promise.all([
+      const [tRes, wRes, settingsRes] = await Promise.all([
         listPatioVehicleTypes(supabase, companyId, true),
         supabase
           .from("car_wash_services")
@@ -86,10 +112,15 @@ export default function LavaRapidoPage() {
           .eq("company_id", companyId)
           .order("service_date", { ascending: false })
           .limit(100),
+        getPatioSettings(supabase, companyId),
       ]);
       if (tRes.error || wRes.error) setError(tRes.error ?? wRes.error?.message ?? null);
+      if (settingsRes.error && /apply-063/i.test(settingsRes.error)) {
+        setInfo(settingsRes.error);
+      }
       setTypes(tRes.rows);
       setRows((wRes.data as CarWashServiceRow[]) ?? []);
+      setLoyaltySettings(settingsRes.settings);
       setForm((f) => {
         if (f.vehicle_type_id) return f;
         const first = tRes.rows.find((r) => allowsWash(r.usage_category));
@@ -129,6 +160,22 @@ export default function LavaRapidoPage() {
     };
   }, [companyId, form.vehicle_type_id, form.service_name, form.service_date, supabase]);
 
+  useEffect(() => {
+    if (!companyId || !loyaltySettings || !form.plate.trim()) {
+      setPlateLoyalty(null);
+      return;
+    }
+    let cancelled = false;
+    const plate = normalizePlate(form.plate);
+    void listWashHistoryForPlate(supabase, companyId, plate).then((res) => {
+      if (cancelled) return;
+      setPlateLoyalty(computeWashLoyaltyProgress(res.rows, loyaltySettings));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, form.plate, loyaltySettings, supabase, rows]);
+
   const openService = async () => {
     if (!companyId) return;
     if (!canEdit) {
@@ -153,14 +200,27 @@ export default function LavaRapidoPage() {
       return;
     }
 
+    const plate = normalizePlate(form.plate);
+    const history = await listWashHistoryForPlate(supabase, companyId, plate);
+    const progress = loyaltySettings
+      ? computeWashLoyaltyProgress(history.rows, loyaltySettings)
+      : null;
+    let useLoyalty = false;
+    if (progress?.enabled && progress.availableFree > 0) {
+      useLoyalty = window.confirm(
+        `Placa ${plate} tem ${progress.availableFree} lavagem(ns) grátis (fidelidade a cada ${progress.everyN}).\n\nUsar 1 lavagem grátis nesta ordem?`
+      );
+    }
+
     setSaving(true);
     setError(null);
+    setInfo(null);
     const code = await nextCode("car_wash_services", companyId, "LAV");
     const { error: insertError } = await supabase.from("car_wash_services").insert({
       company_id: companyId,
       code,
       service_date: form.service_date,
-      plate: normalizePlate(form.plate),
+      plate,
       brand: form.brand || null,
       model: form.model || null,
       vehicle_type_id: type.id,
@@ -168,18 +228,26 @@ export default function LavaRapidoPage() {
       client_name: form.client_name || null,
       phone: form.phone || null,
       service_name: form.service_name,
-      service_amount: price.price,
+      service_amount: useLoyalty ? 0 : price.price,
+      is_loyalty_reward: useLoyalty,
       status: "Aberto",
       entry_date: form.service_date,
       attendant: form.attendant || null,
-      payment_method: form.payment_method || null,
+      payment_method: useLoyalty ? "Fidelidade" : form.payment_method || null,
       notes: form.notes || null,
     });
     setSaving(false);
     if (insertError) {
-      setError(insertError.message);
+      if (/is_loyalty_reward|Pronto/i.test(insertError.message)) {
+        setError(
+          "Banco desatualizado. Rode frontend/scripts/apply-063-car-wash-ready-loyalty.sql no Supabase."
+        );
+      } else {
+        setError(insertError.message);
+      }
       return;
     }
+    if (useLoyalty) setInfo(`Ordem ${code}: lavagem grátis (fidelidade) aplicada.`);
     setForm((f) => ({
       ...f,
       plate: "",
@@ -189,6 +257,58 @@ export default function LavaRapidoPage() {
       phone: "",
       notes: "",
     }));
+    await load();
+  };
+
+  const markReady = async (row: CarWashServiceRow, channel: "whatsapp" | "sms") => {
+    if (!companyId || !canEdit) return;
+    if (!row.phone?.trim()) {
+      setError("Informe o telefone do cliente na ordem para avisar.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const { error: updError } = await supabase
+      .from("car_wash_services")
+      .update({
+        status: row.status === "Aberto" ? "Pronto" : row.status,
+        ready_notified_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    setSaving(false);
+    if (updError) {
+      if (/Pronto|ready_notified/i.test(updError.message)) {
+        setError(
+          "Banco desatualizado. Rode frontend/scripts/apply-063-car-wash-ready-loyalty.sql no Supabase."
+        );
+      } else {
+        setError(updError.message);
+      }
+      return;
+    }
+
+    const share = buildWashReadyWhatsApp({
+      companyName,
+      plate: row.plate,
+      phone: row.phone,
+      clientName: row.client_name,
+      serviceName: row.service_name,
+    });
+    try {
+      await navigator.clipboard.writeText(share.message);
+    } catch {
+      /* ignore */
+    }
+
+    if (channel === "whatsapp") {
+      const href = share.links.primaryHref;
+      if (href) window.location.href = href;
+      else setInfo("Mensagem copiada. Cole no WhatsApp do cliente.");
+    } else {
+      const sms = buildSmsShareHref(row.phone, share.message);
+      if (sms) window.location.href = sms;
+      else setInfo("Mensagem copiada. Abra o SMS e cole para o cliente.");
+    }
     await load();
   };
 
@@ -214,13 +334,31 @@ export default function LavaRapidoPage() {
       setError(updError?.message ?? "Falha ao concluir.");
       return;
     }
-    const posted = await postCarWashRevenue({
-      supabase,
-      companyId,
-      row: data as CarWashServiceRow,
-    });
+    const completed = data as CarWashServiceRow;
+    if (!completed.is_loyalty_reward && Number(completed.service_amount) > 0) {
+      const posted = await postCarWashRevenue({
+        supabase,
+        companyId,
+        row: completed,
+      });
+      if (posted.error) {
+        setSaving(false);
+        setError(posted.error);
+        await load();
+        return;
+      }
+    }
     setSaving(false);
-    if (posted.error) setError(posted.error);
+
+    if (loyaltySettings?.wash_loyalty_enabled && !completed.is_loyalty_reward) {
+      const history = await listWashHistoryForPlate(supabase, companyId, completed.plate);
+      const progress = computeWashLoyaltyProgress(history.rows, loyaltySettings);
+      if (progress.availableFree > 0 && progress.paidCompleted % progress.everyN === 0) {
+        setInfo(
+          `Placa ${completed.plate}: a cada ${progress.everyN} lavagens ganhou ${progress.rewardQty} grátis. Crédito disponível!`
+        );
+      }
+    }
     await load();
   };
 
@@ -232,6 +370,35 @@ export default function LavaRapidoPage() {
     [rows]
   );
 
+  function renderReadyActions(row: CarWashServiceRow) {
+    if (!canEdit) return null;
+    if (row.status !== "Aberto" && row.status !== "Pronto") return null;
+    return (
+      <>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={saving}
+          onClick={() => void markReady(row, "whatsapp")}
+          title="Avisar no WhatsApp que o veículo está pronto"
+        >
+          Pronto (WhatsApp)
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={saving}
+          onClick={() => void markReady(row, "sms")}
+          title="Abrir SMS do aparelho"
+        >
+          Pronto (SMS)
+        </Button>
+      </>
+    );
+  }
+
   if (!companyId) return <Loading />;
 
   return (
@@ -239,7 +406,7 @@ export default function LavaRapidoPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Lava-rápido</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Ordem própria — valores por porte em{" "}
+          Aviso de veículo pronto (WhatsApp/SMS), ticket digital e fidelidade por placa. Parâmetros em{" "}
           <Link href="/configuracoes/parametros-patio" className="text-brand-700 underline">
             Parâmetros do Pátio
           </Link>
@@ -248,6 +415,7 @@ export default function LavaRapidoPage() {
       </div>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
+      {info ? <Alert variant="info">{info}</Alert> : null}
       {!canEdit ? (
         <Alert variant="info">
           Modo visualização: você pode consultar as ordens, mas não abrir nem concluir serviços.
@@ -256,83 +424,95 @@ export default function LavaRapidoPage() {
       {loading ? <Loading /> : null}
 
       {canEdit ? (
-      <section className={`space-y-4 ${glassFilterPanel()}`}>
-        <h2 className="text-sm font-semibold text-slate-900">Nova ordem de lava</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Placa</span>
-            <input
-              className={glassField(true)}
-              value={form.plate}
-              onChange={(e) => setForm((f) => ({ ...f, plate: e.target.value.toUpperCase() }))}
+        <section className={`space-y-4 ${glassFilterPanel()}`}>
+          <h2 className="text-sm font-semibold text-slate-900">Nova ordem de lava</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Placa</span>
+              <input
+                className={glassField(true)}
+                value={form.plate}
+                onChange={(e) => setForm((f) => ({ ...f, plate: e.target.value.toUpperCase() }))}
+              />
+            </label>
+            <GlassSelect
+              label="Porte"
+              required
+              value={form.vehicle_type_id}
+              onChange={(next) => setForm((f) => ({ ...f, vehicle_type_id: next }))}
+              options={washTypes.map((t) => ({ value: t.id, label: t.name }))}
             />
-          </label>
-          <GlassSelect
-            label="Porte"
-            required
-            value={form.vehicle_type_id}
-            onChange={(next) => setForm((f) => ({ ...f, vehicle_type_id: next }))}
-            options={washTypes.map((t) => ({ value: t.id, label: t.name }))}
-          />
-          <GlassSelect
-            label="Serviço"
-            required
-            value={form.service_name}
-            onChange={(next) => setForm((f) => ({ ...f, service_name: next }))}
-            options={CAR_WASH_SERVICE_NAMES.map((s) => ({ value: s, label: s }))}
-          />
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Data do serviço</span>
-            <input
-              type="date"
-              className={glassField(true)}
-              value={form.service_date}
-              onChange={(e) => setForm((f) => ({ ...f, service_date: e.target.value }))}
+            <GlassSelect
+              label="Serviço"
+              required
+              value={form.service_name}
+              onChange={(next) => setForm((f) => ({ ...f, service_name: next }))}
+              options={CAR_WASH_SERVICE_NAMES.map((s) => ({ value: s, label: s }))}
             />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Valor (tabela)</span>
-            <input
-              className={glassField(false)}
-              readOnly
-              value={quotedPrice != null ? formatCurrency(quotedPrice) : "— sem preço —"}
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Data do serviço</span>
+              <input
+                type="date"
+                className={glassField(true)}
+                value={form.service_date}
+                onChange={(e) => setForm((f) => ({ ...f, service_date: e.target.value }))}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Valor (tabela)</span>
+              <input
+                className={glassField(false)}
+                readOnly
+                value={
+                  plateLoyalty?.availableFree
+                    ? `${formatCurrency(quotedPrice ?? 0)} · ou grátis (fidelidade)`
+                    : quotedPrice != null
+                      ? formatCurrency(quotedPrice)
+                      : "— sem preço —"
+                }
+              />
+            </label>
+            <GlassSelect
+              label="Pagamento"
+              value={form.payment_method}
+              onChange={(next) => setForm((f) => ({ ...f, payment_method: next }))}
+              options={PATIO_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
             />
-          </label>
-          <GlassSelect
-            label="Pagamento"
-            value={form.payment_method}
-            onChange={(next) => setForm((f) => ({ ...f, payment_method: next }))}
-            options={PATIO_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
-          />
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Cliente</span>
-            <input
-              className={glassField(false)}
-              value={form.client_name}
-              onChange={(e) => setForm((f) => ({ ...f, client_name: e.target.value }))}
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Telefone</span>
-            <input
-              className={glassField(false)}
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Responsável</span>
-            <input
-              className={glassField(false)}
-              value={form.attendant}
-              onChange={(e) => setForm((f) => ({ ...f, attendant: e.target.value }))}
-            />
-          </label>
-        </div>
-        <Button type="button" disabled={saving || quotedPrice == null} onClick={() => void openService()}>
-          Abrir ordem de lava-rápido
-        </Button>
-      </section>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Cliente</span>
+              <input
+                className={glassField(false)}
+                value={form.client_name}
+                onChange={(e) => setForm((f) => ({ ...f, client_name: e.target.value }))}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Telefone (WhatsApp/SMS)</span>
+              <input
+                className={glassField(true)}
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="DDD + número"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-slate-700">Responsável</span>
+              <input
+                className={glassField(false)}
+                value={form.attendant}
+                onChange={(e) => setForm((f) => ({ ...f, attendant: e.target.value }))}
+              />
+            </label>
+          </div>
+          {plateLoyalty?.enabled && form.plate.trim() ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              Cartão fidelidade · {normalizePlate(form.plate)}: {washLoyaltyLabel(plateLoyalty)}
+            </p>
+          ) : null}
+          <Button type="button" disabled={saving || quotedPrice == null} onClick={() => void openService()}>
+            Abrir ordem de lava-rápido
+          </Button>
+        </section>
       ) : null}
 
       {!loading && rows.length === 0 ? (
@@ -356,24 +536,15 @@ export default function LavaRapidoPage() {
                 </p>
                 <p className="mt-2 text-sm leading-snug break-words text-slate-800">
                   {row.service_name}
+                  {row.is_loyalty_reward ? " · Fidelidade" : ""}
                 </p>
                 {row.service_amount != null ? (
                   <p className="mt-2 text-base font-bold tabular-nums text-slate-900">
-                    {formatCurrency(Number(row.service_amount))}
+                    {row.is_loyalty_reward ? "Grátis" : formatCurrency(Number(row.service_amount))}
                   </p>
                 ) : null}
               </div>
-              <Badge
-                variant={
-                  row.status === "Concluido"
-                    ? "success"
-                    : row.status === "Cancelado"
-                      ? "danger"
-                      : "warning"
-                }
-              >
-                {row.status}
-              </Badge>
+              <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
@@ -381,16 +552,17 @@ export default function LavaRapidoPage() {
                 href={`/operacional/lava-rapido/${row.id}/ticket`}
                 className={`text-center ${glassAction("sky", true)}`}
               >
-                Ticket / imprimir
+                Ticket
               </Link>
-              {row.status === "Aberto" && canEdit ? (
+              {renderReadyActions(row)}
+              {(row.status === "Aberto" || row.status === "Pronto") && canEdit ? (
                 <Button
                   type="button"
                   size="sm"
                   disabled={saving}
                   onClick={() => void completeService(row)}
                 >
-                  Concluir
+                  Entregar / concluir
                 </Button>
               ) : null}
             </div>
@@ -411,109 +583,85 @@ export default function LavaRapidoPage() {
       </ul>
 
       <div className="hidden md:block">
-      <DataTableScroll stickyFirst stickyLast compact>
-        <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
-            <tr>
-              <th className="px-1.5 py-2">Código</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">Data</th>
-              <th className="px-1.5 py-2">Placa</th>
-              <th className="hidden px-1.5 py-2 md:table-cell">Porte</th>
-              <th className="px-1.5 py-2">Serviço</th>
-              <th className="hidden px-1.5 py-2 lg:table-cell">Valor</th>
-              <th className="hidden px-1.5 py-2 xl:table-cell">Comprovante</th>
-              <th className="px-1.5 py-2">Status</th>
-              <th className="px-1.5 py-2">Ticket</th>
-              <th className="px-1.5 py-2" />
-            </tr>
-          </thead>
-          <GroupedTableBodies groups={plateGroups} colSpan={10}>
-            {(group) =>
-              group.rows.map((row, index) => (
-                <tr key={row.id} className={group.multi ? "align-top" : "border-t border-slate-100"}>
-                  <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">{row.code}</td>
-                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
-                    {formatDateBR(row.service_date)}
-                  </td>
-                  <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
-                    {index === 0 || !group.multi ? row.plate : (
-                      <span className="text-slate-300" aria-hidden>
-                        ↳
-                      </span>
-                    )}
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 md:table-cell">{row.vehicle_type ?? "—"}</td>
-                  <td
-                    className="max-w-[7rem] truncate px-1.5 py-1.5 sm:max-w-[10rem]"
-                    title={row.service_name || undefined}
-                  >
-                    {row.service_name}
-                  </td>
-                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 lg:table-cell">
-                    {row.service_amount != null ? formatCurrency(Number(row.service_amount)) : "—"}
-                  </td>
-                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
-                    {companyId ? (
-                      <PatioPaymentProofClip
-                        companyId={companyId}
-                        entityType="car_wash_service"
-                        entityId={row.id}
-                        code={row.code}
-                        canUpload={canEdit}
-                      />
-                    ) : null}
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    <Badge
-                      variant={
-                        row.status === "Concluido"
-                          ? "success"
-                          : row.status === "Cancelado"
-                            ? "danger"
-                            : "warning"
-                      }
-                    >
-                      {row.status}
-                    </Badge>
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    <Link
-                      href={`/operacional/lava-rapido/${row.id}/ticket`}
-                      className={glassAction("sky", true)}
-                    >
-                      Ticket
-                    </Link>
-                  </td>
-                  <td className="px-1.5 py-1.5">
-                    {row.status === "Aberto" && canEdit ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="action-icon-btn"
-                        disabled={saving}
-                        title="Concluir"
-                        onClick={() => void completeService(row)}
-                      >
-                        <span className="sm:hidden">OK</span>
-                        <span className="hidden sm:inline">Concluir</span>
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))
-            }
-          </GroupedTableBodies>
-          {rows.length === 0 && !loading ? (
-            <tbody>
+        <DataTableScroll stickyFirst stickyLast>
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-slate-500">
-                  Nenhuma ordem ainda.
-                </td>
+                <th className="px-3 py-2.5">Código</th>
+                <th className="px-3 py-2.5">Data</th>
+                <th className="px-3 py-2.5">Placa</th>
+                <th className="px-3 py-2.5">Serviço</th>
+                <th className="px-3 py-2.5">Valor</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Ticket</th>
+                <th className="px-3 py-2.5">Ações</th>
               </tr>
-            </tbody>
-          ) : null}
-        </table>
-      </DataTableScroll>
+            </thead>
+            <GroupedTableBodies groups={plateGroups} colSpan={8}>
+              {(group) =>
+                group.rows.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className={group.multi ? "align-top" : "border-t border-slate-100"}
+                  >
+                    <td className="whitespace-nowrap px-3 py-3 font-medium">{row.code}</td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {formatDateBR(row.service_date)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900">
+                      {index === 0 || !group.multi ? (
+                        row.plate
+                      ) : (
+                        <span className="text-slate-300" aria-hidden>
+                          ↳
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.service_name}
+                      {row.is_loyalty_reward ? (
+                        <span className="ml-1 text-xs text-amber-700">fidelidade</span>
+                      ) : null}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {row.is_loyalty_reward
+                        ? "Grátis"
+                        : row.service_amount != null
+                          ? formatCurrency(Number(row.service_amount))
+                          : "—"}
+                    </td>
+                    <td className="px-3 py-3">
+                      <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link
+                        href={`/operacional/lava-rapido/${row.id}/ticket`}
+                        className={glassAction("sky", true)}
+                      >
+                        Ticket
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {renderReadyActions(row)}
+                        {(row.status === "Aberto" || row.status === "Pronto") && canEdit ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={saving}
+                            onClick={() => void completeService(row)}
+                          >
+                            Concluir
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              }
+            </GroupedTableBodies>
+          </table>
+        </DataTableScroll>
       </div>
     </div>
   );
