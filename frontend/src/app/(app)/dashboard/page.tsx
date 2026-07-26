@@ -132,16 +132,16 @@ function OwnershipBlock({
           }))}
         />
       ) : null}
-      <DataTableScroll stickyFirst maxHeight="min(50vh, 28rem)">
-        <table className="w-full text-left text-xs sm:text-sm">
-          <thead className="text-xs uppercase text-slate-500">
+      <DataTableScroll stickyFirst compact maxHeight="min(50vh, 28rem)">
+        <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-2 py-2">Sócio</th>
-              <th className="px-2 py-2">Placa</th>
-              <th className="px-2 py-2">%</th>
-              <th className="px-2 py-2">Receita</th>
-              <th className="px-2 py-2">Despesa</th>
-              <th className="px-2 py-2">Resultado</th>
+              <th className="w-[28%] max-w-[7.5rem] px-1.5 py-2 sm:max-w-none">Sócio</th>
+              <th className="w-[18%] px-1.5 py-2">Placa</th>
+              <th className="w-[10%] px-1.5 py-2">%</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Receita</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Despesa</th>
+              <th className="px-1.5 py-2">Resultado</th>
             </tr>
           </thead>
           {participationGroups.length === 0 ? (
@@ -160,19 +160,17 @@ function OwnershipBlock({
                     key={`${row.partnerId}-${row.vehicleId}`}
                     className={group.multi ? "align-top" : "border-t border-slate-100"}
                   >
-                    <td className="px-2 py-2 font-medium">
-                      {row.partnerName}
+                    <td className="max-w-[7.5rem] px-1.5 py-1.5 font-medium sm:max-w-[12rem]">
+                      <span className="block truncate" title={row.partnerName}>
+                        {row.partnerName}
+                      </span>
                       {row.isFullOwner ? (
-                        <span className="ml-2 inline-block">
-                          <Badge variant="success">100%</Badge>
-                        </span>
+                        <Badge variant="success">100%</Badge>
                       ) : Math.abs(row.ownershipPct - 50) < 0.51 ? (
-                        <span className="ml-2 inline-block">
-                          <Badge variant="default">50%</Badge>
-                        </span>
+                        <Badge variant="default">50%</Badge>
                       ) : null}
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="whitespace-nowrap px-1.5 py-1.5 font-semibold tabular-nums">
                       {index === 0 ? (
                         row.plate
                       ) : group.multi ? (
@@ -183,10 +181,16 @@ function OwnershipBlock({
                         row.plate
                       )}
                     </td>
-                    <td className="px-2 py-2">{row.ownershipPct.toFixed(0)}%</td>
-                    <td className="px-2 py-2">{formatCurrency(row.revenue)}</td>
-                    <td className="px-2 py-2">{formatCurrency(row.expense)}</td>
-                    <td className="px-2 py-2 font-medium">{formatCurrency(row.result)}</td>
+                    <td className="whitespace-nowrap px-1.5 py-1.5">{row.ownershipPct.toFixed(0)}%</td>
+                    <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
+                      {formatCurrency(row.revenue)}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
+                      {formatCurrency(row.expense)}
+                    </td>
+                    <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">
+                      {formatCurrency(row.result)}
+                    </td>
                   </tr>
                 ))
               }

@@ -144,14 +144,14 @@ export function VehicleScheduleBoard({
           style={{ width: "max(100%, 72rem)", tableLayout: "fixed" }}
         >
           <colgroup>
-            <col style={{ width: "9.5rem" }} />
+            <col className="schedule-plate-col" style={{ width: "7rem" }} />
             {weekKeys.map((key) => (
               <col key={key} style={{ width: "10.5rem" }} />
             ))}
           </colgroup>
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="sticky left-0 top-0 z-30 bg-slate-100 px-3 py-3 text-left font-semibold text-slate-800 shadow-[2px_0_8px_rgba(15,23,42,0.08)]">
+              <th className="sticky left-0 top-0 z-30 max-w-[7rem] bg-slate-100 px-2 py-2 text-left text-xs font-semibold text-slate-800 shadow-[2px_0_8px_rgba(15,23,42,0.08)] sm:px-3 sm:py-3 sm:text-sm">
                 Veículo
               </th>
               {weekKeys.map((key) => {
@@ -178,9 +178,17 @@ export function VehicleScheduleBoard({
             ) : (
               vehicles.map((vehicle) => (
                 <tr key={vehicle.id} className="border-b border-slate-100 align-top">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-3 shadow-[2px_0_8px_rgba(15,23,42,0.08)]">
-                    <p className="truncate font-semibold text-slate-900">{vehicle.plate}</p>
-                    <p className="truncate text-xs text-slate-500">
+                  <td className="sticky left-0 z-10 max-w-[7rem] bg-white px-2 py-2 shadow-[2px_0_8px_rgba(15,23,42,0.08)] sm:px-3 sm:py-3">
+                    <p
+                      className="truncate text-xs font-semibold tabular-nums text-slate-900 sm:text-sm"
+                      title={vehicle.plate}
+                    >
+                      {vehicle.plate}
+                    </p>
+                    <p
+                      className="truncate text-[10px] text-slate-500 sm:text-xs"
+                      title={vehicle.model || vehicle.vehicle_category || undefined}
+                    >
                       {vehicle.model || vehicle.vehicle_category}
                     </p>
                   </td>

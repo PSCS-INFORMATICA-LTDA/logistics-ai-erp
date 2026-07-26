@@ -622,29 +622,45 @@ export function CrudPage<T extends { id: string }>({
                         <Button
                           variant="ghost"
                           size="sm"
+                          className={compactTable ? "action-icon-btn" : undefined}
                           disabled={!canEdit}
-                          title={editTitle}
+                          title={editTitle ?? "Editar"}
                           onClick={() => {
                             if (!canEdit) return;
                             setEditing(row);
                             setIsNew(false);
                           }}
                         >
-                          Editar
+                          {compactTable ? (
+                            <>
+                              <span className="sm:hidden">Edit</span>
+                              <span className="hidden sm:inline">Editar</span>
+                            </>
+                          ) : (
+                            "Editar"
+                          )}
                         </Button>
                         ) : null}
                         {screenCanDelete ? (
                         <Button
                           variant="ghost"
                           size="sm"
+                          className={compactTable ? "action-icon-btn" : undefined}
                           disabled={!canDelete}
-                          title={deleteTitle}
+                          title={deleteTitle ?? "Excluir"}
                           onClick={() => {
                             if (!canDelete) return;
                             requestDelete(row.id);
                           }}
                         >
-                          Excluir
+                          {compactTable ? (
+                            <>
+                              <span className="sm:hidden">Exc</span>
+                              <span className="hidden sm:inline">Excluir</span>
+                            </>
+                          ) : (
+                            "Excluir"
+                          )}
                         </Button>
                         ) : null}
                       </div>

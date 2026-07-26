@@ -115,18 +115,18 @@ export function DriverDocumentsFollowupPanel({ companyId }: Props) {
 
       <section className={glassFilterPanel()}>
         <h2 className="mb-2 text-sm font-semibold">Motoristas em acompanhamento</h2>
-        <DataTableScroll stickyFirst stickyLast>
-          <table className="w-full text-left text-sm">
-          <thead className="text-xs uppercase text-slate-500">
+        <DataTableScroll stickyFirst stickyLast compact>
+          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-2 py-2">Motorista</th>
-              <th className="px-2 py-2">CNH</th>
-              <th className="px-2 py-2">Validade</th>
-              <th className="px-2 py-2">Situação CNH</th>
-              <th className="px-2 py-2">Pasta CNH</th>
-              <th className="px-2 py-2">Pasta CNH-AVC</th>
-              <th className="px-2 py-2">Pendências</th>
-              <th className="px-2 py-2">Ação</th>
+              <th className="px-1.5 py-2">Motorista</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">CNH</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Validade</th>
+              <th className="px-1.5 py-2">Situação</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Pasta CNH</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Pasta CNH-AVC</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Pendências</th>
+              <th className="px-1.5 py-2">Ação</th>
             </tr>
           </thead>
           <tbody>
@@ -139,41 +139,52 @@ export function DriverDocumentsFollowupPanel({ companyId }: Props) {
             ) : (
               filtered.map((row) => (
                 <tr key={row.id} className="border-t border-slate-100">
-                  <td className="px-2 py-2">
-                    <p className="font-medium text-slate-800">{row.name}</p>
+                  <td className="max-w-[9rem] px-1.5 py-1.5 sm:max-w-[14rem]">
+                    <p className="truncate font-medium text-slate-800" title={row.name}>
+                      {row.name}
+                    </p>
                     {row.code ? (
-                      <p className="text-xs text-slate-500">{row.code}</p>
+                      <p className="text-[10px] text-slate-500 sm:text-xs">{row.code}</p>
                     ) : null}
+                    <p className="mt-0.5 truncate text-[10px] text-slate-500 md:hidden">
+                      {row.reasons.length ? row.reasons.join(" · ") : row.cnhLabel}
+                    </p>
                   </td>
-                  <td className="px-2 py-2 whitespace-nowrap">{row.cnhNumber || "—"}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">
+                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
+                    {row.cnhNumber || "—"}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 lg:table-cell">
                     {formatDriverFollowupExpiry(row.cnhExpiry)}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-1.5 py-1.5">
                     <Badge variant={driverFollowupBadgeVariant(row.cnhStatus)}>
                       {row.cnhLabel}
                     </Badge>
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
                     <Badge variant={row.hasCnhFolder ? "success" : "warning"}>
                       {row.hasCnhFolder ? "Com anexo" : "Enviar"}
                     </Badge>
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
                     <Badge variant={row.hasCnhAvcFolder ? "success" : "warning"}>
                       {row.hasCnhAvcFolder ? "Com anexo" : "Enviar"}
                     </Badge>
                   </td>
-                  <td className="px-2 py-2 text-xs text-slate-600">
+                  <td className="hidden max-w-[12rem] truncate px-1.5 py-1.5 text-xs text-slate-600 md:table-cell">
                     {row.reasons.length ? row.reasons.join(" · ") : "—"}
                   </td>
-                  <td className="px-2 py-2">
-                    <Link
-                      href={`/cadastros/motoristas?edit=${encodeURIComponent(row.id)}`}
-                      className={glassAction("sky", true)}
-                    >
-                      Abrir cadastro
-                    </Link>
+                  <td className="px-1.5 py-1.5">
+                    <div className="os-row-actions">
+                      <Link
+                        href={`/cadastros/motoristas?edit=${encodeURIComponent(row.id)}`}
+                        className={`${glassAction("sky", true)} action-icon-btn !text-[10px] sm:!text-xs`}
+                        title="Abrir cadastro"
+                      >
+                        <span className="sm:hidden">Abrir</span>
+                        <span className="hidden sm:inline">Abrir cadastro</span>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))

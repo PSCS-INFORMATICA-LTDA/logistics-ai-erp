@@ -1587,6 +1587,48 @@ tbody.rateio-os-group + tbody.data-row-group > tr:first-child > td {
   box-shadow: none;
 }
 
+/** Agenda: coluna da placa mais estreita no celular. */
+@media (max-width: 639px) {
+  .schedule-board-scroll .schedule-plate-col {
+    width: 5.75rem !important;
+  }
+
+  .schedule-board-scroll thead th:first-child,
+  .schedule-board-scroll tbody td:first-child {
+    max-width: 5.75rem;
+    width: 5.75rem;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
+}
+
+/** Botões de ação densos (✓ / ✕ / Exc) — ganha espaço para dados no mobile. */
+.action-icon-btn {
+  min-width: 1.85rem;
+  padding-left: 0.35rem !important;
+  padding-right: 0.35rem !important;
+  font-size: 0.7rem !important;
+  line-height: 1.1 !important;
+}
+
+@media (max-width: 639px) {
+  .data-table-scroll--compact.data-table-scroll--fit.data-table-scroll--sticky-last thead th:last-child,
+  .data-table-scroll--compact.data-table-scroll--fit.data-table-scroll--sticky-last tbody td:last-child {
+    width: 5.75rem;
+    min-width: 5.25rem;
+    max-width: 6.5rem;
+  }
+
+  .os-row-actions {
+    max-width: 6.25rem;
+  }
+
+  .data-table-scroll--compact.data-table-scroll--fit table {
+    width: max(100%, 22rem) !important;
+    min-width: 22rem !important;
+  }
+}
+
 @supports (padding: max(0px)) {
   .app-main-scroll {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));

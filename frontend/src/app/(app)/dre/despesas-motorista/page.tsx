@@ -244,17 +244,21 @@ export default function DreDespesasMotoristaPage() {
               a OS já fica vinculada para o rateio. Se a despesa já foi lançada, o sistema avisa e
               bloqueia duplicata (também em Lançamentos da empresa).
             </Alert>
-            <DataTableScroll stickyFirst stickyLast>
-              <table className="w-full text-sm">
+            <DataTableScroll stickyFirst stickyLast compact>
+              <table className="w-full text-[11px] leading-snug sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-600">
-                    <th className="px-3 py-2 font-medium">OS</th>
-                    <th className="px-3 py-2 font-medium">Nº legado</th>
-                    <th className="px-3 py-2 font-medium">Data</th>
-                    <th className="px-3 py-2 font-medium">Motorista</th>
-                    <th className="px-3 py-2 font-medium">Valor motorista</th>
-                    <th className="px-3 py-2 font-medium">Valor ajudante</th>
-                    <th className="px-3 py-2 font-medium">Ação</th>
+                    <th className="px-1.5 py-2 font-medium">OS</th>
+                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Nº legado</th>
+                    <th className="px-1.5 py-2 font-medium">Data</th>
+                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Motorista</th>
+                    <th className="px-1.5 py-2 font-medium" title="Valor motorista">
+                      Mot. R$
+                    </th>
+                    <th className="px-1.5 py-2 font-medium" title="Valor ajudante">
+                      Aj. R$
+                    </th>
+                    <th className="px-1.5 py-2 font-medium">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,18 +270,25 @@ export default function DreDespesasMotoristaPage() {
                     const busy = legacyBusyId === row.id;
                     return (
                       <tr key={row.id} className="border-b border-slate-100 align-top">
-                        <td className="px-3 py-2 font-medium tabular-nums">{row.code}</td>
-                        <td className="px-3 py-2">{row.legacy_number || "—"}</td>
-                        <td className="whitespace-nowrap px-3 py-2">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium tabular-nums">
+                          {row.code}
+                        </td>
+                        <td className="hidden px-1.5 py-1.5 md:table-cell">
+                          {row.legacy_number || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-1.5 py-1.5">
                           {formatDate(row.service_date)}
                         </td>
-                        <td className="px-3 py-2">
+                        <td
+                          className="hidden max-w-[8rem] truncate px-1.5 py-1.5 lg:table-cell"
+                          title={`${row.driver_code} — ${row.driver_name}`}
+                        >
                           {row.driver_code} — {row.driver_name}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-1.5 py-1.5">
                           {motDone ? (
-                            <span className="text-xs font-medium text-emerald-800">
-                              Já lançado
+                            <span className="text-[10px] font-medium text-emerald-800 sm:text-xs">
+                              OK
                               {launchedAmount(existing, "motorista") != null
                                 ? ` · ${formatCurrency(launchedAmount(existing, "motorista")!)}`
                                 : ""}
@@ -287,7 +298,7 @@ export default function DreDespesasMotoristaPage() {
                               type="number"
                               min="0.01"
                               step="0.01"
-                              className={`${glassField(true)} w-28`}
+                              className={`${glassField(true)} w-20 sm:w-28`}
                               placeholder="R$"
                               value={draft.motorista}
                               disabled={!canEdit || busy}
@@ -297,10 +308,10 @@ export default function DreDespesasMotoristaPage() {
                             />
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-1.5 py-1.5">
                           {ajDone ? (
-                            <span className="text-xs font-medium text-emerald-800">
-                              Já lançado
+                            <span className="text-[10px] font-medium text-emerald-800 sm:text-xs">
+                              OK
                               {launchedAmount(existing, "ajudante") != null
                                 ? ` · ${formatCurrency(launchedAmount(existing, "ajudante")!)}`
                                 : ""}
@@ -310,7 +321,7 @@ export default function DreDespesasMotoristaPage() {
                               type="number"
                               min="0.01"
                               step="0.01"
-                              className={`${glassField(false)} w-28`}
+                              className={`${glassField(false)} w-20 sm:w-28`}
                               placeholder="R$"
                               value={draft.ajudante}
                               disabled={!canEdit || busy}
@@ -320,24 +331,33 @@ export default function DreDespesasMotoristaPage() {
                             />
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-1.5 py-1.5">
                           {motDone && ajDone ? (
-                            <span className="text-xs text-slate-500">Concluído</span>
+                            <span className="text-[10px] text-slate-500 sm:text-xs">OK</span>
                           ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="primary"
-                              disabled={
-                                !canEdit ||
-                                busy ||
-                                ((!draft.motorista.trim() || motDone) &&
-                                  (!draft.ajudante.trim() || ajDone))
-                              }
-                              onClick={() => void launchLegacyRow(row)}
-                            >
-                              {busy ? "Lançando…" : "Lançar no DRE"}
-                            </Button>
+                            <div className="os-row-actions">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="primary"
+                                className="action-icon-btn"
+                                disabled={
+                                  !canEdit ||
+                                  busy ||
+                                  ((!draft.motorista.trim() || motDone) &&
+                                    (!draft.ajudante.trim() || ajDone))
+                                }
+                                onClick={() => void launchLegacyRow(row)}
+                                title="Lançar no DRE"
+                              >
+                                {busy ? "…" : (
+                                  <>
+                                    <span className="sm:hidden">DRE</span>
+                                    <span className="hidden sm:inline">Lançar no DRE</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           )}
                         </td>
                       </tr>

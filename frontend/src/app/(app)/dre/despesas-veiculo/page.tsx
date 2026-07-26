@@ -503,17 +503,23 @@ export default function DreDespesasVeiculoPage() {
           ) : rows.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhuma despesa de veículo neste filtro.</p>
           ) : (
-            <DataTableScroll stickyFirst stickyLast>
-              <table className="w-full text-sm">
+            <DataTableScroll stickyFirst stickyLast compact>
+              <table className="w-full text-[11px] leading-snug sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                    <th className="px-3 py-2 font-medium text-slate-600">Data</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Placa</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Conta</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">OS</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Obs.</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Valor</th>
-                    <th className="px-3 py-2 font-medium text-slate-600" />
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Data</th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Placa</th>
+                    <th className="hidden px-1.5 py-2 font-medium text-slate-600 md:table-cell">
+                      Conta
+                    </th>
+                    <th className="hidden px-1.5 py-2 font-medium text-slate-600 lg:table-cell">
+                      OS
+                    </th>
+                    <th className="hidden px-1.5 py-2 font-medium text-slate-600 xl:table-cell">
+                      Obs.
+                    </th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Valor</th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Ação</th>
                   </tr>
                 </thead>
                 <GroupedTableBodies groups={expenseGroups} colSpan={7}>
@@ -523,12 +529,12 @@ export default function DreDespesasVeiculoPage() {
                         key={row.id}
                         className={group.multi ? "align-top" : "border-b border-slate-50"}
                       >
-                        <td className="px-3 py-2 text-slate-700">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 text-slate-700">
                           {index === 0 || !group.multi
                             ? formatDate(row.transaction_date)
                             : ""}
                         </td>
-                        <td className="px-3 py-2 font-medium text-slate-900">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                           {index === 0 ? (
                             row.plate ?? "—"
                           ) : group.multi ? (
@@ -539,39 +545,54 @@ export default function DreDespesasVeiculoPage() {
                             row.plate ?? "—"
                           )}
                         </td>
-                        <td className="px-3 py-2 text-slate-700">{row.dre_account_name}</td>
-                        <td className="px-3 py-2 text-slate-700">
+                        <td
+                          className="hidden max-w-[8rem] truncate px-1.5 py-1.5 text-slate-700 md:table-cell"
+                          title={row.dre_account_name || undefined}
+                        >
+                          {row.dre_account_name}
+                        </td>
+                        <td className="hidden px-1.5 py-1.5 text-slate-700 lg:table-cell">
                           {index === 0 || !group.multi ? row.service_order_code ?? "—" : ""}
                         </td>
-                        <td className="max-w-[220px] truncate px-3 py-2 text-slate-600">
+                        <td
+                          className="hidden max-w-[10rem] truncate px-1.5 py-1.5 text-slate-600 xl:table-cell"
+                          title={row.description ?? undefined}
+                        >
                           {row.description ?? "—"}
                         </td>
-                        <td className="px-3 py-2 font-medium text-slate-900">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                           {formatCurrency(row.amount)}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-1.5 py-1.5 text-right">
                           {canDelete ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onClick={() => {
-                                setPendingDeleteId(row.id);
-                                void (async () => {
-                                  if (!isAdmin || !companyId) {
-                                    setRequireMasterForDelete(false);
-                                    return;
-                                  }
-                                  const {
-                                    data: { user },
-                                  } = await supabase.auth.getUser();
-                                  setRequireMasterForDelete(
-                                    !(user?.id && isMasterSessionUnlocked(companyId, user.id))
-                                  );
-                                })();
-                              }}
-                            >
-                              Excluir
-                            </Button>
+                            <div className="os-row-actions inline-flex justify-end">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="action-icon-btn"
+                                title="Excluir"
+                                aria-label="Excluir"
+                                onClick={() => {
+                                  setPendingDeleteId(row.id);
+                                  void (async () => {
+                                    if (!isAdmin || !companyId) {
+                                      setRequireMasterForDelete(false);
+                                      return;
+                                    }
+                                    const {
+                                      data: { user },
+                                    } = await supabase.auth.getUser();
+                                    setRequireMasterForDelete(
+                                      !(user?.id && isMasterSessionUnlocked(companyId, user.id))
+                                    );
+                                  })();
+                                }}
+                              >
+                                <span className="sm:hidden">Exc</span>
+                                <span className="hidden sm:inline">Excluir</span>
+                              </Button>
+                            </div>
                           ) : null}
                         </td>
                       </tr>

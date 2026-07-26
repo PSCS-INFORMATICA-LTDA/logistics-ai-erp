@@ -315,12 +315,12 @@ export default function DreAprovacoesPage() {
                     {formatCurrency(row.amount)}
                   </td>
                   <td className="px-1.5 py-1.5 text-center">
-                    <div className="os-row-actions inline-flex flex-wrap items-center justify-center gap-1">
+                    <div className="os-row-actions inline-flex flex-wrap items-center justify-center gap-0.5">
                       <Button
                         type="button"
                         size="sm"
                         variant="moss"
-                        className="!px-2 !py-0.5 text-[10px] sm:text-xs"
+                        className="action-icon-btn"
                         disabled={busyId === row.id}
                         onClick={() => {
                           void (async () => {
@@ -343,38 +343,44 @@ export default function DreAprovacoesPage() {
                             await load();
                           })();
                         }}
-                        title="Aprovar lançamento"
+                        title="Aprovar"
+                        aria-label="Aprovar"
                       >
-                        Aprovar
+                        <span className="sm:hidden">✓</span>
+                        <span className="hidden sm:inline">Aprovar</span>
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         variant="danger"
-                        className="!px-2 !py-0.5 text-[10px] sm:text-xs"
+                        className="action-icon-btn"
                         disabled={busyId === row.id || deleting}
                         onClick={() => {
                           setRejectId(row.id);
                           setRejectNote("");
                         }}
-                        title="Rejeitar lançamento"
+                        title="Rejeitar"
+                        aria-label="Rejeitar"
                       >
-                        Rejeitar
+                        <span className="sm:hidden">✕</span>
+                        <span className="hidden sm:inline">Rejeitar</span>
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         variant="ink"
-                        className="!px-2 !py-0.5 text-[10px] sm:text-xs"
+                        className="action-icon-btn"
                         disabled={busyId === row.id || deleting}
                         onClick={() => {
                           setError(null);
                           setMsg(null);
                           setPendingDeleteId(row.id);
                         }}
-                        title="Remove o lançamento e registra no Histórico de Exclusões"
+                        title="Excluir (Histórico de Exclusões)"
+                        aria-label="Excluir"
                       >
-                        Excluir
+                        <span className="sm:hidden">Exc</span>
+                        <span className="hidden sm:inline">Excluir</span>
                       </Button>
                     </div>
                   </td>

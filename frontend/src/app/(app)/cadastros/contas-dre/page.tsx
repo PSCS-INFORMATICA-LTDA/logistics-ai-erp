@@ -98,13 +98,23 @@ export default function ContasDrePage() {
       auditScreenKey="cadastros.contas-dre"
       softDelete={false}
       orderBy="name"
+      compactTable
       columns={[
         { key: "name", label: "Conta DRE" },
-        { key: "classification", label: "Classificação" },
-        { key: "transaction_type", label: "Tipo" },
+        {
+          key: "classification",
+          label: "Classificação",
+          className: "hidden md:table-cell",
+        },
+        {
+          key: "transaction_type",
+          label: "Tipo",
+          className: "hidden lg:table-cell",
+        },
         {
           key: "status",
           label: "Status",
+          className: "hidden sm:table-cell",
           render: (r) => (
             <Badge variant={r.status === "Ativo" ? "success" : "default"}>{r.status}</Badge>
           ),
