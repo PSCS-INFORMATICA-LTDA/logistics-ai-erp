@@ -10,7 +10,7 @@ import { GlassSelect } from "@/components/ui/GlassSelect";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { nextCode } from "@/lib/codes";
-import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
+import { glassAction, glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { groupByKeySorted } from "@/lib/table-row-groups";
 import {
   allowsWash,
@@ -376,6 +376,25 @@ export default function LavaRapidoPage() {
               </Badge>
             </div>
 
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+              <Link
+                href={`/operacional/lava-rapido/${row.id}/ticket`}
+                className={`text-center ${glassAction("sky", true)}`}
+              >
+                Ticket / imprimir
+              </Link>
+              {row.status === "Aberto" && canEdit ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => void completeService(row)}
+                >
+                  Concluir
+                </Button>
+              ) : null}
+            </div>
+
             {companyId ? (
               <div className="mt-3 border-t border-slate-100 pt-3">
                 <PatioPaymentProofClip
@@ -385,19 +404,6 @@ export default function LavaRapidoPage() {
                   code={row.code}
                   canUpload={canEdit}
                 />
-              </div>
-            ) : null}
-
-            {row.status === "Aberto" && canEdit ? (
-              <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={saving}
-                  onClick={() => void completeService(row)}
-                >
-                  Concluir
-                </Button>
               </div>
             ) : null}
           </li>
@@ -417,10 +423,11 @@ export default function LavaRapidoPage() {
               <th className="hidden px-1.5 py-2 lg:table-cell">Valor</th>
               <th className="hidden px-1.5 py-2 xl:table-cell">Comprovante</th>
               <th className="px-1.5 py-2">Status</th>
+              <th className="px-1.5 py-2">Ticket</th>
               <th className="px-1.5 py-2" />
             </tr>
           </thead>
-          <GroupedTableBodies groups={plateGroups} colSpan={9}>
+          <GroupedTableBodies groups={plateGroups} colSpan={10}>
             {(group) =>
               group.rows.map((row, index) => (
                 <tr key={row.id} className={group.multi ? "align-top" : "border-t border-slate-100"}>
@@ -470,6 +477,14 @@ export default function LavaRapidoPage() {
                     </Badge>
                   </td>
                   <td className="px-1.5 py-1.5">
+                    <Link
+                      href={`/operacional/lava-rapido/${row.id}/ticket`}
+                      className={glassAction("sky", true)}
+                    >
+                      Ticket
+                    </Link>
+                  </td>
+                  <td className="px-1.5 py-1.5">
                     {row.status === "Aberto" && canEdit ? (
                       <Button
                         type="button"
@@ -491,7 +506,7 @@ export default function LavaRapidoPage() {
           {rows.length === 0 && !loading ? (
             <tbody>
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={10} className="px-3 py-6 text-center text-slate-500">
                   Nenhuma ordem ainda.
                 </td>
               </tr>

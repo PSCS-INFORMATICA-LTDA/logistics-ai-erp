@@ -10,7 +10,7 @@ import { GlassSelect } from "@/components/ui/GlassSelect";
 import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
-import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
+import { glassAction, glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { groupByKeySorted } from "@/lib/table-row-groups";
 import {
   allowsParking,
@@ -707,6 +707,15 @@ export default function EstacionamentoPage() {
                 </div>
               </div>
 
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                <Link
+                  href={`/operacional/estacionamento/${row.id}/ticket`}
+                  className={`text-center ${glassAction("sky", true)}`}
+                >
+                  Ticket / imprimir
+                </Link>
+              </div>
+
               {companyId ? (
                 <div className="mt-3 border-t border-slate-100 pt-3">
                   <PatioPaymentProofClip
@@ -756,12 +765,13 @@ export default function EstacionamentoPage() {
                 <th className="px-3 py-2.5">Entrada / período</th>
                 <th className="px-3 py-2.5">Saída / fechar</th>
                 <th className="px-3 py-2.5">Valor / estimado</th>
+                <th className="px-3 py-2.5">Ticket</th>
                 <th className="px-3 py-2.5">Comprovante</th>
                 <th className="px-3 py-2.5">Total</th>
                 <th className="px-3 py-2.5">Status</th>
               </tr>
             </thead>
-            <GroupedTableBodies groups={plateGroups} colSpan={9}>
+            <GroupedTableBodies groups={plateGroups} colSpan={10}>
               {(group) =>
                 group.rows.map((row, index) => {
                   const live = liveTotals[row.id];
@@ -834,6 +844,14 @@ export default function EstacionamentoPage() {
                         ) : null}
                       </td>
                       <td className="px-3 py-3">
+                        <Link
+                          href={`/operacional/estacionamento/${row.id}/ticket`}
+                          className={glassAction("sky", true)}
+                        >
+                          Ticket
+                        </Link>
+                      </td>
+                      <td className="px-3 py-3">
                         {companyId ? (
                           <PatioPaymentProofClip
                             companyId={companyId}
@@ -877,7 +895,7 @@ export default function EstacionamentoPage() {
             {rows.length === 0 && !loading ? (
               <tbody>
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={10} className="px-3 py-6 text-center text-slate-500">
                     Nenhuma ordem ainda.
                   </td>
                 </tr>
