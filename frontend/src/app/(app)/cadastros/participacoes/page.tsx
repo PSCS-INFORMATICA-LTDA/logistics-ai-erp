@@ -5,13 +5,13 @@ import { EntityForm, FormFields } from "@/components/crud/EntityForm";
 import { Alert, Badge, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { DataTableScroll } from "@/components/ui/DataTableScroll";
-import { GroupedTableBodies } from "@/components/ui/GroupedTableBodies";
 import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
+import { GlassSelect } from "@/components/ui/GlassSelect";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
 import { importOwnershipFromSpreadsheet, OWNERSHIP_SEED } from "@/lib/import-ownership";
+import { glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
 import {
   fromDbOwnershipRow,
@@ -118,6 +118,16 @@ export default function ParticipacoesPage() {
   const [deleting, setDeleting] = useState(false);
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
+  const vehicleOptions = useMemo(
+    () => [
+      { value: "", label: "Selecione um veículo..." },
+      ...vehicles.map((v) => ({
+        value: v.id,
+        label: `${v.plate_display ?? v.plate}${v.model ? ` — ${v.model}` : ""}`,
+      })),
+    ],
+    [vehicles]
+  );
 
   const partnerMap = useMemo(
     () => new Map(partners.map((p) => [p.id, p.name])),
@@ -364,23 +374,15 @@ export default function ParticipacoesPage() {
       </div>
 
       <Card>
-        <CardBody>
-          <label className="block max-w-md space-y-1">
-            <span className="text-sm font-medium text-slate-700">Veículo</span>
-            <select
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
-            >
-              <option value="">Selecione um veículo...</option>
-              {vehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.plate_display ?? v.plate}
-                  {v.model ? ` — ${v.model}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+        <CardBody className={`max-w-xl space-y-1 ${glassFilterPanel()}`}>
+          <GlassSelect
+            label="Veículo"
+            value={selectedVehicleId}
+            onChange={setSelectedVehicleId}
+            options={vehicleOptions}
+            searchable
+            placeholder="Buscar placa ou modelo…"
+          />
         </CardBody>
       </Card>
 
@@ -399,10 +401,14 @@ export default function ParticipacoesPage() {
           <Card>
             <CardHeader
               title={selectedVehicle?.plate_display ?? selectedVehicle?.plate ?? "Veículo"}
-              description="Distribuição de participação entre sócios"
+              description={
+                selectedVehicle?.model
+                  ? `${selectedVehicle.model} · distribuição entre sócios`
+                  : "Distribuição de participação entre sócios"
+              }
             />
             <CardBody className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-slate-600">Total ativo</span>
                 <Badge variant={distributionVariant}>{formatPercent(activeTotal)}</Badge>
               </div>
@@ -500,114 +506,170 @@ export default function ParticipacoesPage() {
           )}
 
           <Card>
-            <CardBody className="p-0">
+            <CardHeader
+              title="Sócios deste veículo"
+              description={
+                items.length
+                  ? `${items.length} participação(ões)`
+                  : "Nenhum sócio vinculado ainda"
+              }
+            />
+            <CardBody>
               {loading ? (
                 <Loading />
               ) : items.length === 0 ? (
-                <p className="px-6 py-8 text-center text-sm text-slate-500">
+                <p className="py-4 text-center text-sm text-slate-500">
                   Nenhuma participação cadastrada para este veículo.
                 </p>
               ) : (
-                <DataTableScroll stickyFirst stickyLast compact>
-                  <table className="w-full text-[11px] leading-snug sm:text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Sócio</th>
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Percentual</th>
-                      <th className="hidden px-1.5 py-2 font-medium text-slate-600 md:table-cell sm:px-2">
-                        Início
-                      </th>
-                      <th className="hidden px-1.5 py-2 font-medium text-slate-600 lg:table-cell sm:px-2">
-                        Fim
-                      </th>
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Status</th>
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Ações</th>
-                    </tr>
-                  </thead>
-                  <GroupedTableBodies
-                    groups={[{ key: "vehicle-partners", rows: items, multi: items.length > 1 }]}
-                    colSpan={6}
-                  >
-                    {(group) =>
-                      group.rows.map((row) => (
-                        <tr
+                <>
+                  {/* Mobile: cartões legíveis (poucos sócios por placa). */}
+                  <ul className="space-y-3 md:hidden">
+                    {items.map((row) => {
+                      const partnerName = partnerMap.get(row.partner_id) ?? "—";
+                      return (
+                        <li
                           key={row.id}
-                          className={
-                            group.multi
-                              ? "align-top"
-                              : "border-b border-slate-50 hover:bg-slate-50/50"
-                          }
+                          className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
                         >
-                          <td
-                            className="max-w-[8rem] truncate px-1.5 py-1.5 text-slate-700 sm:px-2 sm:max-w-[12rem]"
-                            title={partnerMap.get(row.partner_id) ?? undefined}
-                          >
-                            {partnerMap.get(row.partner_id) ?? "—"}
-                          </td>
-                          <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-700 sm:px-2">
-                            {formatPercent(Number(row.ownership_percentage))}
-                          </td>
-                          <td className="hidden whitespace-nowrap px-1.5 py-1.5 text-slate-700 md:table-cell sm:px-2">
-                            {formatDate(row.effective_date)}
-                          </td>
-                          <td className="hidden whitespace-nowrap px-1.5 py-1.5 text-slate-700 lg:table-cell sm:px-2">
-                            {formatDate(row.end_date)}
-                          </td>
-                          <td className="px-1.5 py-1.5 sm:px-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold leading-snug text-slate-900">
+                                {partnerName}
+                              </p>
+                              <p className="mt-1 text-lg font-bold tabular-nums text-slate-800">
+                                {formatPercent(Number(row.ownership_percentage))}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {formatDate(row.effective_date)}
+                                {row.end_date ? ` → ${formatDate(row.end_date)}` : " · vigente"}
+                              </p>
+                            </div>
                             <Badge variant={row.status === "Ativo" ? "success" : "default"}>
                               {row.status}
                             </Badge>
-                          </td>
-                          <td className="px-1.5 py-1.5 sm:px-2">
-                            {canEdit || canDelete ? (
-                            <div className="os-row-actions flex flex-wrap gap-1">
+                          </div>
+                          {canEdit || canDelete ? (
+                            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                               {canEdit ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="action-icon-btn"
-                                title="Editar"
-                                onClick={() => { setEditing(row); setIsNew(false); setError(null); }}
-                              >
-                                <span className="sm:hidden">Edit</span>
-                                <span className="hidden sm:inline">Editar</span>
-                              </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditing(row);
+                                    setIsNew(false);
+                                    setError(null);
+                                  }}
+                                >
+                                  Editar
+                                </Button>
                               ) : null}
                               {canEdit && row.status === "Ativo" ? (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="action-icon-btn"
-                                  title="Encerrar"
                                   onClick={() => handleClose(row.id)}
                                 >
-                                  <span className="sm:hidden">Enc</span>
-                                  <span className="hidden sm:inline">Encerrar</span>
+                                  Encerrar
                                 </Button>
                               ) : null}
                               {canDelete ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="action-icon-btn"
-                                title="Excluir"
-                                onClick={() => requestDelete(row.id)}
-                              >
-                                <span className="sm:hidden">Exc</span>
-                                <span className="hidden sm:inline">Excluir</span>
-                              </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => requestDelete(row.id)}
+                                >
+                                  Excluir
+                                </Button>
                               ) : null}
                             </div>
-                            ) : (
-                              <span className="text-xs text-slate-400">—</span>
-                            )}
-                          </td>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {/* Desktop: tabela simples (sem quadro azul de grupo). */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50 text-left">
+                          <th className="px-3 py-2.5 font-medium text-slate-600">Sócio</th>
+                          <th className="px-3 py-2.5 font-medium text-slate-600">Percentual</th>
+                          <th className="px-3 py-2.5 font-medium text-slate-600">Início</th>
+                          <th className="px-3 py-2.5 font-medium text-slate-600">Fim</th>
+                          <th className="px-3 py-2.5 font-medium text-slate-600">Status</th>
+                          <th className="px-3 py-2.5 font-medium text-slate-600">Ações</th>
                         </tr>
-                      ))
-                    }
-                  </GroupedTableBodies>
-                </table>
-                </DataTableScroll>
+                      </thead>
+                      <tbody>
+                        {items.map((row) => (
+                          <tr
+                            key={row.id}
+                            className="border-b border-slate-50 hover:bg-slate-50/50"
+                          >
+                            <td className="px-3 py-3 font-medium text-slate-800">
+                              {partnerMap.get(row.partner_id) ?? "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3 font-semibold tabular-nums text-slate-800">
+                              {formatPercent(Number(row.ownership_percentage))}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3 text-slate-700">
+                              {formatDate(row.effective_date)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3 text-slate-700">
+                              {formatDate(row.end_date)}
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variant={row.status === "Ativo" ? "success" : "default"}>
+                                {row.status}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-3">
+                              {canEdit || canDelete ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {canEdit ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditing(row);
+                                        setIsNew(false);
+                                        setError(null);
+                                      }}
+                                    >
+                                      Editar
+                                    </Button>
+                                  ) : null}
+                                  {canEdit && row.status === "Ativo" ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleClose(row.id)}
+                                    >
+                                      Encerrar
+                                    </Button>
+                                  ) : null}
+                                  {canDelete ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => requestDelete(row.id)}
+                                    >
+                                      Excluir
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardBody>
           </Card>
