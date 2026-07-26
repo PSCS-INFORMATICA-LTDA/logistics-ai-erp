@@ -9,6 +9,7 @@ import { GroupedTableBodies } from "@/components/ui/GroupedTableBodies";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import { SmsIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
+import { SmsShareAnchor } from "@/components/operacional/SmsShareAnchor";
 import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
@@ -35,8 +36,8 @@ import {
 } from "@/lib/patio-settings-api";
 import {
   buildSmsShareHref,
+  buildWashReadySmsMessage,
   buildWashReadyWhatsApp,
-  canUseDeviceSms,
   washReadyWhatsAppHref,
 } from "@/lib/wash-notify";
 import {
@@ -428,7 +429,12 @@ export default function LavaRapidoPage() {
       share.links.opensDirectChat && washReadyWhatsAppHref(share.links)
         ? washReadyWhatsAppHref(share.links)
         : "";
-    const smsHref = phoneOk && canUseDeviceSms() ? buildSmsShareHref(phone, share.message) : null;
+    const smsText = buildWashReadySmsMessage({
+      companyName,
+      plate: row.plate,
+      clientName: row.client_name,
+    });
+    const smsHref = phoneOk ? buildSmsShareHref(phone, smsText) : null;
     const phoneLabel = formatWhatsAppPhoneDisplay(share.links.phoneDigits) || phone;
     const draftValue = phoneDraftById[row.id] ?? row.phone ?? phoneFromClientCadastro(row.client_name);
 
@@ -479,32 +485,34 @@ export default function LavaRapidoPage() {
           </button>
         )}
         {smsHref ? (
-          <a
+          <SmsShareAnchor
             href={smsHref}
+            message={smsText}
             title={`SMS — ${phoneLabel}`}
             aria-label={`Avisar por SMS ${phoneLabel}`}
-            className={cn(glassAction("sky", true), SHARE_ICON_BTN, "inline-flex items-center justify-center")}
-            onClick={() => persistReadyStatus(row, phone)}
+            className={cn(
+              glassAction("sky", true),
+              SHARE_ICON_BTN,
+              "inline-flex items-center justify-center"
+            )}
+            onOpen={() => persistReadyStatus(row, phone)}
+            onDesktopHint={() =>
+              setInfo(
+                "SMS: mensagem copiada. No PC o ideal é o celular (ou Vincular ao telefone). Se o app não abriu, cole no SMS do aparelho."
+              )
+            }
           >
             <SmsIcon className="h-5 w-5" />
-          </a>
+          </SmsShareAnchor>
         ) : (
           <button
             type="button"
-            className={cn(glassAction("sky", true), SHARE_ICON_BTN, !phoneOk && "opacity-50")}
-            title={
-              !phoneOk
-                ? "Informe o telefone para SMS"
-                : "SMS só no celular — no PC use o ícone WhatsApp"
+            className={cn(glassAction("sky", true), SHARE_ICON_BTN, "opacity-50")}
+            title="Informe o telefone para SMS"
+            aria-label="SMS indisponível — telefone não cadastrado"
+            onClick={() =>
+              setError("Informe o telefone (cadastro ou manual) para SMS.")
             }
-            aria-label="SMS"
-            onClick={() => {
-              if (!phoneOk) {
-                setError("Informe o telefone (cadastro ou manual) para SMS.");
-                return;
-              }
-              setError("SMS só funciona no celular. No computador use o ícone verde do WhatsApp.");
-            }}
           >
             <SmsIcon className="h-5 w-5" />
           </button>
