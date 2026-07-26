@@ -39,12 +39,13 @@ export function Header({ onMenuClick }: HeaderProps) {
           </span>
         </button>
         <div
-          className="app-header-company liquid-glass-btn min-w-0 text-left"
+          className="app-header-company liquid-glass-btn min-w-0 flex-1 text-left"
           role="status"
           aria-label={`Empresa ${companyName}`}
+          title={companyName}
         >
           <p className="app-header-company-label">Empresa</p>
-          <p className="app-header-company-name truncate">{companyName}</p>
+          <p className="app-header-company-name">{companyName}</p>
         </div>
       </div>
       <button type="button" className="app-header-btn shrink-0" onClick={handleLogout}>

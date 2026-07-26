@@ -107,9 +107,10 @@ export function CrudPage<T extends { id: string }>({
   initialEditId = null,
   initialEditCode = null,
   initialNewDraft = null,
-  /** Padrão mobile: tabela densa em todas as listagens CRUD. */
+  /** Padrão mobile: tabela densa no desktop; no celular usa cartões (cardsOnMobile). */
   compactTable = true,
-  cardsOnMobile = false,
+  /** Padrão: cartões legíveis no celular — o usuário precisa ler nome/código sem truncar. */
+  cardsOnMobile = true,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const { canEditScreen, canDeleteScreen, isAdmin, loading: accessLoading } = useAccess();
@@ -553,7 +554,7 @@ export function CrudPage<T extends { id: string }>({
           ) : (
             <>
               {cardsOnMobile ? (
-                <ul className="space-y-3 p-3 md:hidden">
+                <ul className="space-y-3 bg-slate-50/60 p-3 md:hidden">
                   {visibleItems.map((row) => {
                     const canEdit = screenCanEdit && (canEditRow?.(row) ?? true);
                     const editTitle = !screenCanEdit
@@ -569,7 +570,24 @@ export function CrudPage<T extends { id: string }>({
                         : (deleteBlockedReason?.(row) ?? "Exclusão indisponível para este registro.");
                     const showActions =
                       screenCanEdit || screenCanDelete || Boolean(renderRowActions);
-                    const [primaryCol, ...metaCols] = columns;
+                    /**
+                     * No cartão: título = nome/placa/conta (o que o usuário procura com os olhos).
+                     * Meta: até 6 campos (omite só colunas xl/2xl).
+                     */
+                    const cardVisibleCols = columns.filter(
+                      (col) =>
+                        !col.className?.includes("xl:table-cell") &&
+                        !col.className?.includes("2xl:table-cell")
+                    );
+                    const primaryCol =
+                      columns.find((c) => c.key === "name" || c.key === "plate") ??
+                      cardVisibleCols.find((c) => !c.className?.includes("hidden")) ??
+                      cardVisibleCols[0] ??
+                      columns[0];
+                    const codeCol = columns.find((c) => c.key === "code");
+                    const metaCols = (cardVisibleCols.length ? cardVisibleCols : columns)
+                      .filter((col) => col !== primaryCol && col !== codeCol)
+                      .slice(0, 6);
                     const primaryValue = primaryCol
                       ? primaryCol.render
                         ? primaryCol.render(row)
@@ -577,18 +595,31 @@ export function CrudPage<T extends { id: string }>({
                             (row as Record<string, unknown>)[primaryCol.key as string]
                           )
                       : "—";
+                    const codeValue =
+                      codeCol && codeCol !== primaryCol
+                        ? codeCol.render
+                          ? codeCol.render(row)
+                          : formatDisplayValueBR(
+                              (row as Record<string, unknown>)[codeCol.key as string]
+                            )
+                        : null;
 
                     return (
                       <li
                         key={row.id}
-                        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold leading-snug break-words text-slate-900">
+                          {codeValue ? (
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              {codeValue}
+                            </p>
+                          ) : null}
+                          <p className="text-base font-semibold leading-snug break-words text-slate-900">
                             {primaryValue}
                           </p>
                           {metaCols.length ? (
-                            <dl className="mt-2 space-y-1 text-xs text-slate-600">
+                            <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
                               {metaCols.map((col) => {
                                 const value = col.render
                                   ? col.render(row)
@@ -598,10 +629,10 @@ export function CrudPage<T extends { id: string }>({
                                 return (
                                   <div
                                     key={String(col.key)}
-                                    className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+                                    className="grid grid-cols-[7.5rem_1fr] gap-2 sm:grid-cols-[9rem_1fr]"
                                   >
-                                    <dt className="font-medium text-slate-500">{col.label}:</dt>
-                                    <dd className="min-w-0 break-words text-slate-700">{value}</dd>
+                                    <dt className="text-xs font-medium text-slate-500">{col.label}</dt>
+                                    <dd className="min-w-0 break-words text-slate-800">{value}</dd>
                                   </div>
                                 );
                               })}
@@ -609,7 +640,7 @@ export function CrudPage<T extends { id: string }>({
                           ) : null}
                         </div>
                         {showActions ? (
-                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                             {screenCanEdit ? renderRowActions?.(row) : null}
                             {screenCanEdit ? (
                               <Button

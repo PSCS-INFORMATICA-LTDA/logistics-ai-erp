@@ -357,6 +357,127 @@ export default function EstacionamentoPage() {
       </section>
       ) : null}
 
+      {!loading && rows.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+          Nenhuma ordem ainda.
+        </p>
+      ) : null}
+
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row) => {
+          const draft = exitDraft[row.id] ?? {
+            date: new Date().toISOString().slice(0, 10),
+            time: new Date().toTimeString().slice(0, 5),
+          };
+          return (
+            <li
+              key={row.id}
+              className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-500">{row.code}</p>
+                  <p className="mt-1 text-lg font-semibold text-slate-900">{row.plate}</p>
+                  <p className="mt-1 text-sm text-slate-700">{row.vehicle_type ?? "—"}</p>
+                  <p className="mt-2 text-sm text-slate-800">
+                    <span className="font-medium text-slate-500">Entrada:</span>{" "}
+                    {formatDateTimeBR(row.entry_date, row.entry_time)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">{row.billing_mode ?? "Diária"}</p>
+                  {row.daily_rate != null ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      <span className="font-medium text-slate-500">Valor:</span>{" "}
+                      {formatCurrency(Number(row.daily_rate))}{" "}
+                      <span className="text-xs text-slate-500">
+                        ({rateUnitLabel(row.billing_mode)})
+                      </span>
+                    </p>
+                  ) : null}
+                  {row.total_amount != null ? (
+                    <p className="mt-1 text-base font-bold tabular-nums text-slate-900">
+                      Total: {formatCurrency(Number(row.total_amount))}
+                      {totalBreakdown(row) ? (
+                        <span className="ml-1 text-xs font-normal text-slate-500">
+                          ({totalBreakdown(row)})
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  {row.status !== "Aberto" ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      <span className="font-medium text-slate-500">Saída:</span>{" "}
+                      {formatDateTimeBR(row.exit_date, row.exit_time)}
+                    </p>
+                  ) : null}
+                </div>
+                <Badge
+                  variant={
+                    row.status === "Finalizado"
+                      ? "success"
+                      : row.status === "Cancelado"
+                        ? "danger"
+                        : "warning"
+                  }
+                >
+                  {row.status}
+                </Badge>
+              </div>
+
+              {companyId ? (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <PatioPaymentProofClip
+                    companyId={companyId}
+                    entityType="parking_entry"
+                    entityId={row.id}
+                    code={row.code}
+                    canUpload={canEdit}
+                  />
+                </div>
+              ) : null}
+
+              {row.status === "Aberto" && canEdit ? (
+                <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                  <p className="text-xs font-medium text-slate-600">Saída / fechar</p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <input
+                      type="date"
+                      className={glassField(true)}
+                      value={draft.date}
+                      onChange={(e) =>
+                        setExitDraft((d) => ({
+                          ...d,
+                          [row.id]: { ...draft, date: e.target.value },
+                        }))
+                      }
+                    />
+                    <input
+                      type="time"
+                      className={glassField(false)}
+                      value={draft.time}
+                      onChange={(e) =>
+                        setExitDraft((d) => ({
+                          ...d,
+                          [row.id]: { ...draft, time: e.target.value },
+                        }))
+                      }
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={saving}
+                      onClick={() => void closeEntry(row)}
+                    >
+                      Finalizar
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="hidden md:block">
       <DataTableScroll stickyFirst compact>
         <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
           <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
@@ -495,6 +616,7 @@ export default function EstacionamentoPage() {
           ) : null}
         </table>
       </DataTableScroll>
+      </div>
     </div>
   );
 }

@@ -1217,6 +1217,22 @@ body {
   color: #ffffff;
   letter-spacing: 0.01em;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  /* Celular: até 2 linhas — dá para ler o nome da empresa (não só "GRXTRANSPORTES FR…"). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+@media (min-width: 640px) {
+  .app-header-company-name {
+    display: block;
+    -webkit-line-clamp: unset;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
 }
 
 /* Sair — vermelho liquid glass (padrão primary do sistema) */

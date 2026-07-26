@@ -299,6 +299,22 @@ export default function DreDespesasVeiculoPage() {
     [rows]
   );
 
+  const requestDelete = (id: string) => {
+    setPendingDeleteId(id);
+    void (async () => {
+      if (!isAdmin || !companyId) {
+        setRequireMasterForDelete(false);
+        return;
+      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setRequireMasterForDelete(
+        !(user?.id && isMasterSessionUnlocked(companyId, user.id))
+      );
+    })();
+  };
+
   return (
     <Card>
       <CardHeader
@@ -503,6 +519,53 @@ export default function DreDespesasVeiculoPage() {
           ) : rows.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhuma despesa de veículo neste filtro.</p>
           ) : (
+            <>
+              <ul className="space-y-3 md:hidden">
+                {rows.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-slate-500">
+                          {formatDate(row.transaction_date)}
+                        </p>
+                        <p className="mt-1 font-semibold text-slate-900">{row.plate ?? "—"}</p>
+                        <p className="mt-1 text-sm leading-snug break-words text-slate-800">
+                          {row.dre_account_name}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-600">
+                          OS: {row.service_order_code ?? "—"}
+                        </p>
+                        {row.description ? (
+                          <p className="mt-2 break-words text-sm text-slate-700">
+                            <span className="font-medium text-slate-500">Obs.:</span>{" "}
+                            {row.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      <p className="shrink-0 text-lg font-bold tabular-nums text-slate-900">
+                        {formatCurrency(row.amount)}
+                      </p>
+                    </div>
+                    {canDelete ? (
+                      <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          onClick={() => requestDelete(row.id)}
+                        >
+                          Excluir
+                        </Button>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="hidden md:block">
             <DataTableScroll stickyFirst stickyLast compact>
               <table className="w-full text-[11px] leading-snug sm:text-xs">
                 <thead>
@@ -573,24 +636,9 @@ export default function DreDespesasVeiculoPage() {
                                 className="action-icon-btn"
                                 title="Excluir"
                                 aria-label="Excluir"
-                                onClick={() => {
-                                  setPendingDeleteId(row.id);
-                                  void (async () => {
-                                    if (!isAdmin || !companyId) {
-                                      setRequireMasterForDelete(false);
-                                      return;
-                                    }
-                                    const {
-                                      data: { user },
-                                    } = await supabase.auth.getUser();
-                                    setRequireMasterForDelete(
-                                      !(user?.id && isMasterSessionUnlocked(companyId, user.id))
-                                    );
-                                  })();
-                                }}
+                                onClick={() => requestDelete(row.id)}
                               >
-                                <span className="sm:hidden">Exc</span>
-                                <span className="hidden sm:inline">Excluir</span>
+                                Excluir
                               </Button>
                             </div>
                           ) : null}
@@ -601,6 +649,8 @@ export default function DreDespesasVeiculoPage() {
                 </GroupedTableBodies>
               </table>
             </DataTableScroll>
+              </div>
+            </>
           )}
         </section>
       </CardBody>

@@ -99,7 +99,6 @@ export default function ContasDrePage() {
       softDelete={false}
       orderBy="name"
       compactTable
-      cardsOnMobile
       columns={[
         { key: "name", label: "Conta DRE" },
         {
