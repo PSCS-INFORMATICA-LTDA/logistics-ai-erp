@@ -7,11 +7,23 @@ import { screenKeyFromPath } from "@/lib/app-screens";
 import { glassTabLink, glassTabsNav } from "@/lib/liquid-glass-styles";
 
 const TABS = [
-  { href: "/dre/lancamentos", label: "Lançamentos da Empresa" },
-  { href: "/dre/aprovacoes", label: "Aprovações" },
-  { href: "/dre/despesas-motorista", label: "Despesas Motorista / Ajudante" },
-  { href: "/dre/despesas-veiculo", label: "Despesas do Veículo" },
-  { href: "/dre/rateio-os", label: "Rateio por OS" },
+  {
+    href: "/dre/lancamentos",
+    label: "Lançamentos da Empresa",
+    shortLabel: "Lançamentos",
+  },
+  { href: "/dre/aprovacoes", label: "Aprovações", shortLabel: "Aprovações" },
+  {
+    href: "/dre/despesas-motorista",
+    label: "Despesas Motorista / Ajudante",
+    shortLabel: "Motorista / Ajudante",
+  },
+  {
+    href: "/dre/despesas-veiculo",
+    label: "Despesas do Veículo",
+    shortLabel: "Veículo",
+  },
+  { href: "/dre/rateio-os", label: "Rateio por OS", shortLabel: "Rateio" },
 ] as const;
 
 export function DreSubNav() {
@@ -31,8 +43,14 @@ export function DreSubNav() {
       {tabs.map((tab) => {
         const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
-          <Link key={tab.href} href={tab.href} className={glassTabLink(active)}>
-            {tab.label}
+          <Link
+            key={tab.href}
+            href={tab.href}
+            className={glassTabLink(active)}
+            title={tab.label}
+          >
+            <span className="sm:hidden">{tab.shortLabel}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
           </Link>
         );
       })}

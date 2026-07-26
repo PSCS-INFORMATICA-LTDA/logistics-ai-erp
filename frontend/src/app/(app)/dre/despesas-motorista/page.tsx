@@ -200,10 +200,10 @@ export default function DreDespesasMotoristaPage() {
     <Card>
       <CardHeader
         title="Despesas Motorista / Ajudante"
-        description="Após concluir o frete, a OS entra aqui com valores e dados bancários do motorista. Anexe o comprovante, marque pago e o lançamento DRE é gerado automaticamente. OS legado/importada: informe Valor motorista e/ou Valor ajudante na linha e lance direto no DRE (com nº da OS para o rateio)."
+        description="OS concluída: anexe o comprovante, marque pago e o DRE é gerado. OS legado: informe os valores no cartão e lance no DRE."
       />
       <CardBody className="space-y-6">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-end">
           <label className="space-y-1 text-sm">
             <span className="font-medium text-slate-700">Mês (lançamentos pagos)</span>
             <input
@@ -219,16 +219,24 @@ export default function DreDespesasMotoristaPage() {
               }}
             />
           </label>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 sm:pb-2">
             Período DRE: <strong className="capitalize text-slate-700">{monthLabel}</strong>
           </p>
-          <Link href="/cadastros/contas-dre" className={glassAction("brand", true)}>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Link href="/cadastros/contas-dre" className={`text-center ${glassAction("brand", true)}`}>
             Contas DRE
           </Link>
-          <Link href="/dre/lancamentos?legacyPay=1&account=motorista" className={glassAction("amber", true)}>
+          <Link
+            href="/dre/lancamentos?legacyPay=1&account=motorista"
+            className={`text-center ${glassAction("amber", true)}`}
+          >
             Lançamentos da empresa
           </Link>
-          <Link href="/cadastros/motoristas/pagamentos" className={glassAction("brand", true)}>
+          <Link
+            href="/cadastros/motoristas/pagamentos"
+            className={`text-center ${glassAction("brand", true)}`}
+          >
             Acompanhamento de pagamentos
           </Link>
         </div>
@@ -238,109 +246,204 @@ export default function DreDespesasMotoristaPage() {
         {legacyManualPayments.length > 0 ? (
           <section className={`space-y-3 p-4 ${glassFilterPanel()}`}>
             <Alert variant="info">
-              <strong>{legacyManualPayments.length}</strong> OS legado/importada sem valor na
-              designação. Informe <strong>Valor motorista</strong> e/ou{" "}
-              <strong>Valor ajudante</strong> na linha e clique em <strong>Lançar no DRE</strong> —
-              a OS já fica vinculada para o rateio. Se a despesa já foi lançada, o sistema avisa e
-              bloqueia duplicata (também em Lançamentos da empresa).
+              <strong>{legacyManualPayments.length}</strong> OS legado sem valor na designação.
+              Informe os valores e clique em <strong>Lançar no DRE</strong> (duplicata bloqueada).
             </Alert>
-            <DataTableScroll stickyFirst stickyLast compact>
-              <table className="w-full text-[11px] leading-snug sm:text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-slate-600">
-                    <th className="px-1.5 py-2 font-medium">OS</th>
-                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Nº legado</th>
-                    <th className="px-1.5 py-2 font-medium">Data</th>
-                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Motorista</th>
-                    <th className="px-1.5 py-2 font-medium" title="Valor motorista">
-                      Mot. R$
-                    </th>
-                    <th className="px-1.5 py-2 font-medium" title="Valor ajudante">
-                      Aj. R$
-                    </th>
-                    <th className="px-1.5 py-2 font-medium">Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {legacyManualPayments.slice(0, 40).map((row) => {
-                    const existing = legacyExistingByOrder.get(row.id);
-                    const motDone = hasLaunchedKind(existing, "motorista");
-                    const ajDone = hasLaunchedKind(existing, "ajudante");
-                    const draft = legacyDrafts[row.id] ?? { motorista: "", ajudante: "" };
-                    const busy = legacyBusyId === row.id;
-                    return (
-                      <tr key={row.id} className="border-b border-slate-100 align-top">
-                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium tabular-nums">
-                          {row.code}
-                        </td>
-                        <td className="hidden px-1.5 py-1.5 md:table-cell">
-                          {row.legacy_number || "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5">
-                          {formatDate(row.service_date)}
-                        </td>
-                        <td
-                          className="hidden max-w-[8rem] truncate px-1.5 py-1.5 lg:table-cell"
-                          title={`${row.driver_code} — ${row.driver_name}`}
+
+            {/* Mobile: cartão por OS legado. */}
+            <ul className="space-y-3 md:hidden">
+              {legacyManualPayments.slice(0, 40).map((row) => {
+                const existing = legacyExistingByOrder.get(row.id);
+                const motDone = hasLaunchedKind(existing, "motorista");
+                const ajDone = hasLaunchedKind(existing, "ajudante");
+                const draft = legacyDrafts[row.id] ?? { motorista: "", ajudante: "" };
+                const busy = legacyBusyId === row.id;
+                return (
+                  <li
+                    key={row.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        OS {row.code}
+                        {row.legacy_number ? ` · Legado ${row.legacy_number}` : ""}
+                      </p>
+                      <p className="text-base font-semibold leading-snug break-words text-slate-900">
+                        {row.driver_code} — {row.driver_name}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Data: {formatDate(row.service_date)}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3">
+                      <label className="space-y-1 text-sm">
+                        <span className="text-xs font-medium text-slate-500">Valor motorista</span>
+                        {motDone ? (
+                          <p className="font-medium text-emerald-800">
+                            Lançado
+                            {launchedAmount(existing, "motorista") != null
+                              ? ` · ${formatCurrency(launchedAmount(existing, "motorista")!)}`
+                              : ""}
+                          </p>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputMode="decimal"
+                            className={`${glassField(true)} w-full`}
+                            placeholder="R$ 0,00"
+                            value={draft.motorista}
+                            disabled={!canEdit || busy}
+                            onChange={(e) =>
+                              updateLegacyDraft(row.id, "motorista", e.target.value)
+                            }
+                          />
+                        )}
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        <span className="text-xs font-medium text-slate-500">Valor ajudante</span>
+                        {ajDone ? (
+                          <p className="font-medium text-emerald-800">
+                            Lançado
+                            {launchedAmount(existing, "ajudante") != null
+                              ? ` · ${formatCurrency(launchedAmount(existing, "ajudante")!)}`
+                              : ""}
+                          </p>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputMode="decimal"
+                            className={`${glassField(false)} w-full`}
+                            placeholder="R$ 0,00"
+                            value={draft.ajudante}
+                            disabled={!canEdit || busy}
+                            onChange={(e) =>
+                              updateLegacyDraft(row.id, "ajudante", e.target.value)
+                            }
+                          />
+                        )}
+                      </label>
+                    </div>
+
+                    <div className="mt-4 border-t border-slate-100 pt-3">
+                      {motDone && ajDone ? (
+                        <p className="text-center text-sm font-medium text-emerald-800">
+                          Já lançado no DRE
+                        </p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="primary"
+                          className="w-full"
+                          disabled={
+                            !canEdit ||
+                            busy ||
+                            ((!draft.motorista.trim() || motDone) &&
+                              (!draft.ajudante.trim() || ajDone))
+                          }
+                          onClick={() => void launchLegacyRow(row)}
                         >
-                          {row.driver_code} — {row.driver_name}
-                        </td>
-                        <td className="px-1.5 py-1.5">
-                          {motDone ? (
-                            <span className="text-[10px] font-medium text-emerald-800 sm:text-xs">
-                              OK
-                              {launchedAmount(existing, "motorista") != null
-                                ? ` · ${formatCurrency(launchedAmount(existing, "motorista")!)}`
-                                : ""}
-                            </span>
-                          ) : (
-                            <input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              className={`${glassField(true)} w-20 sm:w-28`}
-                              placeholder="R$"
-                              value={draft.motorista}
-                              disabled={!canEdit || busy}
-                              onChange={(e) =>
-                                updateLegacyDraft(row.id, "motorista", e.target.value)
-                              }
-                            />
-                          )}
-                        </td>
-                        <td className="px-1.5 py-1.5">
-                          {ajDone ? (
-                            <span className="text-[10px] font-medium text-emerald-800 sm:text-xs">
-                              OK
-                              {launchedAmount(existing, "ajudante") != null
-                                ? ` · ${formatCurrency(launchedAmount(existing, "ajudante")!)}`
-                                : ""}
-                            </span>
-                          ) : (
-                            <input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              className={`${glassField(false)} w-20 sm:w-28`}
-                              placeholder="R$"
-                              value={draft.ajudante}
-                              disabled={!canEdit || busy}
-                              onChange={(e) =>
-                                updateLegacyDraft(row.id, "ajudante", e.target.value)
-                              }
-                            />
-                          )}
-                        </td>
-                        <td className="px-1.5 py-1.5">
-                          {motDone && ajDone ? (
-                            <span className="text-[10px] text-slate-500 sm:text-xs">OK</span>
-                          ) : (
-                            <div className="os-row-actions">
+                          {busy ? "Lançando…" : "Lançar no DRE"}
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: tabela. */}
+            <div className="hidden md:block">
+              <DataTableScroll stickyFirst stickyLast>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-slate-600">
+                      <th className="px-3 py-2.5 font-medium">OS</th>
+                      <th className="px-3 py-2.5 font-medium">Nº legado</th>
+                      <th className="px-3 py-2.5 font-medium">Data</th>
+                      <th className="px-3 py-2.5 font-medium">Motorista</th>
+                      <th className="px-3 py-2.5 font-medium">Valor motorista</th>
+                      <th className="px-3 py-2.5 font-medium">Valor ajudante</th>
+                      <th className="px-3 py-2.5 font-medium">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {legacyManualPayments.slice(0, 40).map((row) => {
+                      const existing = legacyExistingByOrder.get(row.id);
+                      const motDone = hasLaunchedKind(existing, "motorista");
+                      const ajDone = hasLaunchedKind(existing, "ajudante");
+                      const draft = legacyDrafts[row.id] ?? { motorista: "", ajudante: "" };
+                      const busy = legacyBusyId === row.id;
+                      return (
+                        <tr key={row.id} className="border-b border-slate-100 align-top">
+                          <td className="whitespace-nowrap px-3 py-3 font-medium tabular-nums">
+                            {row.code}
+                          </td>
+                          <td className="px-3 py-3">{row.legacy_number || "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-3">
+                            {formatDate(row.service_date)}
+                          </td>
+                          <td className="px-3 py-3">
+                            {row.driver_code} — {row.driver_name}
+                          </td>
+                          <td className="px-3 py-3">
+                            {motDone ? (
+                              <span className="font-medium text-emerald-800">
+                                Lançado
+                                {launchedAmount(existing, "motorista") != null
+                                  ? ` · ${formatCurrency(launchedAmount(existing, "motorista")!)}`
+                                  : ""}
+                              </span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                className={`${glassField(true)} w-28`}
+                                placeholder="R$"
+                                value={draft.motorista}
+                                disabled={!canEdit || busy}
+                                onChange={(e) =>
+                                  updateLegacyDraft(row.id, "motorista", e.target.value)
+                                }
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            {ajDone ? (
+                              <span className="font-medium text-emerald-800">
+                                Lançado
+                                {launchedAmount(existing, "ajudante") != null
+                                  ? ` · ${formatCurrency(launchedAmount(existing, "ajudante")!)}`
+                                  : ""}
+                              </span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                className={`${glassField(false)} w-28`}
+                                placeholder="R$"
+                                value={draft.ajudante}
+                                disabled={!canEdit || busy}
+                                onChange={(e) =>
+                                  updateLegacyDraft(row.id, "ajudante", e.target.value)
+                                }
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            {motDone && ajDone ? (
+                              <span className="text-sm text-slate-500">OK</span>
+                            ) : (
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="primary"
-                                className="action-icon-btn"
                                 disabled={
                                   !canEdit ||
                                   busy ||
@@ -348,24 +451,18 @@ export default function DreDespesasMotoristaPage() {
                                     (!draft.ajudante.trim() || ajDone))
                                 }
                                 onClick={() => void launchLegacyRow(row)}
-                                title="Lançar no DRE"
                               >
-                                {busy ? "…" : (
-                                  <>
-                                    <span className="sm:hidden">DRE</span>
-                                    <span className="hidden sm:inline">Lançar no DRE</span>
-                                  </>
-                                )}
+                                {busy ? "…" : "Lançar no DRE"}
                               </Button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </DataTableScroll>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </DataTableScroll>
+            </div>
             {legacyManualPayments.length > 40 ? (
               <p className="text-xs text-slate-500">
                 Mostrando 40 de {legacyManualPayments.length}. Lance os primeiros e a lista atualiza.
@@ -475,80 +572,121 @@ export default function DreDespesasMotoristaPage() {
             </div>
           ) : rows.length === 0 ? (
             <p className="text-sm text-slate-500">
-              Nenhum lançamento pago neste período. Marque um pagamento como pago na tabela acima.
+              Nenhum lançamento pago neste período. Marque um pagamento como pago na lista acima.
             </p>
           ) : (
-            <DataTableScroll stickyFirst compact>
-              <table className="w-full text-[11px] leading-snug sm:text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-slate-600">
-                    <th className="px-1.5 py-2 font-medium">Data</th>
-                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Conta DRE</th>
-                    <th className="px-1.5 py-2 font-medium">OS</th>
-                    <th className="px-1.5 py-2 font-medium">Motorista</th>
-                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Pix</th>
-                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Banco</th>
-                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Agência</th>
-                    <th className="hidden px-1.5 py-2 font-medium xl:table-cell">Conta</th>
-                    <th className="px-1.5 py-2 font-medium">Valor</th>
-                  </tr>
-                </thead>
-                <GroupedTableBodies groups={paidDreGroups} colSpan={9}>
-                  {(group) =>
-                    group.rows.map((row, index) => (
-                      <tr
-                        key={row.id}
-                        className={group.multi ? "align-top" : "border-b border-slate-100"}
-                      >
-                        <td className="whitespace-nowrap px-1.5 py-1.5">
-                          {index === 0 || !group.multi
-                            ? formatDate(row.transaction_date)
-                            : ""}
-                        </td>
-                        <td
-                          className="hidden max-w-[8rem] truncate px-1.5 py-1.5 font-medium md:table-cell"
-                          title={row.dre_account_name || undefined}
-                        >
-                          {row.dre_account_name}
-                        </td>
-                        <td className="px-1.5 py-1.5 font-medium">
-                          {index === 0 ? (
-                            row.service_order_code ?? "—"
-                          ) : group.multi ? (
-                            <span className="text-slate-300" aria-hidden>
-                              ↳
-                            </span>
-                          ) : (
-                            row.service_order_code ?? "—"
-                          )}
-                        </td>
-                        <td
-                          className="max-w-[8rem] truncate px-1.5 py-1.5"
-                          title={
-                            row.driver_code && row.driver_name
-                              ? `${row.driver_code} — ${row.driver_name}`
-                              : undefined
-                          }
-                        >
+            <>
+              {/* Mobile: cartão por lançamento pago. */}
+              <ul className="space-y-3 md:hidden">
+                {rows.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          OS {row.service_order_code ?? "—"} · {formatDate(row.transaction_date)}
+                        </p>
+                        <p className="text-base font-semibold leading-snug break-words text-slate-900">
                           {row.driver_code && row.driver_name
                             ? `${row.driver_code} — ${row.driver_name}`
                             : "—"}
-                        </td>
-                        <td className="hidden max-w-[6rem] truncate px-1.5 py-1.5 md:table-cell">
-                          {row.pix_key ?? "—"}
-                        </td>
-                        <td className="hidden px-1.5 py-1.5 lg:table-cell">{row.bank_code ?? "—"}</td>
-                        <td className="hidden px-1.5 py-1.5 lg:table-cell">{row.bank_agency ?? "—"}</td>
-                        <td className="hidden px-1.5 py-1.5 xl:table-cell">{row.bank_account ?? "—"}</td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">
+                        </p>
+                      </div>
+                      <p className="w-fit rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                        {row.dre_account_name || "Conta DRE"}
+                      </p>
+                    </div>
+                    <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Valor</dt>
+                        <dd className="font-semibold text-slate-900">
                           {formatCurrency(row.amount)}
-                        </td>
+                        </dd>
+                      </div>
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Pix</dt>
+                        <dd className="break-words text-slate-800">{row.pix_key ?? "—"}</dd>
+                      </div>
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Banco</dt>
+                        <dd className="text-slate-800">{row.bank_code ?? "—"}</dd>
+                      </div>
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Agência</dt>
+                        <dd className="text-slate-800">{row.bank_agency ?? "—"}</dd>
+                      </div>
+                      <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+                        <dt className="text-xs font-medium text-slate-500">Conta</dt>
+                        <dd className="text-slate-800">{row.bank_account ?? "—"}</dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Desktop: tabela agrupada por OS. */}
+              <div className="hidden md:block">
+                <DataTableScroll stickyFirst>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-600">
+                        <th className="px-3 py-2.5 font-medium">Data</th>
+                        <th className="px-3 py-2.5 font-medium">Conta DRE</th>
+                        <th className="px-3 py-2.5 font-medium">OS</th>
+                        <th className="px-3 py-2.5 font-medium">Motorista</th>
+                        <th className="px-3 py-2.5 font-medium">Pix</th>
+                        <th className="px-3 py-2.5 font-medium">Banco</th>
+                        <th className="px-3 py-2.5 font-medium">Agência</th>
+                        <th className="px-3 py-2.5 font-medium">Conta</th>
+                        <th className="px-3 py-2.5 font-medium">Valor</th>
                       </tr>
-                    ))
-                  }
-                </GroupedTableBodies>
-              </table>
-            </DataTableScroll>
+                    </thead>
+                    <GroupedTableBodies groups={paidDreGroups} colSpan={9}>
+                      {(group) =>
+                        group.rows.map((row, index) => (
+                          <tr
+                            key={row.id}
+                            className={group.multi ? "align-top" : "border-b border-slate-100"}
+                          >
+                            <td className="whitespace-nowrap px-3 py-3">
+                              {index === 0 || !group.multi
+                                ? formatDate(row.transaction_date)
+                                : ""}
+                            </td>
+                            <td className="px-3 py-3 font-medium">{row.dre_account_name}</td>
+                            <td className="px-3 py-3 font-medium">
+                              {index === 0 ? (
+                                row.service_order_code ?? "—"
+                              ) : group.multi ? (
+                                <span className="text-slate-300" aria-hidden>
+                                  ↳
+                                </span>
+                              ) : (
+                                row.service_order_code ?? "—"
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              {row.driver_code && row.driver_name
+                                ? `${row.driver_code} — ${row.driver_name}`
+                                : "—"}
+                            </td>
+                            <td className="px-3 py-3">{row.pix_key ?? "—"}</td>
+                            <td className="px-3 py-3">{row.bank_code ?? "—"}</td>
+                            <td className="px-3 py-3">{row.bank_agency ?? "—"}</td>
+                            <td className="px-3 py-3">{row.bank_account ?? "—"}</td>
+                            <td className="whitespace-nowrap px-3 py-3 font-medium">
+                              {formatCurrency(row.amount)}
+                            </td>
+                          </tr>
+                        ))
+                      }
+                    </GroupedTableBodies>
+                  </table>
+                </DataTableScroll>
+              </div>
+            </>
           )}
         </section>
       </CardBody>

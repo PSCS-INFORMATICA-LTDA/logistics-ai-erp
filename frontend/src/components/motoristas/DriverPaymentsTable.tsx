@@ -258,8 +258,8 @@ export function DriverPaymentsTable({
               key={row.id}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-2">
+                <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     OS {row.code}
                   </p>
@@ -268,7 +268,9 @@ export function DriverPaymentsTable({
                   </p>
                   <p className="mt-1 text-sm text-slate-600">Data: {formatDate(row.service_date)}</p>
                 </div>
-                {paid ? <Badge variant="success">Pago</Badge> : <Badge variant="warning">Pendente</Badge>}
+                <div className="w-fit max-w-full">
+                  {paid ? <Badge variant="success">Pago</Badge> : <Badge variant="warning">Pendente</Badge>}
+                </div>
               </div>
 
               <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
