@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import {
   billablePerDiemTotal,
   buildPerDiemDays,
@@ -257,43 +258,52 @@ export function FreightPerDiemPanel({
       </div>
 
       {displayDays.length > 0 && (
-        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-600">
+        <DataTableScroll
+          stickyFirst
+          compact
+          fitWidth={false}
+          hint="No celular, arraste na horizontal para editar Hospedagem / Café / Almoço / Jantar / Diária."
+        >
+          <table className="w-full min-w-[36rem] text-left text-[11px] leading-snug sm:text-xs">
+            <thead className="bg-slate-50 text-[10px] text-slate-600 sm:text-xs">
               <tr>
-                <th className="px-2 py-2 font-medium">Dia</th>
-                <th className="px-2 py-2 font-medium">Hospedagem</th>
-                <th className="px-2 py-2 font-medium">Café</th>
-                <th className="px-2 py-2 font-medium">Almoço</th>
-                <th className="px-2 py-2 font-medium">Jantar</th>
-                <th className="px-2 py-2 font-medium">Diária</th>
-                <th className="px-2 py-2 font-medium text-right">Subtotal</th>
+                <th className="px-1.5 py-2 font-medium">Dia</th>
+                <th className="px-1.5 py-2 font-medium">Hospedagem</th>
+                <th className="px-1.5 py-2 font-medium">Café</th>
+                <th className="px-1.5 py-2 font-medium">Almoço</th>
+                <th className="px-1.5 py-2 font-medium">Jantar</th>
+                <th className="px-1.5 py-2 font-medium">Diária</th>
+                <th className="px-1.5 py-2 font-medium text-right">Subtotal</th>
               </tr>
             </thead>
             <tbody>
               {displayDays.map((day) => (
                 <tr key={day.day} className="border-t border-slate-100">
-                  <td className="px-2 py-2 font-medium text-slate-800">Dia {day.day}</td>
-                  {(["lodging", "breakfast", "meals", "dinner", "daily_allowance"] as const).map((field) => (
-                    <td key={field} className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className="w-full min-w-[5rem] rounded border border-slate-200 px-2 py-1 text-sm"
-                        value={String(day[field] ?? "")}
-                        onChange={(e) => updateDayField(day.day, field, e.target.value)}
-                      />
-                    </td>
-                  ))}
-                  <td className="px-2 py-2 text-right font-medium text-slate-800">
+                  <td className="whitespace-nowrap px-1.5 py-2 font-medium text-slate-800">
+                    Dia {day.day}
+                  </td>
+                  {(["lodging", "breakfast", "meals", "dinner", "daily_allowance"] as const).map(
+                    (field) => (
+                      <td key={field} className="px-1.5 py-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="w-full min-w-[4rem] rounded border border-slate-200 px-1.5 py-1 text-[11px] sm:text-sm"
+                          value={String(day[field] ?? "")}
+                          onChange={(e) => updateDayField(day.day, field, e.target.value)}
+                        />
+                      </td>
+                    )
+                  )}
+                  <td className="whitespace-nowrap px-1.5 py-2 text-right font-medium text-slate-800">
                     {formatCurrency(perDiemDayTotal(day))}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </DataTableScroll>
       )}
 
       <div className="grid gap-2 rounded-md border border-emerald-200 bg-white p-3 text-sm sm:grid-cols-2">

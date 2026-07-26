@@ -151,14 +151,14 @@ export default function UsuariosAcessosPage() {
           ) : rows.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum usuário vinculado.</p>
           ) : (
-            <DataTableScroll stickyFirst stickyLast>
-              <table className="w-full text-left text-sm">
+            <DataTableScroll stickyFirst stickyLast compact>
+              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="px-2 py-2 font-medium">Nome / e-mail</th>
-                    <th className="px-2 py-2 font-medium">Papel</th>
-                    <th className="px-2 py-2 font-medium">Aprova lançamentos</th>
-                    <th className="px-2 py-2 font-medium">Ação</th>
+                    <th className="px-1.5 py-2 font-medium">Nome / e-mail</th>
+                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Papel</th>
+                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Aprova lançamentos</th>
+                    <th className="px-1.5 py-2 font-medium">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -167,8 +167,8 @@ export default function UsuariosAcessosPage() {
                     const demoteBlocked = row.ui_role === "admin" && adminCount <= 1;
                     return (
                       <tr key={row.id} className="border-b border-slate-100">
-                        <td className="px-2 py-3">
-                          <div className="font-medium text-slate-900">
+                        <td className="px-1.5 py-2">
+                          <div className="max-w-[10rem] truncate font-medium text-slate-900 sm:max-w-none">
                             {row.full_name || "—"}
                             {isSelf ? (
                               <span className="ml-2 text-xs font-normal text-slate-400">
@@ -176,51 +176,60 @@ export default function UsuariosAcessosPage() {
                               </span>
                             ) : null}
                           </div>
-                          <div className="text-slate-500">{row.email || row.user_id}</div>
+                          <div className="truncate text-slate-500" title={row.email || row.user_id}>
+                            {row.email || row.user_id}
+                          </div>
                           {row.role !== "admin" && row.role !== "operacional" ? (
                             <div className="mt-0.5 text-xs text-slate-400">
                               Registro: {roleLabel(row.role)}
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-2 py-3">
+                        <td className="hidden px-1.5 py-2 md:table-cell">
                           <Badge variant={row.ui_role === "admin" ? "success" : "default"}>
                             {row.ui_role === "admin" ? "Administrador" : "Operacional"}
                           </Badge>
                         </td>
-                        <td className="px-2 py-3">
+                        <td className="hidden px-1.5 py-2 lg:table-cell">
                           {row.can_approve_launches ? (
                             <span className="text-emerald-700">Sim</span>
                           ) : (
                             <span className="text-slate-500">Não</span>
                           )}
                         </td>
-                        <td className="px-2 py-3">
+                        <td className="px-1.5 py-2">
+                          <div className="os-row-actions">
                           {row.ui_role === "admin" ? (
                             <Button
                               type="button"
                               variant="secondary"
                               size="sm"
+                              className="action-icon-btn"
                               disabled={busyId === row.id || demoteBlocked}
                               onClick={() => void changeRole(row, "operacional")}
                               title={
                                 demoteBlocked
                                   ? "Promova outro Admin antes de rebaixar o último."
-                                  : undefined
+                                  : "Tornar operacional"
                               }
                             >
-                              Tornar operacional
+                              <span className="sm:hidden">Op.</span>
+                              <span className="hidden sm:inline">Tornar operacional</span>
                             </Button>
                           ) : (
                             <Button
                               type="button"
                               size="sm"
+                              className="action-icon-btn"
                               disabled={busyId === row.id}
+                              title="Promover a Admin"
                               onClick={() => void changeRole(row, "admin")}
                             >
-                              Promover a Admin
+                              <span className="sm:hidden">Admin</span>
+                              <span className="hidden sm:inline">Promover a Admin</span>
                             </Button>
                           )}
+                          </div>
                         </td>
                       </tr>
                     );

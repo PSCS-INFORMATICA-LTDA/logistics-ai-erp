@@ -30,11 +30,12 @@ export default function FornecedoresPage() {
       columns={[
         { key: "code", label: "Código" },
         { key: "name", label: "Fornecedor" },
-        { key: "category", label: "Categoria" },
-        { key: "city", label: "Cidade" },
+        { key: "category", label: "Categoria", className: "hidden md:table-cell" },
+        { key: "city", label: "Cidade", className: "hidden lg:table-cell" },
         {
           key: "cnpj_status",
           label: "Sit. CNPJ",
+          className: "hidden xl:table-cell",
           render: (r) =>
             r.cnpj_status ? (
               <Badge variant={String(r.cnpj_status).toUpperCase().includes("ATIVA") ? "success" : "default"}>

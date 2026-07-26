@@ -147,12 +147,13 @@ function MotoristasPageContent() {
 
   const columns = useMemo(
     () => [
-      { key: "code", label: "Código" },
+      { key: "code", label: "Código", className: "hidden sm:table-cell" },
       { key: "name", label: "Nome" },
-      { key: "driver_type", label: "Tipo" },
+      { key: "driver_type", label: "Tipo", className: "hidden md:table-cell" },
       {
         key: "status",
         label: "Status",
+        className: "hidden lg:table-cell",
         render: (r: DriverListRow) => (
           <Badge variant={r.status === "Ativo" ? "success" : "default"}>{r.status}</Badge>
         ),
@@ -174,21 +175,23 @@ function MotoristasPageContent() {
           return <Badge variant="default">Indisponível</Badge>;
         },
       },
-      { key: "phone", label: "Telefone" },
-      { key: "email", label: "E-mail" },
-      { key: "pix_key", label: "Chave Pix", render: (r: DriverListRow) => r.pix_key ?? "—" },
-      { key: "bank_code", label: "Cód. banco", render: (r: DriverListRow) => r.bank_code ?? "—" },
-      { key: "bank_agency", label: "Agência", render: (r: DriverListRow) => r.bank_agency ?? "—" },
-      { key: "bank_account", label: "Conta corrente", render: (r: DriverListRow) => r.bank_account ?? "—" },
-      { key: "address", label: "Endereço" },
+      { key: "phone", label: "Telefone", className: "hidden md:table-cell" },
+      { key: "email", label: "E-mail", className: "hidden lg:table-cell" },
+      { key: "pix_key", label: "Chave Pix", className: "hidden lg:table-cell", render: (r: DriverListRow) => r.pix_key ?? "—" },
+      { key: "bank_code", label: "Cód. banco", className: "hidden xl:table-cell", render: (r: DriverListRow) => r.bank_code ?? "—" },
+      { key: "bank_agency", label: "Agência", className: "hidden xl:table-cell", render: (r: DriverListRow) => r.bank_agency ?? "—" },
+      { key: "bank_account", label: "Conta corrente", className: "hidden xl:table-cell", render: (r: DriverListRow) => r.bank_account ?? "—" },
+      { key: "address", label: "Endereço", className: "hidden xl:table-cell" },
       {
         key: "cnh_number",
         label: "CNH",
+        className: "hidden md:table-cell",
         render: (r: DriverListRow) => (r.cnh_number ? formatCnh(r.cnh_number) : "—"),
       },
       {
         key: "cnh_categories",
         label: "Categorias",
+        className: "hidden lg:table-cell",
         render: (r: DriverListRow) => {
           const categories = r.cnh_categories ?? [];
           if (!categories.length) return "—";

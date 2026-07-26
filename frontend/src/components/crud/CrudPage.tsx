@@ -102,7 +102,8 @@ export function CrudPage<T extends { id: string }>({
   initialEditId = null,
   initialEditCode = null,
   initialNewDraft = null,
-  compactTable = false,
+  /** Padrão mobile: tabela densa em todas as listagens CRUD. */
+  compactTable = true,
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const { canEditScreen, canDeleteScreen, isAdmin, loading: accessLoading } = useAccess();

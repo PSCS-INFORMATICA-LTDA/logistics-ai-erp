@@ -335,40 +335,47 @@ export default function LavaRapidoPage() {
       </section>
       ) : null}
 
-      <DataTableScroll stickyFirst stickyLast>
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+      <DataTableScroll stickyFirst stickyLast compact>
+        <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-3 py-2">Código</th>
-              <th className="px-3 py-2">Data</th>
-              <th className="px-3 py-2">Placa</th>
-              <th className="px-3 py-2">Porte</th>
-              <th className="px-3 py-2">Serviço</th>
-              <th className="px-3 py-2">Valor</th>
-              <th className="px-3 py-2">Comprovante</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2" />
+              <th className="px-1.5 py-2">Código</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Data</th>
+              <th className="px-1.5 py-2">Placa</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Porte</th>
+              <th className="px-1.5 py-2">Serviço</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Valor</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Comprovante</th>
+              <th className="px-1.5 py-2">Status</th>
+              <th className="px-1.5 py-2" />
             </tr>
           </thead>
           <GroupedTableBodies groups={plateGroups} colSpan={9}>
             {(group) =>
               group.rows.map((row, index) => (
                 <tr key={row.id} className={group.multi ? "align-top" : "border-t border-slate-100"}>
-                  <td className="px-3 py-2 font-medium">{row.code}</td>
-                  <td className="px-3 py-2">{formatDateBR(row.service_date)}</td>
-                  <td className="px-3 py-2 font-medium text-slate-900">
+                  <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">{row.code}</td>
+                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 md:table-cell">
+                    {formatDateBR(row.service_date)}
+                  </td>
+                  <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                     {index === 0 || !group.multi ? row.plate : (
                       <span className="text-slate-300" aria-hidden>
                         ↳
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2">{row.vehicle_type ?? "—"}</td>
-                  <td className="px-3 py-2">{row.service_name}</td>
-                  <td className="px-3 py-2">
+                  <td className="hidden px-1.5 py-1.5 md:table-cell">{row.vehicle_type ?? "—"}</td>
+                  <td
+                    className="max-w-[7rem] truncate px-1.5 py-1.5 sm:max-w-[10rem]"
+                    title={row.service_name || undefined}
+                  >
+                    {row.service_name}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-1.5 py-1.5 lg:table-cell">
                     {row.service_amount != null ? formatCurrency(Number(row.service_amount)) : "—"}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="hidden px-1.5 py-1.5 xl:table-cell">
                     {companyId ? (
                       <PatioPaymentProofClip
                         companyId={companyId}
@@ -379,7 +386,7 @@ export default function LavaRapidoPage() {
                       />
                     ) : null}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-1.5">
                     <Badge
                       variant={
                         row.status === "Concluido"
@@ -392,10 +399,18 @@ export default function LavaRapidoPage() {
                       {row.status}
                     </Badge>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-1.5">
                     {row.status === "Aberto" && canEdit ? (
-                      <Button type="button" disabled={saving} onClick={() => void completeService(row)}>
-                        Concluir
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="action-icon-btn"
+                        disabled={saving}
+                        title="Concluir"
+                        onClick={() => void completeService(row)}
+                      >
+                        <span className="sm:hidden">OK</span>
+                        <span className="hidden sm:inline">Concluir</span>
                       </Button>
                     ) : null}
                   </td>

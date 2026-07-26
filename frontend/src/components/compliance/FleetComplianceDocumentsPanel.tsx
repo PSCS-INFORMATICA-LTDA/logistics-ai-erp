@@ -307,20 +307,20 @@ export function FleetComplianceDocumentsPanel({
       ) : null}
 
       <div className={glassFilterPanel()}>
-        <DataTableScroll stickyFirst stickyLast>
-          <table className="w-full text-left text-sm">
-          <thead className="text-xs uppercase text-slate-500">
+        <DataTableScroll stickyFirst stickyLast compact>
+          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-2 py-2">Placa</th>
-              <th className="px-2 py-2">Marca / modelo</th>
-              <th className="px-2 py-2">Tipo de documento</th>
-              <th className="px-2 py-2">Nº</th>
-              <th className="px-2 py-2">Data de vencimento</th>
-              <th className="px-2 py-2">Situação</th>
-              <th className="px-2 py-2" title="Anexo da digitalização (por linha)">
+              <th className="px-1.5 py-2">Placa</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Marca / modelo</th>
+              <th className="px-1.5 py-2">Tipo de documento</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Nº</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Data de vencimento</th>
+              <th className="px-1.5 py-2">Situação</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell" title="Anexo da digitalização (por linha)">
                 Anexo
               </th>
-              <th className="px-2 py-2" />
+              <th className="px-1.5 py-2" />
             </tr>
           </thead>
           {docGroups.length === 0 ? (
@@ -344,7 +344,7 @@ export function FleetComplianceDocumentsPanel({
                       key={doc.id}
                       className={group.multi ? "align-top" : "border-t border-slate-100"}
                     >
-                      <td className="px-2 py-2 font-medium">
+                      <td className="whitespace-nowrap px-1.5 py-2 font-medium">
                         {index === 0 ? (
                           veh?.plate || "—"
                         ) : group.multi ? (
@@ -355,22 +355,25 @@ export function FleetComplianceDocumentsPanel({
                           veh?.plate || "—"
                         )}
                       </td>
-                      <td className="px-2 py-2 text-slate-700">
+                      <td className="hidden px-1.5 py-2 text-slate-700 md:table-cell">
                         {index === 0 || !group.multi ? veh?.brandModel || "—" : ""}
                       </td>
-                      <td className="px-2 py-2">
+                      <td
+                        className="max-w-[7rem] truncate px-1.5 py-2 sm:max-w-[10rem]"
+                        title={documentDisplayName(doc.document_type)}
+                      >
                         {documentDisplayName(doc.document_type)}
                       </td>
-                      <td className="px-2 py-2">{doc.document_number || "—"}</td>
-                      <td className="px-2 py-2 whitespace-nowrap">
+                      <td className="hidden px-1.5 py-2 lg:table-cell">{doc.document_number || "—"}</td>
+                      <td className="hidden whitespace-nowrap px-1.5 py-2 lg:table-cell">
                         {doc.no_expiry
                           ? "Sem vencimento"
                           : formatExpiryDateBR(doc.expires_at)}
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-1.5 py-2">
                         <Badge variant={view.badge}>{view.label}</Badge>
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="hidden px-1.5 py-2 xl:table-cell">
                         <ComplianceDocumentClip
                           companyId={companyId}
                           documentId={doc.id}
@@ -379,12 +382,15 @@ export function FleetComplianceDocumentsPanel({
                           onUploaded={() => setClipRefresh((k) => k + 1)}
                         />
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-1.5 py-2">
                         {canEdit ? (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="os-row-actions flex flex-wrap gap-1">
                             <Button
                               type="button"
                               variant="secondary"
+                              size="sm"
+                              className="action-icon-btn"
+                              title="Editar"
                               onClick={() =>
                                 setEditor({
                                   mode: "edit",
@@ -393,11 +399,15 @@ export function FleetComplianceDocumentsPanel({
                                 })
                               }
                             >
-                              Editar
+                              <span className="sm:hidden">Edit</span>
+                              <span className="hidden sm:inline">Editar</span>
                             </Button>
                             <Button
                               type="button"
                               variant="secondary"
+                              size="sm"
+                              className="action-icon-btn"
+                              title="Renovar"
                               onClick={() =>
                                 setEditor({
                                   mode: "renew",
@@ -406,16 +416,21 @@ export function FleetComplianceDocumentsPanel({
                                 })
                               }
                             >
-                              Renovar
+                              <span className="sm:hidden">Ren.</span>
+                              <span className="hidden sm:inline">Renovar</span>
                             </Button>
                           </div>
                         ) : null}
                         <Button
                           type="button"
                           variant="secondary"
+                          size="sm"
+                          className="action-icon-btn"
+                          title="Histórico"
                           onClick={() => void openHistory(doc)}
                         >
-                          Histórico
+                          <span className="sm:hidden">Hist.</span>
+                          <span className="hidden sm:inline">Histórico</span>
                         </Button>
                       </td>
                     </tr>

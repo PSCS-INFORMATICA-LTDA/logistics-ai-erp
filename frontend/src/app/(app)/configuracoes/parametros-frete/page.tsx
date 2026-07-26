@@ -209,40 +209,48 @@ export default function ParametrosFretePage() {
       ) : null}
 
       <section>
-        <DataTableScroll stickyFirst stickyLast>
-          <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <DataTableScroll stickyFirst stickyLast compact>
+          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-3 py-2">Cód.</th>
-              <th className="px-3 py-2">Modalidade</th>
-              <th className="px-3 py-2">Categoria</th>
-              <th className="px-3 py-2">R$/km</th>
-              <th className="px-3 py-2">Ida/volta ≥</th>
-              <th className="px-3 py-2">Desde</th>
-              <th className="px-3 py-2">Data fim</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2" />
+              <th className="px-1.5 py-2">Cód.</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Modalidade</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Categoria</th>
+              <th className="px-1.5 py-2">R$/km</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Ida/volta ≥</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Desde</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Data fim</th>
+              <th className="px-1.5 py-2">Status</th>
+              <th className="px-1.5 py-2" />
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-slate-100">
-                <td className="px-3 py-2">{row.code}</td>
-                <td className="px-3 py-2">{row.modality}</td>
-                <td className="px-3 py-2">{row.vehicle_category}</td>
-                <td className="px-3 py-2 font-medium">{formatKmRate(Number(row.rate_per_km))}</td>
-                <td className="px-3 py-2">{Number(row.round_trip_from_km)} km</td>
-                <td className="px-3 py-2 whitespace-nowrap">{formatDateBR(row.valid_from)}</td>
-                <td className="px-3 py-2 whitespace-nowrap">
+                <td className="whitespace-nowrap px-1.5 py-2">{row.code}</td>
+                <td className="hidden px-1.5 py-2 md:table-cell">{row.modality}</td>
+                <td className="hidden px-1.5 py-2 lg:table-cell">{row.vehicle_category}</td>
+                <td className="whitespace-nowrap px-1.5 py-2 font-medium">{formatKmRate(Number(row.rate_per_km))}</td>
+                <td className="hidden px-1.5 py-2 lg:table-cell">{Number(row.round_trip_from_km)} km</td>
+                <td className="hidden whitespace-nowrap px-1.5 py-2 xl:table-cell">{formatDateBR(row.valid_from)}</td>
+                <td className="hidden whitespace-nowrap px-1.5 py-2 xl:table-cell">
                   {row.valid_until ? formatDateBR(row.valid_until) : "—"}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-1.5 py-2">
                   <Badge variant={row.status === "Ativo" ? "success" : "default"}>{row.status}</Badge>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-1.5 py-2">
                   {canEdit && row.status === "Ativo" ? (
-                    <Button type="button" variant="ghost" onClick={() => void deactivate(row.id)}>
-                      Inativar
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="action-icon-btn"
+                      title="Inativar"
+                      onClick={() => void deactivate(row.id)}
+                    >
+                      <span className="sm:hidden">Inat.</span>
+                      <span className="hidden sm:inline">Inativar</span>
                     </Button>
                   ) : null}
                 </td>

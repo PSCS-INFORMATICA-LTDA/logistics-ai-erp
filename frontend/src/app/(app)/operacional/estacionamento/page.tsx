@@ -357,19 +357,19 @@ export default function EstacionamentoPage() {
       </section>
       ) : null}
 
-      <DataTableScroll stickyFirst>
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+      <DataTableScroll stickyFirst compact>
+        <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-3 py-2">Código</th>
-              <th className="px-3 py-2">Placa</th>
-              <th className="px-3 py-2">Porte</th>
-              <th className="px-3 py-2">Entrada</th>
-              <th className="px-3 py-2">Saída / fechar</th>
-              <th className="px-3 py-2">Valor</th>
-              <th className="px-3 py-2">Comprovante</th>
-              <th className="px-3 py-2">Total</th>
-              <th className="px-3 py-2">Status</th>
+              <th className="px-1.5 py-2">Código</th>
+              <th className="px-1.5 py-2">Placa</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Porte</th>
+              <th className="px-1.5 py-2">Entrada</th>
+              <th className="px-1.5 py-2">Saída / fechar</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Valor</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Comprovante</th>
+              <th className="px-1.5 py-2">Total</th>
+              <th className="px-1.5 py-2">Status</th>
             </tr>
           </thead>
           <GroupedTableBodies groups={plateGroups} colSpan={9}>
@@ -381,22 +381,22 @@ export default function EstacionamentoPage() {
                 };
                 return (
                   <tr key={row.id} className={group.multi ? "align-top" : "border-t border-slate-100"}>
-                    <td className="px-3 py-2 font-medium">{row.code}</td>
-                    <td className="px-3 py-2 font-medium text-slate-900">
+                    <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">{row.code}</td>
+                    <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                       {index === 0 || !group.multi ? row.plate : (
                         <span className="text-slate-300" aria-hidden>
                           ↳
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2">{row.vehicle_type ?? "—"}</td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-1.5 py-1.5 md:table-cell">{row.vehicle_type ?? "—"}</td>
+                    <td className="px-1.5 py-1.5">
                       {formatDateTimeBR(row.entry_date, row.entry_time)}
                       <div className="text-xs text-slate-500">{row.billing_mode ?? "Diária"}</div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-1.5 py-1.5">
                       {row.status === "Aberto" && canEdit ? (
-                        <div className="flex flex-wrap items-end gap-2">
+                        <div className="flex flex-wrap items-end gap-1">
                           <input
                             type="date"
                             className={`${glassField(true)} w-auto`}
@@ -421,10 +421,14 @@ export default function EstacionamentoPage() {
                           />
                           <Button
                             type="button"
+                            size="sm"
+                            className="action-icon-btn"
                             disabled={saving}
+                            title="Finalizar"
                             onClick={() => void closeEntry(row)}
                           >
-                            Finalizar
+                            <span className="sm:hidden">Fin</span>
+                            <span className="hidden sm:inline">Finalizar</span>
                           </Button>
                         </div>
                       ) : row.status === "Aberto" ? (
@@ -433,7 +437,7 @@ export default function EstacionamentoPage() {
                         <span>{formatDateTimeBR(row.exit_date, row.exit_time)}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-1.5 py-1.5 lg:table-cell">
                       {row.daily_rate != null ? (
                         <>
                           {formatCurrency(Number(row.daily_rate))}
@@ -445,7 +449,7 @@ export default function EstacionamentoPage() {
                         "—"
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-1.5 py-1.5 xl:table-cell">
                       {companyId ? (
                         <PatioPaymentProofClip
                           companyId={companyId}
@@ -456,13 +460,13 @@ export default function EstacionamentoPage() {
                         />
                       ) : null}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="whitespace-nowrap px-1.5 py-1.5">
                       {row.total_amount != null ? formatCurrency(Number(row.total_amount)) : "—"}
                       {totalBreakdown(row) ? (
-                        <div className="text-xs text-slate-500">{totalBreakdown(row)}</div>
+                        <div className="text-[10px] text-slate-500 sm:text-xs">{totalBreakdown(row)}</div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-1.5 py-1.5">
                       <Badge
                         variant={
                           row.status === "Finalizado"

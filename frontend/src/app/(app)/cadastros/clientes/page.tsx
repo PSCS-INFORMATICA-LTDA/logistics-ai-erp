@@ -30,11 +30,12 @@ export default function ClientesPage() {
       columns={[
         { key: "code", label: "Código" },
         { key: "name", label: "Nome" },
-        { key: "document", label: "CNPJ/CPF" },
-        { key: "city", label: "Cidade" },
+        { key: "document", label: "CNPJ/CPF", className: "hidden md:table-cell" },
+        { key: "city", label: "Cidade", className: "hidden lg:table-cell" },
         {
           key: "cnpj_status",
           label: "Sit. CNPJ",
+          className: "hidden xl:table-cell",
           render: (r) =>
             r.cnpj_status ? (
               <Badge variant={String(r.cnpj_status).toUpperCase().includes("ATIVA") ? "success" : "default"}>

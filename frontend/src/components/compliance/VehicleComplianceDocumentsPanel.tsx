@@ -218,18 +218,18 @@ export function VehicleComplianceDocumentsPanel({
         {vehicleDocs.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum documento cadastrado neste veículo.</p>
           ) : (
-            <DataTableScroll stickyFirst stickyLast>
-              <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
+            <DataTableScroll stickyFirst stickyLast compact>
+              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
                 <tr>
-                  <th className="px-2 py-2">Documento</th>
-                  <th className="px-2 py-2">Nº</th>
-                  <th className="px-2 py-2">Data de vencimento</th>
-                  <th className="px-2 py-2">Situação</th>
-                  <th className="px-2 py-2" title="Digitalização">
+                  <th className="px-1.5 py-2">Documento</th>
+                  <th className="hidden px-1.5 py-2 md:table-cell">Nº</th>
+                  <th className="hidden px-1.5 py-2 lg:table-cell">Data de vencimento</th>
+                  <th className="px-1.5 py-2">Situação</th>
+                  <th className="hidden px-1.5 py-2 xl:table-cell" title="Digitalização">
                     Clipe
                   </th>
-                  <th className="px-2 py-2" />
+                  <th className="px-1.5 py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -237,29 +237,29 @@ export function VehicleComplianceDocumentsPanel({
                   const view = resolveComplianceSituation(doc, doc.document_type);
                   return (
                     <tr key={doc.id} className="border-t border-slate-100 align-top">
-                      <td className="px-2 py-2">
-                        <p className="font-medium text-slate-900">
+                      <td className="px-1.5 py-2">
+                        <p className="max-w-[8rem] truncate font-medium text-slate-900 sm:max-w-none">
                           {documentDisplayName(doc.document_type)}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="hidden truncate text-[10px] text-slate-500 sm:block sm:text-xs">
                           {doc.issuing_body || doc.document_type?.issuing_body || "—"}
                         </p>
                       </td>
-                      <td className="px-2 py-2">{doc.document_number || "—"}</td>
-                      <td className="px-2 py-2 whitespace-nowrap">
+                      <td className="hidden px-1.5 py-2 md:table-cell">{doc.document_number || "—"}</td>
+                      <td className="hidden whitespace-nowrap px-1.5 py-2 lg:table-cell">
                         {doc.no_expiry
                           ? "Sem vencimento"
                           : formatExpiryDateBR(doc.expires_at)}
                         {view.daysLeft != null ? (
-                          <span className="block text-xs text-slate-500">
+                          <span className="block text-[10px] text-slate-500 sm:text-xs">
                             {view.daysLeft} dia(s)
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-1.5 py-2">
                         <Badge variant={view.badge}>{view.label}</Badge>
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="hidden px-1.5 py-2 xl:table-cell">
                         <ComplianceDocumentClip
                           companyId={companyId}
                           documentId={doc.id}
@@ -268,32 +268,44 @@ export function VehicleComplianceDocumentsPanel({
                           onUploaded={() => setClipRefresh((k) => k + 1)}
                         />
                       </td>
-                      <td className="px-2 py-2">
-                        <div className="flex flex-wrap gap-1">
+                      <td className="px-1.5 py-2">
+                        <div className="os-row-actions flex flex-wrap gap-1">
                           {canEdit ? (
                             <>
                               <Button
                                 type="button"
                                 variant="secondary"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Editar"
                                 onClick={() => setEditor({ mode: "edit", doc })}
                               >
-                                Editar
+                                <span className="sm:hidden">Edit</span>
+                                <span className="hidden sm:inline">Editar</span>
                               </Button>
                               <Button
                                 type="button"
                                 variant="secondary"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Renovar"
                                 onClick={() => setEditor({ mode: "renew", doc })}
                               >
-                                Renovar
+                                <span className="sm:hidden">Ren.</span>
+                                <span className="hidden sm:inline">Renovar</span>
                               </Button>
                             </>
                           ) : null}
                           <Button
                             type="button"
                             variant="secondary"
+                            size="sm"
+                            className="action-icon-btn"
+                            title="Histórico"
                             onClick={() => void openHistory(doc)}
                           >
-                            Histórico
+                            <span className="sm:hidden">Hist.</span>
+                            <span className="hidden sm:inline">Histórico</span>
                           </Button>
                         </div>
                       </td>
@@ -326,13 +338,13 @@ export function VehicleComplianceDocumentsPanel({
         {companyDocs.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhum documento da empresa cadastrado.</p>
         ) : (
-          <DataTableScroll stickyFirst>
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
+          <DataTableScroll stickyFirst compact>
+            <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
                 <tr>
-                  <th className="px-2 py-2">Documento</th>
-                  <th className="px-2 py-2">Data de vencimento</th>
-                  <th className="px-2 py-2">Situação</th>
+                  <th className="px-1.5 py-2">Documento</th>
+                  <th className="hidden px-1.5 py-2 md:table-cell">Data de vencimento</th>
+                  <th className="px-1.5 py-2">Situação</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,15 +352,15 @@ export function VehicleComplianceDocumentsPanel({
                   const view = resolveComplianceSituation(doc, doc.document_type);
                   return (
                     <tr key={doc.id} className="border-t border-slate-100">
-                      <td className="px-2 py-2 font-medium">
+                      <td className="max-w-[8rem] truncate px-1.5 py-2 font-medium sm:max-w-none">
                         {documentDisplayName(doc.document_type)}
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
+                      <td className="hidden whitespace-nowrap px-1.5 py-2 md:table-cell">
                         {doc.no_expiry
                           ? "Sem vencimento"
                           : formatExpiryDateBR(doc.expires_at)}
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-1.5 py-2">
                         <Badge variant={view.badge}>{view.label}</Badge>
                       </td>
                     </tr>

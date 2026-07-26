@@ -67,11 +67,12 @@ export default function VeiculosPage() {
       columns={[
         { key: "code", label: "Código" },
         { key: "plate", label: "Placa" },
-        { key: "model", label: "Marca / modelo" },
-        { key: "vehicle_category", label: "Categoria" },
+        { key: "model", label: "Marca / modelo", className: "hidden md:table-cell" },
+        { key: "vehicle_category", label: "Categoria", className: "hidden lg:table-cell" },
         {
           key: "docs",
           label: "Documentos",
+          className: "hidden xl:table-cell",
           render: (r) => {
             const s = docBadges.get(r.id);
             if (!s) return <span className="text-slate-400">—</span>;

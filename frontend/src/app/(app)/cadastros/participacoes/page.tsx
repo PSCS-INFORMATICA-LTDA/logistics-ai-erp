@@ -508,16 +508,20 @@ export default function ParticipacoesPage() {
                   Nenhuma participação cadastrada para este veículo.
                 </p>
               ) : (
-                <DataTableScroll stickyFirst stickyLast>
-                  <table className="w-full text-sm">
+                <DataTableScroll stickyFirst stickyLast compact>
+                  <table className="w-full text-[11px] leading-snug sm:text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                      <th className="px-4 py-3 font-medium text-slate-600">Sócio</th>
-                      <th className="px-4 py-3 font-medium text-slate-600">Percentual</th>
-                      <th className="px-4 py-3 font-medium text-slate-600">Início</th>
-                      <th className="px-4 py-3 font-medium text-slate-600">Fim</th>
-                      <th className="px-4 py-3 font-medium text-slate-600">Status</th>
-                      <th className="px-4 py-3 font-medium text-slate-600">Ações</th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Sócio</th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Percentual</th>
+                      <th className="hidden px-1.5 py-2 font-medium text-slate-600 md:table-cell sm:px-2">
+                        Início
+                      </th>
+                      <th className="hidden px-1.5 py-2 font-medium text-slate-600 lg:table-cell sm:px-2">
+                        Fim
+                      </th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Status</th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Ações</th>
                     </tr>
                   </thead>
                   <GroupedTableBodies
@@ -534,41 +538,63 @@ export default function ParticipacoesPage() {
                               : "border-b border-slate-50 hover:bg-slate-50/50"
                           }
                         >
-                          <td className="px-4 py-3 text-slate-700">
+                          <td
+                            className="max-w-[8rem] truncate px-1.5 py-1.5 text-slate-700 sm:px-2 sm:max-w-[12rem]"
+                            title={partnerMap.get(row.partner_id) ?? undefined}
+                          >
                             {partnerMap.get(row.partner_id) ?? "—"}
                           </td>
-                          <td className="px-4 py-3 font-medium text-slate-700">
+                          <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-700 sm:px-2">
                             {formatPercent(Number(row.ownership_percentage))}
                           </td>
-                          <td className="px-4 py-3 text-slate-700">
+                          <td className="hidden whitespace-nowrap px-1.5 py-1.5 text-slate-700 md:table-cell sm:px-2">
                             {formatDate(row.effective_date)}
                           </td>
-                          <td className="px-4 py-3 text-slate-700">{formatDate(row.end_date)}</td>
-                          <td className="px-4 py-3">
+                          <td className="hidden whitespace-nowrap px-1.5 py-1.5 text-slate-700 lg:table-cell sm:px-2">
+                            {formatDate(row.end_date)}
+                          </td>
+                          <td className="px-1.5 py-1.5 sm:px-2">
                             <Badge variant={row.status === "Ativo" ? "success" : "default"}>
                               {row.status}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-1.5 py-1.5 sm:px-2">
                             {canEdit || canDelete ? (
-                            <div className="flex gap-2">
+                            <div className="os-row-actions flex flex-wrap gap-1">
                               {canEdit ? (
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                className="action-icon-btn"
+                                title="Editar"
                                 onClick={() => { setEditing(row); setIsNew(false); setError(null); }}
                               >
-                                Editar
+                                <span className="sm:hidden">Edit</span>
+                                <span className="hidden sm:inline">Editar</span>
                               </Button>
                               ) : null}
                               {canEdit && row.status === "Ativo" ? (
-                                <Button variant="ghost" size="sm" onClick={() => handleClose(row.id)}>
-                                  Encerrar
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="action-icon-btn"
+                                  title="Encerrar"
+                                  onClick={() => handleClose(row.id)}
+                                >
+                                  <span className="sm:hidden">Enc</span>
+                                  <span className="hidden sm:inline">Encerrar</span>
                                 </Button>
                               ) : null}
                               {canDelete ? (
-                              <Button variant="ghost" size="sm" onClick={() => requestDelete(row.id)}>
-                                Excluir
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Excluir"
+                                onClick={() => requestDelete(row.id)}
+                              >
+                                <span className="sm:hidden">Exc</span>
+                                <span className="hidden sm:inline">Excluir</span>
                               </Button>
                               ) : null}
                             </div>

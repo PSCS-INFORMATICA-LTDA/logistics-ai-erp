@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AddressWithCepField } from "@/components/operacional/AddressWithCepField";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import { ANTT_AXLE_OPTIONS, ANTT_CARGO_TYPES } from "@/lib/antt-freight";
 import { buildTollLookupLinks } from "@/lib/freight-toll-links";
 import type { FreightTollPlaza } from "@/lib/qualp-freight";
@@ -606,35 +607,40 @@ export function FreightCalculatorPanel({
             </p>
           </div>
           {tolls.length > 0 ? (
-            <div className="overflow-x-auto rounded border border-amber-100 bg-white">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600">
+            <DataTableScroll stickyFirst compact>
+              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+                <thead className="bg-slate-50 text-[10px] text-slate-600 sm:text-xs">
                   <tr>
-                    <th className="px-2 py-1.5 font-medium">#</th>
-                    <th className="px-2 py-1.5 font-medium">Praça</th>
-                    <th className="px-2 py-1.5 font-medium">Local</th>
-                    <th className="px-2 py-1.5 font-medium text-right">Valor</th>
-                    <th className="px-2 py-1.5 font-medium text-right">Tag</th>
+                    <th className="px-1.5 py-1.5 font-medium">#</th>
+                    <th className="px-1.5 py-1.5 font-medium">Praça</th>
+                    <th className="hidden px-1.5 py-1.5 font-medium md:table-cell">Local</th>
+                    <th className="px-1.5 py-1.5 font-medium text-right">Valor</th>
+                    <th className="hidden px-1.5 py-1.5 font-medium text-right lg:table-cell">Tag</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tolls.map((plaza) => (
                     <tr key={`${plaza.order}-${plaza.name}`} className="border-t border-slate-100">
-                      <td className="px-2 py-1.5 text-slate-500">{plaza.order}</td>
-                      <td className="px-2 py-1.5 font-medium text-slate-800">{plaza.name}</td>
-                      <td className="px-2 py-1.5 text-slate-600">
+                      <td className="px-1.5 py-1.5 text-slate-500">{plaza.order}</td>
+                      <td
+                        className="max-w-[7rem] truncate px-1.5 py-1.5 font-medium text-slate-800 sm:max-w-[10rem]"
+                        title={plaza.name}
+                      >
+                        {plaza.name}
+                      </td>
+                      <td className="hidden max-w-[8rem] truncate px-1.5 py-1.5 text-slate-600 md:table-cell">
                         {[plaza.city, plaza.state].filter(Boolean).join(" / ") || "—"}
                         {plaza.concessionaire ? ` · ${plaza.concessionaire}` : ""}
                       </td>
-                      <td className="px-2 py-1.5 text-right">{formatCurrency(plaza.amount)}</td>
-                      <td className="px-2 py-1.5 text-right text-slate-600">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right">{formatCurrency(plaza.amount)}</td>
+                      <td className="hidden whitespace-nowrap px-1.5 py-1.5 text-right text-slate-600 lg:table-cell">
                         {plaza.tagAmount != null ? formatCurrency(plaza.tagAmount) : "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </DataTableScroll>
           ) : (
             <p className="text-xs text-slate-600">
               Nenhuma praça listada — ajuste o total de pedágio manualmente se necessário.

@@ -2,6 +2,13 @@ import type { CSSProperties, ReactNode } from "react";
 import { dataTableScroll } from "@/lib/liquid-glass-styles";
 import { cn } from "@/lib/utils";
 
+/**
+ * Padrão mobile das listagens:
+ * - fitWidth + compact (defaults)
+ * - colunas secundárias: `hidden md|lg|xl:table-cell`
+ * - nomes longos: truncate + title
+ * - ações: `os-row-actions` + `action-icon-btn` + rótulo curto no mobile
+ */
 type Props = {
   children: ReactNode;
   /** Coluna da esquerda fixa no scroll horizontal (ex.: OS, código). */
@@ -29,7 +36,8 @@ export function DataTableScroll({
   stickyLast = false,
   /** Padrão: cabe em 100% (sem forçar barra horizontal). */
   fitWidth = true,
-  compact = false,
+  /** Padrão mobile: fonte/padding densos + ações com wrap. */
+  compact = true,
   maxHeight,
   className,
   hint,

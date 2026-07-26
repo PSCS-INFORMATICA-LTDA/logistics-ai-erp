@@ -702,14 +702,23 @@ export default function ParametrosPage() {
             </p>
           ) : (
             <>
-              <DataTableScroll stickyFirst>
-                <table className="w-full text-xs sm:text-sm">
+              <DataTableScroll stickyFirst compact>
+                <table className="w-full text-[11px] leading-snug sm:text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                      <th className="px-3 py-2 font-medium text-slate-600">Tela</th>
-                      <th className="px-3 py-2 font-medium text-slate-600">Análise (ver)</th>
-                      <th className="px-3 py-2 font-medium text-slate-600">Alteração</th>
-                      <th className="px-3 py-2 font-medium text-slate-600">Exclusão</th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Tela</th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">
+                        <span className="sm:hidden">Ver</span>
+                        <span className="hidden sm:inline">Análise (ver)</span>
+                      </th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">
+                        <span className="sm:hidden">Alt</span>
+                        <span className="hidden sm:inline">Alteração</span>
+                      </th>
+                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">
+                        <span className="sm:hidden">Exc</span>
+                        <span className="hidden sm:inline">Exclusão</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -727,8 +736,8 @@ export default function ParametrosPage() {
                           const row = perms[screen.key];
                           return (
                             <tr key={screen.key} className="border-b border-slate-50">
-                              <td className="px-3 py-2 text-slate-700">{screen.label}</td>
-                              <td className="px-3 py-2">
+                              <td className="max-w-[8rem] truncate px-1.5 py-1.5 text-slate-700 sm:max-w-none sm:px-2">{screen.label}</td>
+                              <td className="px-1.5 py-1.5 sm:px-2">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(row?.can_view)}
@@ -737,7 +746,7 @@ export default function ParametrosPage() {
                                   }
                                 />
                               </td>
-                              <td className="px-3 py-2">
+                              <td className="px-1.5 py-1.5 sm:px-2">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(row?.can_edit)}
@@ -746,7 +755,7 @@ export default function ParametrosPage() {
                                   }
                                 />
                               </td>
-                              <td className="px-3 py-2">
+                              <td className="px-1.5 py-1.5 sm:px-2">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(row?.can_delete)}

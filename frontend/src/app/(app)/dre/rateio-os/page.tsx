@@ -267,25 +267,34 @@ export default function DreRateioOsPage() {
         {partnerTotals.length > 0 ? (
           <div className={`space-y-2 p-4 ${glassFilterPanel()}`}>
             <h3 className="text-sm font-semibold text-slate-900">Totais por sócio</h3>
-            <DataTableScroll stickyFirst maxHeight="min(40vh, 22rem)">
-              <table className="w-full text-sm">
+            <DataTableScroll stickyFirst compact maxHeight="min(40vh, 22rem)">
+              <table className="w-full text-[11px] leading-snug sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-slate-600">
-                    <th className="px-2 py-1.5 font-medium">Sócio</th>
-                    <th className="px-2 py-1.5 font-medium">OS</th>
-                    <th className="px-2 py-1.5 font-medium">Receita</th>
-                    <th className="px-2 py-1.5 font-medium">Despesa</th>
-                    <th className="px-2 py-1.5 font-medium">Resultado</th>
+                    <th className="px-1.5 py-1.5 font-medium">Sócio</th>
+                    <th className="hidden px-1.5 py-1.5 font-medium md:table-cell">OS</th>
+                    <th className="hidden px-1.5 py-1.5 font-medium md:table-cell">Receita</th>
+                    <th className="hidden px-1.5 py-1.5 font-medium lg:table-cell">Despesa</th>
+                    <th className="px-1.5 py-1.5 font-medium">Resultado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {partnerTotals.map((p) => (
                     <tr key={p.partnerId} className="border-b border-slate-50">
-                      <td className="px-2 py-1.5 font-medium text-slate-900">{p.partnerName}</td>
-                      <td className="px-2 py-1.5 text-slate-700">{p.osCount}</td>
-                      <td className="px-2 py-1.5 text-emerald-800">{formatCurrency(p.revenueShare)}</td>
-                      <td className="px-2 py-1.5 text-amber-800">{formatCurrency(p.expenseShare)}</td>
-                      <td className="px-2 py-1.5 font-medium text-slate-900">
+                      <td
+                        className="max-w-[8rem] truncate px-1.5 py-1.5 font-medium text-slate-900 sm:max-w-[12rem]"
+                        title={p.partnerName}
+                      >
+                        {p.partnerName}
+                      </td>
+                      <td className="hidden px-1.5 py-1.5 text-slate-700 md:table-cell">{p.osCount}</td>
+                      <td className="hidden px-1.5 py-1.5 text-emerald-800 md:table-cell">
+                        {formatCurrency(p.revenueShare)}
+                      </td>
+                      <td className="hidden px-1.5 py-1.5 text-amber-800 lg:table-cell">
+                        {formatCurrency(p.expenseShare)}
+                      </td>
+                      <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                         {formatCurrency(p.resultShare)}
                       </td>
                     </tr>
@@ -305,6 +314,7 @@ export default function DreRateioOsPage() {
           ) : (
             <DataTableScroll
               stickyFirst
+              compact
               fitWidth
               hint={
                 <>
@@ -337,18 +347,18 @@ export default function DreRateioOsPage() {
                     <th className="px-1.5 py-2 font-semibold text-slate-800" title="Cliente">
                       Cliente
                     </th>
-                    <th className="px-1.5 py-2 font-semibold text-slate-800" title="Receita OS">
+                    <th className="hidden px-1.5 py-2 font-semibold text-slate-800 md:table-cell" title="Receita OS">
                       Rec. OS
                     </th>
-                    <th className="px-1.5 py-2 font-semibold text-slate-800" title="Despesa OS">
+                    <th className="hidden px-1.5 py-2 font-semibold text-slate-800 md:table-cell" title="Despesa OS">
                       Desp. OS
                     </th>
                     <th className="px-1.5 py-2 font-semibold text-slate-800">Sócio</th>
                     <th className="px-1.5 py-2 font-semibold text-slate-800">%</th>
-                    <th className="px-1.5 py-2 font-semibold text-slate-800" title="Cota receita">
+                    <th className="hidden px-1.5 py-2 font-semibold text-slate-800 lg:table-cell" title="Cota receita">
                       Cota rec.
                     </th>
-                    <th className="px-1.5 py-2 font-semibold text-slate-800" title="Cota despesa">
+                    <th className="hidden px-1.5 py-2 font-semibold text-slate-800 lg:table-cell" title="Cota despesa">
                       Cota desp.
                     </th>
                     <th className="px-1.5 py-2 font-semibold text-slate-800" title="Cota resultado">
@@ -394,14 +404,14 @@ export default function DreRateioOsPage() {
                         >
                           {index === 0 ? row.order.clientName || "—" : ""}
                         </td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5 tabular-nums text-emerald-800">
+                        <td className="hidden whitespace-nowrap px-1.5 py-1.5 tabular-nums text-emerald-800 md:table-cell">
                           {index === 0 ? formatCurrency(row.order.revenue) : ""}
                         </td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5 tabular-nums text-amber-800">
+                        <td className="hidden whitespace-nowrap px-1.5 py-1.5 tabular-nums text-amber-800 md:table-cell">
                           {index === 0 ? formatCurrency(row.order.expense) : ""}
                         </td>
                         <td
-                          className="truncate px-1.5 py-1.5 text-slate-800"
+                          className="max-w-[7rem] truncate px-1.5 py-1.5 text-slate-800 sm:max-w-[10rem]"
                           title={row.partnerName}
                         >
                           {row.partnerName}
@@ -409,10 +419,10 @@ export default function DreRateioOsPage() {
                         <td className="whitespace-nowrap px-1.5 py-1.5 tabular-nums text-slate-700">
                           {row.partnerId ? `${row.ownershipPct.toFixed(0)}%` : "—"}
                         </td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium tabular-nums text-emerald-900">
+                        <td className="hidden whitespace-nowrap px-1.5 py-1.5 font-medium tabular-nums text-emerald-900 lg:table-cell">
                           {formatCurrency(row.revenueShare)}
                         </td>
-                        <td className="whitespace-nowrap px-1.5 py-1.5 tabular-nums text-amber-900">
+                        <td className="hidden whitespace-nowrap px-1.5 py-1.5 tabular-nums text-amber-900 lg:table-cell">
                           {formatCurrency(row.expenseShare)}
                         </td>
                         <td className="whitespace-nowrap px-1.5 py-1.5 font-medium tabular-nums text-slate-900">

@@ -478,19 +478,19 @@ export default function DreDespesasMotoristaPage() {
               Nenhum lançamento pago neste período. Marque um pagamento como pago na tabela acima.
             </p>
           ) : (
-            <DataTableScroll stickyFirst>
-              <table className="w-full text-sm">
+            <DataTableScroll stickyFirst compact>
+              <table className="w-full text-[11px] leading-snug sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-600">
-                    <th className="px-3 py-2 font-medium">Data</th>
-                    <th className="px-3 py-2 font-medium">Conta DRE</th>
-                    <th className="px-3 py-2 font-medium">OS</th>
-                    <th className="px-3 py-2 font-medium">Motorista</th>
-                    <th className="px-3 py-2 font-medium">Pix</th>
-                    <th className="px-3 py-2 font-medium">Banco</th>
-                    <th className="px-3 py-2 font-medium">Agência</th>
-                    <th className="px-3 py-2 font-medium">Conta</th>
-                    <th className="px-3 py-2 font-medium">Valor</th>
+                    <th className="px-1.5 py-2 font-medium">Data</th>
+                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Conta DRE</th>
+                    <th className="px-1.5 py-2 font-medium">OS</th>
+                    <th className="px-1.5 py-2 font-medium">Motorista</th>
+                    <th className="hidden px-1.5 py-2 font-medium md:table-cell">Pix</th>
+                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Banco</th>
+                    <th className="hidden px-1.5 py-2 font-medium lg:table-cell">Agência</th>
+                    <th className="hidden px-1.5 py-2 font-medium xl:table-cell">Conta</th>
+                    <th className="px-1.5 py-2 font-medium">Valor</th>
                   </tr>
                 </thead>
                 <GroupedTableBodies groups={paidDreGroups} colSpan={9}>
@@ -500,13 +500,18 @@ export default function DreDespesasMotoristaPage() {
                         key={row.id}
                         className={group.multi ? "align-top" : "border-b border-slate-100"}
                       >
-                        <td className="px-3 py-2">
+                        <td className="whitespace-nowrap px-1.5 py-1.5">
                           {index === 0 || !group.multi
                             ? formatDate(row.transaction_date)
                             : ""}
                         </td>
-                        <td className="px-3 py-2 font-medium">{row.dre_account_name}</td>
-                        <td className="px-3 py-2 font-medium">
+                        <td
+                          className="hidden max-w-[8rem] truncate px-1.5 py-1.5 font-medium md:table-cell"
+                          title={row.dre_account_name || undefined}
+                        >
+                          {row.dre_account_name}
+                        </td>
+                        <td className="px-1.5 py-1.5 font-medium">
                           {index === 0 ? (
                             row.service_order_code ?? "—"
                           ) : group.multi ? (
@@ -517,16 +522,27 @@ export default function DreDespesasMotoristaPage() {
                             row.service_order_code ?? "—"
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td
+                          className="max-w-[8rem] truncate px-1.5 py-1.5"
+                          title={
+                            row.driver_code && row.driver_name
+                              ? `${row.driver_code} — ${row.driver_name}`
+                              : undefined
+                          }
+                        >
                           {row.driver_code && row.driver_name
                             ? `${row.driver_code} — ${row.driver_name}`
                             : "—"}
                         </td>
-                        <td className="px-3 py-2">{row.pix_key ?? "—"}</td>
-                        <td className="px-3 py-2">{row.bank_code ?? "—"}</td>
-                        <td className="px-3 py-2">{row.bank_agency ?? "—"}</td>
-                        <td className="px-3 py-2">{row.bank_account ?? "—"}</td>
-                        <td className="px-3 py-2 font-medium">{formatCurrency(row.amount)}</td>
+                        <td className="hidden max-w-[6rem] truncate px-1.5 py-1.5 md:table-cell">
+                          {row.pix_key ?? "—"}
+                        </td>
+                        <td className="hidden px-1.5 py-1.5 lg:table-cell">{row.bank_code ?? "—"}</td>
+                        <td className="hidden px-1.5 py-1.5 lg:table-cell">{row.bank_agency ?? "—"}</td>
+                        <td className="hidden px-1.5 py-1.5 xl:table-cell">{row.bank_account ?? "—"}</td>
+                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">
+                          {formatCurrency(row.amount)}
+                        </td>
                       </tr>
                     ))
                   }

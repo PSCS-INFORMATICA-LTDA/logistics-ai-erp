@@ -232,16 +232,16 @@ export default function DocumentosAVencerOperacionalPage() {
 
           <section className={glassFilterPanel()}>
             <h2 className="mb-2 text-sm font-semibold">Documentos em atenção</h2>
-            <DataTableScroll stickyFirst>
-              <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
+            <DataTableScroll stickyFirst compact>
+              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
                 <tr>
-                  <th className="px-2 py-2">Placa / Escopo</th>
-                  <th className="px-2 py-2">Marca / modelo</th>
-                  <th className="px-2 py-2">Documento</th>
-                  <th className="px-2 py-2">Nº</th>
-                  <th className="px-2 py-2">Validade</th>
-                  <th className="px-2 py-2">Situação</th>
+                  <th className="px-1.5 py-2">Placa / Escopo</th>
+                  <th className="hidden px-1.5 py-2 md:table-cell">Marca / modelo</th>
+                  <th className="px-1.5 py-2">Documento</th>
+                  <th className="hidden px-1.5 py-2 lg:table-cell">Nº</th>
+                  <th className="hidden px-1.5 py-2 xl:table-cell">Validade</th>
+                  <th className="px-1.5 py-2">Situação</th>
                 </tr>
               </thead>
               {docGroups.length === 0 ? (
@@ -268,7 +268,7 @@ export default function DocumentosAVencerOperacionalPage() {
                           key={doc.id}
                           className={group.multi ? "align-top" : "border-t border-slate-100"}
                         >
-                          <td className="px-2 py-2 font-medium">
+                          <td className="whitespace-nowrap px-1.5 py-1.5 font-medium">
                             {index === 0 ? (
                               plate
                             ) : group.multi ? (
@@ -279,14 +279,19 @@ export default function DocumentosAVencerOperacionalPage() {
                               plate
                             )}
                           </td>
-                          <td className="px-2 py-2 text-slate-700">
+                          <td className="hidden px-1.5 py-1.5 text-slate-700 md:table-cell">
                             {index === 0 || !group.multi ? brandModel : ""}
                           </td>
-                          <td className="px-2 py-2">
+                          <td
+                            className="max-w-[7rem] truncate px-1.5 py-1.5 sm:max-w-[10rem]"
+                            title={documentDisplayName(doc.document_type)}
+                          >
                             {documentDisplayName(doc.document_type)}
                           </td>
-                          <td className="px-2 py-2">{doc.document_number || "—"}</td>
-                          <td className="px-2 py-2 whitespace-nowrap">
+                          <td className="hidden px-1.5 py-1.5 lg:table-cell">
+                            {doc.document_number || "—"}
+                          </td>
+                          <td className="hidden whitespace-nowrap px-1.5 py-1.5 xl:table-cell">
                             {doc.no_expiry
                               ? "Sem vencimento"
                               : formatExpiryDateBR(doc.expires_at) || "—"}
@@ -297,7 +302,7 @@ export default function DocumentosAVencerOperacionalPage() {
                               </span>
                             ) : null}
                           </td>
-                          <td className="px-2 py-2">
+                          <td className="px-1.5 py-1.5">
                             <Badge variant={view.badge}>{view.label}</Badge>
                           </td>
                         </tr>

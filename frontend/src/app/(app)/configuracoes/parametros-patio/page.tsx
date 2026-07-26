@@ -312,23 +312,23 @@ export default function ParametrosPatioPage() {
           + Porte
         </Button>
         ) : null}
-        <DataTableScroll stickyFirst>
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
+        <DataTableScroll stickyFirst compact>
+          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+            <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
               <tr>
-                <th className="px-2 py-2">Código</th>
-                <th className="px-2 py-2">Porte</th>
-                <th className="px-2 py-2">Uso</th>
-                <th className="px-2 py-2">Status</th>
+                <th className="px-1.5 py-2">Código</th>
+                <th className="px-1.5 py-2">Porte</th>
+                <th className="hidden px-1.5 py-2 md:table-cell">Uso</th>
+                <th className="px-1.5 py-2">Status</th>
               </tr>
             </thead>
             <tbody>
               {types.map((t) => (
                 <tr key={t.id} className="border-t border-slate-100">
-                  <td className="px-2 py-2">{t.code}</td>
-                  <td className="px-2 py-2 font-medium">{t.name}</td>
-                  <td className="px-2 py-2 text-slate-600">{t.usage_category}</td>
-                  <td className="px-2 py-2">
+                  <td className="px-1.5 py-2">{t.code}</td>
+                  <td className="max-w-[8rem] truncate px-1.5 py-2 font-medium sm:max-w-none">{t.name}</td>
+                  <td className="hidden px-1.5 py-2 text-slate-600 md:table-cell">{t.usage_category}</td>
+                  <td className="px-1.5 py-2">
                     <Badge variant={t.is_active ? "success" : "default"}>
                       {t.is_active ? "Ativo" : "Inativo"}
                     </Badge>
@@ -436,33 +436,38 @@ export default function ParametrosPatioPage() {
         </Button>
         ) : null}
 
-        <DataTableScroll stickyFirst stickyLast>
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
+        <DataTableScroll stickyFirst stickyLast compact>
+          <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+            <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
               <tr>
-                <th className="px-2 py-2">Cód.</th>
-                <th className="px-2 py-2">Modalidade</th>
-                <th className="px-2 py-2">Porte</th>
-                <th className="px-2 py-2">Serviço</th>
-                <th className="px-2 py-2">Valor</th>
-                <th className="px-2 py-2">Unidade</th>
-                <th className="px-2 py-2">Desde</th>
-                <th className="px-2 py-2">Data fim</th>
-                <th className="px-2 py-2">Status</th>
-                <th className="px-2 py-2" />
+                <th className="px-1.5 py-2">Cód.</th>
+                <th className="hidden px-1.5 py-2 md:table-cell">Modalidade</th>
+                <th className="px-1.5 py-2">Porte</th>
+                <th className="hidden px-1.5 py-2 lg:table-cell">Serviço</th>
+                <th className="px-1.5 py-2">Valor</th>
+                <th className="hidden px-1.5 py-2 xl:table-cell">Unidade</th>
+                <th className="hidden px-1.5 py-2 xl:table-cell">Desde</th>
+                <th className="hidden px-1.5 py-2 xl:table-cell">Data fim</th>
+                <th className="px-1.5 py-2">Status</th>
+                <th className="px-1.5 py-2" />
               </tr>
             </thead>
             <tbody>
               {prices.map((p) => (
                 <tr key={p.id} className="border-t border-slate-100">
-                  <td className="px-2 py-2">{p.code}</td>
-                  <td className="px-2 py-2">{p.modality}</td>
-                  <td className="px-2 py-2">{p.vehicle_type_name ?? "—"}</td>
-                  <td className="px-2 py-2">{p.service_name}</td>
-                  <td className="px-2 py-2 font-medium">{formatCurrency(Number(p.price))}</td>
-                  <td className="px-2 py-2">{p.billing_unit}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">{p.valid_from}</td>
-                  <td className="px-2 py-2">
+                  <td className="px-1.5 py-2">{p.code}</td>
+                  <td className="hidden px-1.5 py-2 md:table-cell">{p.modality}</td>
+                  <td className="max-w-[6rem] truncate px-1.5 py-2 sm:max-w-none">{p.vehicle_type_name ?? "—"}</td>
+                  <td
+                    className="hidden max-w-[8rem] truncate px-1.5 py-2 lg:table-cell sm:max-w-none"
+                    title={p.service_name}
+                  >
+                    {p.service_name}
+                  </td>
+                  <td className="whitespace-nowrap px-1.5 py-2 font-medium">{formatCurrency(Number(p.price))}</td>
+                  <td className="hidden px-1.5 py-2 xl:table-cell">{p.billing_unit}</td>
+                  <td className="hidden whitespace-nowrap px-1.5 py-2 xl:table-cell">{p.valid_from}</td>
+                  <td className="hidden px-1.5 py-2 xl:table-cell">
                     {canEdit ? (
                     <input
                       type="date"
@@ -475,13 +480,21 @@ export default function ParametrosPatioPage() {
                       <span>{p.valid_until ?? "—"}</span>
                     )}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-1.5 py-2">
                     <Badge variant={p.status === "Ativo" ? "success" : "default"}>{p.status}</Badge>
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-1.5 py-2">
                     {canEdit && p.status === "Ativo" ? (
-                      <Button type="button" variant="ghost" onClick={() => void deactivatePrice(p.id)}>
-                        Inativar
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="action-icon-btn"
+                        title="Inativar"
+                        onClick={() => void deactivatePrice(p.id)}
+                      >
+                        <span className="sm:hidden">Inat.</span>
+                        <span className="hidden sm:inline">Inativar</span>
                       </Button>
                     ) : null}
                   </td>

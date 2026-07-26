@@ -151,9 +151,9 @@ function SociosPageContent() {
         columns={[
           { key: "code", label: "Código" },
           { key: "name", label: "Nome completo" },
-          { key: "cpf", label: "CPF/CNPJ" },
-          { key: "rg", label: "RG" },
-          { key: "partner_type", label: "Tipo" },
+          { key: "cpf", label: "CPF/CNPJ", className: "hidden md:table-cell" },
+          { key: "rg", label: "RG", className: "hidden lg:table-cell" },
+          { key: "partner_type", label: "Tipo", className: "hidden lg:table-cell" },
           {
             key: "status",
             label: "Status",
@@ -164,6 +164,7 @@ function SociosPageContent() {
           {
             key: "use_in_allocation",
             label: "Rateio",
+            className: "hidden xl:table-cell",
             render: (r) => (r.use_in_allocation ? "Sim" : "Não"),
           },
         ]}

@@ -667,18 +667,24 @@ function DreLancamentosPageContent() {
               Nenhum lançamento da empresa neste filtro. Cadastre despesas/receitas gerais acima.
             </p>
           ) : (
-            <DataTableScroll stickyFirst stickyLast>
-              <table className="w-full text-sm">
+            <DataTableScroll stickyFirst stickyLast compact>
+              <table className="w-full text-[11px] leading-snug sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                    <th className="px-3 py-2 font-medium text-slate-600">Data</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Tipo</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Conta</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">OS</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Fornecedor</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Obs.</th>
-                    <th className="px-3 py-2 font-medium text-slate-600">Valor</th>
-                    <th className="px-3 py-2 font-medium text-slate-600" />
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Data</th>
+                    <th className="hidden px-1.5 py-2 font-medium text-slate-600 md:table-cell">
+                      Tipo
+                    </th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Conta</th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600">OS</th>
+                    <th className="hidden px-1.5 py-2 font-medium text-slate-600 lg:table-cell">
+                      Fornecedor
+                    </th>
+                    <th className="hidden px-1.5 py-2 font-medium text-slate-600 xl:table-cell">
+                      Obs.
+                    </th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600">Valor</th>
+                    <th className="px-1.5 py-2 font-medium text-slate-600" />
                   </tr>
                 </thead>
                 <GroupedTableBodies groups={ledgerGroups} colSpan={8}>
@@ -688,8 +694,10 @@ function DreLancamentosPageContent() {
                         key={row.id}
                         className={group.multi ? "align-top" : "border-b border-slate-50"}
                       >
-                        <td className="px-3 py-2 text-slate-700">{formatDate(row.transaction_date)}</td>
-                        <td className="px-3 py-2">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 text-slate-700">
+                          {formatDate(row.transaction_date)}
+                        </td>
+                        <td className="hidden px-1.5 py-1.5 md:table-cell">
                           <span
                             className={
                               row.transaction_type === "Receita"
@@ -700,8 +708,13 @@ function DreLancamentosPageContent() {
                             {row.transaction_type}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-slate-700">{row.dre_account_name}</td>
-                        <td className="px-3 py-2 font-medium text-slate-800">
+                        <td
+                          className="max-w-[8rem] truncate px-1.5 py-1.5 text-slate-700"
+                          title={row.dre_account_name || undefined}
+                        >
+                          {row.dre_account_name}
+                        </td>
+                        <td className="px-1.5 py-1.5 font-medium text-slate-800">
                           {index === 0 ? (
                             row.service_order_code ?? "—"
                           ) : group.multi ? (
@@ -712,18 +725,28 @@ function DreLancamentosPageContent() {
                             row.service_order_code ?? "—"
                           )}
                         </td>
-                        <td className="px-3 py-2 text-slate-600">{row.supplier_name ?? "—"}</td>
-                        <td className="max-w-[220px] truncate px-3 py-2 text-slate-600">
+                        <td className="hidden max-w-[8rem] truncate px-1.5 py-1.5 text-slate-600 lg:table-cell">
+                          {row.supplier_name ?? "—"}
+                        </td>
+                        <td
+                          className="hidden max-w-[10rem] truncate px-1.5 py-1.5 text-slate-600 xl:table-cell"
+                          title={row.description ?? undefined}
+                        >
                           {row.description ?? "—"}
                         </td>
-                        <td className="px-3 py-2 font-medium text-slate-900">
+                        <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                           {formatCurrency(row.amount)}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-1.5 py-1.5 text-right">
                           {canDelete ? (
+                            <div className="os-row-actions inline-flex justify-end">
                             <Button
                               type="button"
                               variant="ghost"
+                              size="sm"
+                              className="action-icon-btn"
+                              title="Excluir"
+                              aria-label="Excluir"
                               onClick={() => {
                                 setPendingDeleteId(row.id);
                                 void (async () => {
@@ -740,8 +763,10 @@ function DreLancamentosPageContent() {
                                 })();
                               }}
                             >
-                              Excluir
+                              <span className="sm:hidden">Exc</span>
+                              <span className="hidden sm:inline">Excluir</span>
                             </Button>
+                            </div>
                           ) : null}
                         </td>
                       </tr>

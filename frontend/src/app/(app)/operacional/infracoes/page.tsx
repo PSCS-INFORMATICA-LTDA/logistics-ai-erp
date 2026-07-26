@@ -183,11 +183,13 @@ export default function InfracoesPage() {
         {
           key: "driver_name",
           label: "Responsável",
+          className: "hidden md:table-cell",
           render: (r) => r.driver_name ?? "—",
         },
         {
           key: "authority_status",
           label: "Órgão autuador",
+          className: "hidden lg:table-cell",
           render: (r) => (
             <Badge variant={authorityVariant(r.authority_status ?? "Pendente")}>
               {getAuthorityStatusLabel(r.authority_status ?? "Pendente")}
@@ -197,6 +199,7 @@ export default function InfracoesPage() {
         {
           key: "payment_proof_status",
           label: "Comprovante",
+          className: "hidden lg:table-cell",
           render: (r) => (
             <Badge variant={paymentVariant(r.payment_proof_status ?? "Pendente")}>
               {getPaymentProofStatusLabel(r.payment_proof_status ?? "Pendente")}
@@ -211,11 +214,13 @@ export default function InfracoesPage() {
         {
           key: "case_status",
           label: "Processo",
+          className: "hidden xl:table-cell",
           render: (r) => getCaseStatusLabel(r.case_status ?? "EmAndamento"),
         },
         {
           key: "amount",
           label: "Valor",
+          className: "hidden md:table-cell",
           render: (r) => (r.amount != null ? formatCurrency(r.amount) : "—"),
         },
       ]}

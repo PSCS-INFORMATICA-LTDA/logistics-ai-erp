@@ -444,20 +444,20 @@ export default function HistoricoExclusoesPage() {
 
       {loading ? <Loading /> : null}
 
-      <DataTableScroll stickyLast>
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+      <DataTableScroll stickyLast compact>
+        <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sm:text-xs">
             <tr>
-              <th className="px-3 py-2">Data / hora</th>
-              <th className="px-3 py-2">Usuário</th>
-              <th className="px-3 py-2">Tela</th>
-              <th className="px-3 py-2">Módulo</th>
-              <th className="px-3 py-2">Código</th>
-              <th className="px-3 py-2">Resumo</th>
-              <th className="px-3 py-2">Motivo</th>
-              <th className="px-3 py-2">Modo</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Ações</th>
+              <th className="px-1.5 py-2">Data / hora</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Usuário</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Tela</th>
+              <th className="hidden px-1.5 py-2 lg:table-cell">Módulo</th>
+              <th className="px-1.5 py-2">Código</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Resumo</th>
+              <th className="hidden px-1.5 py-2 xl:table-cell">Motivo</th>
+              <th className="hidden px-1.5 py-2 md:table-cell">Modo</th>
+              <th className="px-1.5 py-2">Status</th>
+              <th className="px-1.5 py-2">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -466,18 +466,20 @@ export default function HistoricoExclusoesPage() {
               return (
                 <Fragment key={row.id}>
                   <tr className="border-t border-slate-100 align-top">
-                    <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
+                    <td className="whitespace-nowrap px-1.5 py-1.5 font-medium text-slate-900">
                       {formatOccurredAt(row.occurred_at)}
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium text-slate-900">{row.actor_name || "—"}</div>
+                    <td className="hidden px-1.5 py-1.5 md:table-cell">
+                      <div className="max-w-[8rem] truncate font-medium text-slate-900 sm:max-w-[12rem]" title={row.actor_name || undefined}>
+                        {row.actor_name || "—"}
+                      </div>
                       {row.actor_email ? (
-                        <div className="text-xs text-slate-500">{row.actor_email}</div>
+                        <div className="truncate text-[10px] text-slate-500 sm:text-xs">{row.actor_email}</div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2">{screenLabel(row.screen_key)}</td>
-                    <td className="px-3 py-2">{entityTypeLabel(row.entity_type)}</td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-1.5 py-1.5 lg:table-cell">{screenLabel(row.screen_key)}</td>
+                    <td className="hidden px-1.5 py-1.5 lg:table-cell">{entityTypeLabel(row.entity_type)}</td>
+                    <td className="px-1.5 py-1.5">
                       {row.entity_code ? (
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{row.entity_code}</span>
@@ -497,50 +499,67 @@ export default function HistoricoExclusoesPage() {
                         "—"
                       )}
                     </td>
-                    <td className="max-w-xs px-3 py-2 text-slate-700" title={row.summary ?? undefined}>
+                    <td className="hidden max-w-xs truncate px-1.5 py-1.5 text-slate-700 xl:table-cell" title={row.summary ?? undefined}>
                       {row.summary || "—"}
                     </td>
-                    <td className="max-w-[12rem] truncate px-3 py-2 sm:max-w-md">
+                    <td className="hidden max-w-[8rem] truncate px-1.5 py-1.5 xl:table-cell sm:max-w-md">
                       {row.reason ? (
-                        <p className="whitespace-pre-wrap text-sm font-medium text-slate-900">
+                        <p className="truncate font-medium text-slate-900" title={row.reason}>
                           {row.reason}
                         </p>
                       ) : (
-                        <span className="text-sm text-slate-400">Sem observação</span>
+                        <span className="text-slate-400">Sem observação</span>
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-1.5 py-1.5 md:table-cell">
                       <Badge variant={row.delete_mode === "soft" ? "warning" : "danger"}>
                         {row.delete_mode === "soft" ? "Soft" : "Hard"}
                       </Badge>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-1.5 py-1.5">
                       <Badge variant={row.restored ? "success" : "danger"}>
                         {row.restored ? "Restaurado" : "Excluído"}
                       </Badge>
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-col gap-1.5">
+                    <td className="px-1.5 py-1.5">
+                      <div className="os-row-actions flex flex-col gap-1">
                         <Button
                           type="button"
                           size="sm"
                           variant="ghost"
+                          className="action-icon-btn"
+                          title={expandedId === row.id ? "Ocultar detalhe" : "Ver detalhe"}
                           onClick={() =>
                             setExpandedId((cur) => (cur === row.id ? null : row.id))
                           }
                         >
-                          {expandedId === row.id ? "Ocultar" : "Detalhe"}
+                          {expandedId === row.id ? (
+                            <>
+                              <span className="sm:hidden">Ocult.</span>
+                              <span className="hidden sm:inline">Ocultar</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="sm:hidden">Det.</span>
+                              <span className="hidden sm:inline">Detalhe</span>
+                            </>
+                          )}
                         </Button>
                         {restorable ? (
                           <Button
                             type="button"
                             size="sm"
+                            className="action-icon-btn"
+                            title={row.delete_mode === "hard" ? "Restaurar (hard)" : "Restaurar"}
                             onClick={() => {
                               setMsg(null);
                               setPendingRestore(row);
                             }}
                           >
-                            {row.delete_mode === "hard" ? "Restaurar (hard)" : "Restaurar"}
+                            <span className="sm:hidden">Rest.</span>
+                            <span className="hidden sm:inline">
+                              {row.delete_mode === "hard" ? "Restaurar (hard)" : "Restaurar"}
+                            </span>
                           </Button>
                         ) : null}
                       </div>

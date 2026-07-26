@@ -321,35 +321,38 @@ export default function DocumentosLicencasPage() {
           </div>
 
           <div className={glassFilterPanel()}>
-            <DataTableScroll stickyFirst stickyLast>
-              <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
+            <DataTableScroll stickyFirst stickyLast compact>
+              <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+              <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
                 <tr>
-                  <th className="px-2 py-2">Sigla</th>
-                  <th className="px-2 py-2">Nome</th>
-                  <th className="px-2 py-2">Aplicação</th>
-                  <th className="px-2 py-2">Alerta</th>
-                  <th className="px-2 py-2">Ativo</th>
-                  <th className="px-2 py-2" />
+                  <th className="px-1.5 py-2">Sigla</th>
+                  <th className="px-1.5 py-2">Nome</th>
+                  <th className="hidden px-1.5 py-2 md:table-cell">Aplicação</th>
+                  <th className="hidden px-1.5 py-2 lg:table-cell">Alerta</th>
+                  <th className="px-1.5 py-2">Ativo</th>
+                  <th className="px-1.5 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {types.map((t) => (
                   <tr key={t.id} className="border-t border-slate-100">
-                    <td className="px-2 py-2 font-medium">{t.acronym || "—"}</td>
-                    <td className="px-2 py-2">{t.name}</td>
-                    <td className="px-2 py-2">{t.applies_to === "company" ? "Empresa" : "Veículo"}</td>
-                    <td className="px-2 py-2">{t.alert_days_first}d</td>
-                    <td className="px-2 py-2">
+                    <td className="px-1.5 py-2 font-medium">{t.acronym || "—"}</td>
+                    <td className="max-w-[8rem] truncate px-1.5 py-2 sm:max-w-none">{t.name}</td>
+                    <td className="hidden px-1.5 py-2 md:table-cell">{t.applies_to === "company" ? "Empresa" : "Veículo"}</td>
+                    <td className="hidden px-1.5 py-2 lg:table-cell">{t.alert_days_first}d</td>
+                    <td className="px-1.5 py-2">
                       <Badge variant={t.is_active ? "success" : "default"}>
                         {t.is_active ? "Sim" : "Não"}
                       </Badge>
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-1.5 py-2">
                       {canEdit ? (
                         <Button
                           type="button"
                           variant="secondary"
+                          size="sm"
+                          className="action-icon-btn"
+                          title="Editar"
                           onClick={() =>
                             setTypeForm({
                               id: t.id,
@@ -365,7 +368,8 @@ export default function DocumentosLicencasPage() {
                             })
                           }
                         >
-                          Editar
+                          <span className="sm:hidden">Edit</span>
+                          <span className="hidden sm:inline">Editar</span>
                         </Button>
                       ) : null}
                     </td>
@@ -450,18 +454,18 @@ export default function DocumentosLicencasPage() {
             </p>
           ) : (
             <div className={glassFilterPanel()}>
-              <DataTableScroll stickyFirst stickyLast>
-                <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500">
+              <DataTableScroll stickyFirst stickyLast compact>
+                <table className="w-full text-left text-[11px] leading-snug sm:text-xs">
+                <thead className="text-[10px] uppercase text-slate-500 sm:text-xs">
                   <tr>
-                    <th className="px-2 py-2">Documento</th>
-                    <th className="px-2 py-2">Nº</th>
-                    <th className="px-2 py-2">Data de vencimento</th>
-                    <th className="px-2 py-2">Situação</th>
-                    <th className="px-2 py-2" title="Digitalização">
+                    <th className="px-1.5 py-2">Documento</th>
+                    <th className="hidden px-1.5 py-2 md:table-cell">Nº</th>
+                    <th className="hidden px-1.5 py-2 lg:table-cell">Data de vencimento</th>
+                    <th className="px-1.5 py-2">Situação</th>
+                    <th className="hidden px-1.5 py-2 xl:table-cell" title="Digitalização">
                       Clipe
                     </th>
-                    <th className="px-2 py-2" />
+                    <th className="px-1.5 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -469,9 +473,11 @@ export default function DocumentosLicencasPage() {
                     const view = resolveComplianceSituation(doc, doc.document_type);
                     return (
                       <tr key={doc.id} className="border-t border-slate-100">
-                        <td className="px-2 py-2 font-medium">
-                          {documentDisplayName(doc.document_type)}
-                          <div className="mt-2 max-w-sm">
+                        <td className="px-1.5 py-2 font-medium">
+                          <p className="max-w-[8rem] truncate sm:max-w-none">
+                            {documentDisplayName(doc.document_type)}
+                          </p>
+                          <div className="mt-2 hidden max-w-sm sm:block">
                             <AttachmentGallery
                               companyId={companyId}
                               entityType="compliance_document"
@@ -481,16 +487,16 @@ export default function DocumentosLicencasPage() {
                             />
                           </div>
                         </td>
-                        <td className="px-2 py-2">{doc.document_number || "—"}</td>
-                        <td className="px-2 py-2 whitespace-nowrap">
+                        <td className="hidden px-1.5 py-2 md:table-cell">{doc.document_number || "—"}</td>
+                        <td className="hidden whitespace-nowrap px-1.5 py-2 lg:table-cell">
                           {doc.no_expiry
                             ? "Sem vencimento"
                             : formatExpiryDateBR(doc.expires_at)}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-1.5 py-2">
                           <Badge variant={view.badge}>{view.label}</Badge>
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="hidden px-1.5 py-2 xl:table-cell">
                           <ComplianceDocumentClip
                             companyId={companyId}
                             documentId={doc.id}
@@ -499,31 +505,43 @@ export default function DocumentosLicencasPage() {
                             onUploaded={() => setClipRefresh((k) => k + 1)}
                           />
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-1.5 py-2">
                           {canEdit ? (
-                            <div className="flex flex-wrap gap-1">
+                            <div className="os-row-actions flex flex-wrap gap-1">
                               <Button
                                 type="button"
                                 variant="secondary"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Editar"
                                 onClick={() => setEditor({ mode: "edit", doc })}
                               >
-                                Editar
+                                <span className="sm:hidden">Edit</span>
+                                <span className="hidden sm:inline">Editar</span>
                               </Button>
                               <Button
                                 type="button"
                                 variant="secondary"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Renovar"
                                 onClick={() => setEditor({ mode: "renew", doc })}
                               >
-                                Renovar
+                                <span className="sm:hidden">Ren.</span>
+                                <span className="hidden sm:inline">Renovar</span>
                               </Button>
                             </div>
                           ) : null}
                           <Button
                             type="button"
                             variant="secondary"
+                            size="sm"
+                            className="action-icon-btn"
+                            title="Histórico"
                             onClick={() => void openCompanyHistory(doc)}
                           >
-                            Histórico
+                            <span className="sm:hidden">Hist.</span>
+                            <span className="hidden sm:inline">Histórico</span>
                           </Button>
                         </td>
                       </tr>
