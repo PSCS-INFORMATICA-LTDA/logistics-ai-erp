@@ -5,11 +5,10 @@ import Link from "next/link";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import { APP_SCREENS } from "@/lib/app-screens";
 import { useCompany } from "@/lib/company-context";
-import { glassField } from "@/lib/liquid-glass-styles";
+import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import {
   createSalt,
   hashMasterPassword,
@@ -629,13 +628,13 @@ export default function ParametrosPage() {
   ) : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <Card>
+    <div className="mx-auto min-w-0 max-w-5xl space-y-6">
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader
           title="Senha Máster - Concessão de Acessos"
           description="Somente parametrização de acessos por usuário. Valores e cartão da licença ficam em Configurações → Renovação da Licença."
         />
-        <CardBody className="space-y-4">
+        <CardBody className="min-w-0 space-y-4">
           {error && <Alert variant="error">{error}</Alert>}
           {msg && <Alert variant="info">{msg}</Alert>}
           <Alert variant="info">
@@ -683,12 +682,16 @@ export default function ParametrosPage() {
 
           <h3 className="text-base font-semibold text-slate-800">Permissões por usuário</h3>
 
-          <GlassSelect
-            label="Usuário cadastrado"
-            value={selectedPartnerId}
-            onChange={setSelectedPartnerId}
-            options={partnerOptions}
-          />
+          <div className={`max-w-xl ${glassFilterPanel()}`}>
+            <GlassSelect
+              label="Usuário cadastrado"
+              value={selectedPartnerId}
+              onChange={setSelectedPartnerId}
+              options={partnerOptions}
+              searchable
+              placeholder="Buscar sócio / usuário…"
+            />
+          </div>
 
           {selectedPartnerId ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
@@ -702,23 +705,67 @@ export default function ParametrosPage() {
             </p>
           ) : (
             <>
-              <DataTableScroll stickyFirst compact>
-                <table className="w-full text-[11px] leading-snug sm:text-xs">
+              {/* Mobile: cartão por tela — nome completo + checkboxes grandes. */}
+              <div className="space-y-4 md:hidden">
+                {Object.entries(screensByGroup).map(([group, screens]) => (
+                  <section key={group} className="space-y-2">
+                    <h4 className="rounded-lg bg-brand-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-800">
+                      {group}
+                    </h4>
+                    <ul className="space-y-2">
+                      {screens.map((screen) => {
+                        const row = perms[screen.key];
+                        return (
+                          <li
+                            key={screen.key}
+                            className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                          >
+                            <p className="text-sm font-semibold leading-snug break-words text-slate-900">
+                              {screen.label}
+                            </p>
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              {(
+                                [
+                                  ["can_view", "Análise"],
+                                  ["can_edit", "Alteração"],
+                                  ["can_delete", "Exclusão"],
+                                ] as const
+                              ).map(([field, label]) => (
+                                <label
+                                  key={field}
+                                  className="flex flex-col items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50/80 px-1 py-2 text-center"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-5 w-5 accent-brand-700"
+                                    checked={Boolean(row?.[field])}
+                                    onChange={(e) =>
+                                      togglePerm(screen.key, field, e.target.checked)
+                                    }
+                                  />
+                                  <span className="text-[11px] font-medium leading-tight text-slate-600">
+                                    {label}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+
+              {/* Desktop: tabela limpa, sem truncar o nome da tela. */}
+              <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
+                <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">Tela</th>
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">
-                        <span className="sm:hidden">Ver</span>
-                        <span className="hidden sm:inline">Análise (ver)</span>
-                      </th>
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">
-                        <span className="sm:hidden">Alt</span>
-                        <span className="hidden sm:inline">Alteração</span>
-                      </th>
-                      <th className="px-1.5 py-2 font-medium text-slate-600 sm:px-2">
-                        <span className="sm:hidden">Exc</span>
-                        <span className="hidden sm:inline">Exclusão</span>
-                      </th>
+                      <th className="px-3 py-2.5 font-medium text-slate-600">Tela</th>
+                      <th className="px-3 py-2.5 font-medium text-slate-600">Análise (ver)</th>
+                      <th className="px-3 py-2.5 font-medium text-slate-600">Alteração</th>
+                      <th className="px-3 py-2.5 font-medium text-slate-600">Exclusão</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -736,34 +783,23 @@ export default function ParametrosPage() {
                           const row = perms[screen.key];
                           return (
                             <tr key={screen.key} className="border-b border-slate-50">
-                              <td className="max-w-[8rem] truncate px-1.5 py-1.5 text-slate-700 sm:max-w-none sm:px-2">{screen.label}</td>
-                              <td className="px-1.5 py-1.5 sm:px-2">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(row?.can_view)}
-                                  onChange={(e) =>
-                                    togglePerm(screen.key, "can_view", e.target.checked)
-                                  }
-                                />
+                              <td className="px-3 py-2.5 font-medium text-slate-800">
+                                {screen.label}
                               </td>
-                              <td className="px-1.5 py-1.5 sm:px-2">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(row?.can_edit)}
-                                  onChange={(e) =>
-                                    togglePerm(screen.key, "can_edit", e.target.checked)
-                                  }
-                                />
-                              </td>
-                              <td className="px-1.5 py-1.5 sm:px-2">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(row?.can_delete)}
-                                  onChange={(e) =>
-                                    togglePerm(screen.key, "can_delete", e.target.checked)
-                                  }
-                                />
-                              </td>
+                              {(
+                                ["can_view", "can_edit", "can_delete"] as const
+                              ).map((field) => (
+                                <td key={field} className="px-3 py-2.5">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 accent-brand-700"
+                                    checked={Boolean(row?.[field])}
+                                    onChange={(e) =>
+                                      togglePerm(screen.key, field, e.target.checked)
+                                    }
+                                  />
+                                </td>
+                              ))}
                             </tr>
                           );
                         })}
@@ -771,8 +807,9 @@ export default function ParametrosPage() {
                     ))}
                   </tbody>
                 </table>
-              </DataTableScroll>
-              <div className="sticky bottom-0 z-10 -mx-1 border-t border-slate-200 bg-white/95 px-1 py-3 backdrop-blur">
+              </div>
+
+              <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 py-3 backdrop-blur">
                 {savePermissionsButton}
               </div>
             </>
