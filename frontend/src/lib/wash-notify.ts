@@ -9,13 +9,15 @@ export function buildWashReadyMessage(params: {
   clientName?: string | null;
   serviceName?: string | null;
 }): string {
-  const who = params.clientName?.trim() ? ` ${params.clientName.trim()}` : "";
-  const service = params.serviceName?.trim() ? ` (${params.serviceName.trim()})` : "";
+  const name = params.clientName?.trim();
+  const greeting = name ? `Olá, ${name}!` : "Olá!";
   return [
     `*${params.companyName}*`,
-    `Olá${who}!`,
-    `Seu veículo *${params.plate}*${service} está *pronto para retirada*.`,
-    "Pode vir buscar quando quiser. Obrigado!",
+    "",
+    greeting,
+    "",
+    `Boa notícia: o *${params.plate}* está pronto para retirada.`,
+    "Pode vir buscar quando quiser 🙂",
   ].join("\n");
 }
 
