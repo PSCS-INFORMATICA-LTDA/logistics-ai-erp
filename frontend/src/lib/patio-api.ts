@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nextCode } from "@/lib/codes";
 import {
+  calcMensalPeriod,
   calcParkingDailyCount,
   calcParkingHourCount,
   calcRotativoTotal,
+  nextChargeFromPeriodEnd,
   PARKING_SERVICE_NAMES,
   PATIO_ENTRY_SOURCE_PARKING,
   PATIO_ENTRY_SOURCE_WASH,
@@ -384,6 +386,8 @@ export async function createParkingEntry(
     entryDate: string;
     entryTime?: string;
     billingMode: ParkingBillingMode;
+    /** Override opcional do fim da vigência mensal (senão = aniversário − 1 dia). */
+    periodEndDate?: string | null;
     notes?: string;
   }
 ): Promise<{ row: ParkingEntryRow | null; error: string | null }> {
@@ -397,6 +401,25 @@ export async function createParkingEntry(
     exitDate: null,
   });
   if (!totals.ok) return { row: null, error: totals.error };
+
+  const mensalPeriod =
+    input.billingMode === "Mensal" ? calcMensalPeriod(input.entryDate) : null;
+  const periodEndDate =
+    input.billingMode === "Mensal"
+      ? input.periodEndDate?.trim() || mensalPeriod!.periodEndDate
+      : null;
+  const nextChargeDate =
+    input.billingMode === "Mensal" && periodEndDate
+      ? nextChargeFromPeriodEnd(periodEndDate)
+      : null;
+
+  if (
+    input.billingMode === "Mensal" &&
+    periodEndDate &&
+    periodEndDate < input.entryDate
+  ) {
+    return { row: null, error: "Fim da vigência não pode ser anterior à entrada." };
+  }
 
   const { data, error } = await supabase
     .from("parking_entries")
@@ -414,8 +437,10 @@ export async function createParkingEntry(
       entry_date: input.entryDate,
       entry_time: input.entryTime || null,
       billing_mode: input.billingMode,
+      period_end_date: periodEndDate,
+      next_charge_date: nextChargeDate,
       daily_rate: totals.dailyRate,
-      daily_count: null,
+      daily_count: input.billingMode === "Mensal" ? 1 : null,
       total_amount: input.billingMode === "Mensal" ? totals.totalAmount : null,
       status: "Aberto",
       notes: input.notes || null,
@@ -423,7 +448,16 @@ export async function createParkingEntry(
     .select("*")
     .single();
 
-  if (error) return { row: null, error: error.message };
+  if (error) {
+    if (/period_end_date|next_charge_date/i.test(error.message)) {
+      return {
+        row: null,
+        error:
+          "Banco sem colunas de período mensal. Rode frontend/scripts/apply-061-parking-mensal-period.sql no Supabase.",
+      };
+    }
+    return { row: null, error: error.message };
+  }
   return { row: data as ParkingEntryRow, error: null };
 }
 
@@ -447,6 +481,13 @@ export async function finalizeParkingEntry(
   if (!entry.vehicle_type_id) return { error: "Movimento sem porte de veículo." };
 
   const billingMode = (entry.billing_mode as ParkingBillingMode) || "Diária";
+  if (billingMode === "Rotativo" && !exitTime?.trim()) {
+    return { error: "Rotativo: informe a hora de saída para finalizar." };
+  }
+  if (!exitDate?.trim()) {
+    return { error: "Informe a data de saída." };
+  }
+
   const totals = await computeParkingTotals({
     supabase,
     companyId,
@@ -481,4 +522,97 @@ export async function finalizeParkingEntry(
     entry: updated as ParkingEntryRow,
   });
   return { error: posted.error };
+}
+
+/**
+ * Renova mensalidade: finaliza o período atual (saída = fim da vigência) e abre o próximo
+ * a partir da data de próxima cobrança (aniversário).
+ */
+export async function renewMensalParkingEntry(
+  supabase: SupabaseClient,
+  companyId: string,
+  entryId: string
+): Promise<{ row: ParkingEntryRow | null; error: string | null }> {
+  const { data: current, error: fetchError } = await supabase
+    .from("parking_entries")
+    .select("*")
+    .eq("id", entryId)
+    .eq("company_id", companyId)
+    .single();
+  if (fetchError || !current) {
+    return { row: null, error: fetchError?.message ?? "Movimento não encontrado." };
+  }
+
+  const entry = current as ParkingEntryRow;
+  if (entry.billing_mode !== "Mensal") {
+    return { row: null, error: "Só mensalidade pode ser renovada." };
+  }
+  if (!entry.vehicle_type_id || !entry.vehicle_type) {
+    return { row: null, error: "Movimento sem porte de veículo." };
+  }
+
+  const period =
+    entry.next_charge_date && entry.period_end_date
+      ? {
+          periodEndDate: entry.period_end_date,
+          nextChargeDate: entry.next_charge_date,
+        }
+      : calcMensalPeriod(entry.entry_date);
+
+  if (entry.status === "Aberto") {
+    const fin = await finalizeParkingEntry(
+      supabase,
+      companyId,
+      entryId,
+      period.periodEndDate,
+      entry.entry_time || "12:00"
+    );
+    if (fin.error) return { row: null, error: fin.error };
+  }
+
+  return createParkingEntry(supabase, companyId, {
+    plate: entry.plate,
+    brand: entry.brand || undefined,
+    model: entry.model || undefined,
+    year: entry.year,
+    vehicleTypeId: entry.vehicle_type_id,
+    vehicleTypeName: entry.vehicle_type,
+    clientName: entry.client_name || undefined,
+    phone: entry.phone || undefined,
+    entryDate: period.nextChargeDate,
+    entryTime: entry.entry_time || undefined,
+    billingMode: "Mensal",
+    notes: entry.notes
+      ? `${entry.notes}\nRenovação de ${entry.code}`.trim()
+      : `Renovação de ${entry.code}`,
+  });
+}
+
+/** Estimativa de total com saída informada (rotativo/diária) — para UI ao vivo. */
+export async function estimateParkingTotal(params: {
+  supabase: SupabaseClient;
+  companyId: string;
+  vehicleTypeId: string;
+  billingMode: ParkingBillingMode;
+  entryDate: string;
+  entryTime?: string | null;
+  exitDate: string;
+  exitTime?: string | null;
+}): Promise<{ hoursOrDays: number | null; total: number | null; error: string | null }> {
+  const totals = await computeParkingTotals({
+    supabase: params.supabase,
+    companyId: params.companyId,
+    vehicleTypeId: params.vehicleTypeId,
+    billingMode: params.billingMode,
+    entryDate: params.entryDate,
+    entryTime: params.entryTime,
+    exitDate: params.exitDate,
+    exitTime: params.exitTime,
+  });
+  if (!totals.ok) return { hoursOrDays: null, total: null, error: totals.error };
+  return {
+    hoursOrDays: totals.dailyCount,
+    total: totals.totalAmount,
+    error: null,
+  };
 }

@@ -76,6 +76,10 @@ export type ParkingEntryRow = {
   entry_time: string | null;
   exit_date: string | null;
   exit_time: string | null;
+  /** Fim da vigência mensal (inclusivo). */
+  period_end_date: string | null;
+  /** Aniversário / início do próximo período mensal. */
+  next_charge_date: string | null;
   daily_count: number | null;
   daily_rate: number | null;
   total_amount: number | null;
@@ -118,6 +122,70 @@ export function calcParkingDailyCount(entryDate: string, exitDate: string): numb
   if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return 1;
   const days = Math.floor((b.getTime() - a.getTime()) / 86_400_000) + 1;
   return Math.max(1, days);
+}
+
+function toISODateLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseISODateLocal(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+/** Soma 1 mês mantendo o dia (aniversário); ajusta meses curtos (31→28/29). */
+export function addOneMonthAnniversary(isoDate: string): string {
+  const start = parseISODateLocal(isoDate);
+  const day = start.getDate();
+  const next = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(day, lastDay));
+  return toISODateLocal(next);
+}
+
+export function addDaysISO(isoDate: string, days: number): string {
+  const d = parseISODateLocal(isoDate);
+  d.setDate(d.getDate() + days);
+  return toISODateLocal(d);
+}
+
+/**
+ * Mensalidade por aniversário:
+ * entrada 05/07 → vigência até 04/08 → próxima cobrança 05/08.
+ */
+export function calcMensalPeriod(entryDate: string): {
+  periodEndDate: string;
+  nextChargeDate: string;
+} {
+  const nextChargeDate = addOneMonthAnniversary(entryDate);
+  const periodEndDate = addDaysISO(nextChargeDate, -1);
+  return { periodEndDate, nextChargeDate };
+}
+
+/** Próxima cobrança = dia seguinte ao fim da vigência. */
+export function nextChargeFromPeriodEnd(periodEndDate: string): string {
+  return addDaysISO(periodEndDate, 1);
+}
+
+export function formatParkingDateBR(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+/** Mensal vencido para renovação (próxima cobrança já chegou e ainda Aberto). */
+export function isMensalDueForRenewal(
+  row: Pick<ParkingEntryRow, "billing_mode" | "status" | "next_charge_date">,
+  todayISO = toISODateLocal(new Date())
+): boolean {
+  if (row.billing_mode !== "Mensal" || row.status !== "Aberto" || !row.next_charge_date) {
+    return false;
+  }
+  return row.next_charge_date <= todayISO;
 }
 
 function parsePatioDateTime(date: string, time: string | null | undefined): Date {
