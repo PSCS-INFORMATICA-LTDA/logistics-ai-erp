@@ -567,6 +567,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       message,
       phoneDigits: phone,
       title: `Designação ${orderDetails.code}`,
+      recipient: "motorista",
     });
     setWhatsappBusy(false);
 

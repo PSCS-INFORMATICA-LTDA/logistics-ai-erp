@@ -97,6 +97,6 @@ export function buildPatioTicketWhatsAppShare(params: {
   const message = buildPatioTicketWhatsAppMessage(params);
   return {
     message,
-    links: buildWhatsAppShareLinks(message, params.phone),
+    links: buildWhatsAppShareLinks(message, params.phone, { recipient: "cliente" }),
   };
 }

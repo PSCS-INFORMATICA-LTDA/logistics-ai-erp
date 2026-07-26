@@ -606,10 +606,20 @@ export function isDemoSeedWhatsAppPhone(phone: string | null | undefined): boole
   return digits === "5511987654321" || digits === "11987654321";
 }
 
+export type WhatsAppRecipientRole = "motorista" | "cliente" | "contato";
+
 export type WhatsAppShareLinkOptions = {
   /** Abre o app sem fixar chat (útil quando o telefone da OS é placeholder). */
   omitPhone?: boolean;
+  /** Quem recebe: aparece no texto do Compartilhar Windows (“Enviar para o …”). */
+  recipient?: WhatsAppRecipientRole;
 };
+
+function whatsappRecipientShareLabel(role: WhatsAppRecipientRole): string {
+  if (role === "motorista") return "o motorista";
+  if (role === "cliente") return "o cliente";
+  return "o contato";
+}
 
 function isMobileWhatsAppDevice(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -752,19 +762,22 @@ export type WhatsAppShareLinks = {
 };
 
 /**
- * Ponte /abrir-whatsapp#phone=&text=&full=
+ * Ponte /abrir-whatsapp#phone=&text=&full=&to=
  * `text` = curto para whatsapp:// (Windows corta URL longa).
  * `full` = mensagem completa só para copiar (Ctrl+V) — nunca HTTPS/Web.
+ * `to` = motorista | cliente | contato (rótulo no Compartilhar Windows).
  */
 export function buildWhatsAppDesktopBridgeHref(
   phoneDigits: string,
   text?: string | null,
-  fullMessage?: string | null
+  fullMessage?: string | null,
+  recipient?: WhatsAppRecipientRole | null
 ): string {
   const params = new URLSearchParams();
   params.set("phone", phoneDigits.replace(/\D/g, ""));
   if (text?.trim()) params.set("text", text.trim());
   if (fullMessage?.trim()) params.set("full", fullMessage.trim());
+  if (recipient) params.set("to", recipient);
   return `/abrir-whatsapp#${params.toString()}`;
 }
 
@@ -800,6 +813,7 @@ export function buildWhatsAppShareLinks(
     };
   }
 
+  const recipient = options?.recipient ?? "contato";
   const storeAppHref = `https://api.whatsapp.com/send?phone=${normalized}&text=${encodedText}`;
   // PC: protocolo oficial do app (sem barra após send — no Desktop o send/? falha com frequência).
   const desktopHref = `whatsapp://send?phone=${normalized}&text=${encodedNativeText}`;
@@ -808,12 +822,14 @@ export function buildWhatsAppShareLinks(
   const desktopBridgeHref = buildWhatsAppDesktopBridgeHref(
     normalized,
     nativeText,
-    messageForShare
+    messageForShare,
+    recipient
   );
   const desktopChatOnlyBridgeHref = buildWhatsAppDesktopBridgeHref(
     normalized,
     null,
-    messageForShare
+    messageForShare,
+    recipient
   );
   const mobileHref = `https://wa.me/${normalized}?text=${encodedText}`;
 
@@ -936,13 +952,16 @@ export async function sendWhatsAppDesktopMessage(input: {
   message: string;
   phoneDigits: string;
   title?: string;
+  /** Padrão: contato. Use cliente (lava/proposta) ou motorista (designação). */
+  recipient?: WhatsAppRecipientRole;
 }): Promise<DesktopWhatsAppSendResult> {
   const phone = input.phoneDigits.replace(/\D/g, "");
   const message = input.message.trim();
   const phoneLabel = formatWhatsAppPhoneDisplay(phone) || phone;
+  const who = whatsappRecipientShareLabel(input.recipient ?? "contato");
   // Windows Share não deixa pré-selecionar contato — o número vai no topo para buscar no WhatsApp.
   const shareText = phone
-    ? `Enviar para o motorista: ${phoneLabel} (${phone})\n\n${message}`
+    ? `Enviar para ${who}: ${phoneLabel} (${phone})\n\n${message}`
     : message;
   const copied = shareText ? copyTextToClipboardSync(shareText) : false;
 

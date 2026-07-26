@@ -30,7 +30,10 @@ export function buildWashReadyWhatsApp(params: {
   serviceName?: string | null;
 }) {
   const message = buildWashReadyMessage(params);
-  return { message, links: buildWhatsAppShareLinks(message, params.phone) };
+  return {
+    message,
+    links: buildWhatsAppShareLinks(message, params.phone, { recipient: "cliente" }),
+  };
 }
 
 /**

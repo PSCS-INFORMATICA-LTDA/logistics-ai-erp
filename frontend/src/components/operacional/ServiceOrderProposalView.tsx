@@ -118,7 +118,7 @@ export function ServiceOrderProposalView({
     const shareUrl = resolveClientProposalShareUrl(publicToken);
     if (!shareUrl) return null;
     const message = buildWhatsAppProposalText(order, context, shareUrl, { forClient: true });
-    return buildWhatsAppShareLinks(message, order.phone);
+    return buildWhatsAppShareLinks(message, order.phone, { recipient: "cliente" });
   }, [publicToken, order, context]);
 
   const clientPhoneOk =

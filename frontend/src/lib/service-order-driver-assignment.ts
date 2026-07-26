@@ -305,7 +305,7 @@ export async function prepareDriverAssignmentSharePayload(
     payDetails
   );
   const whatsappLinks = {
-    ...buildWhatsAppShareLinks(urlMessage, driverPhone),
+    ...buildWhatsAppShareLinks(urlMessage, driverPhone, { recipient: "motorista" }),
     // URL nativa usa texto compacto; clipboard/painel guardam a mensagem completa.
     message: whatsappMessage,
   };

@@ -7,7 +7,19 @@ import {
   copyTextToClipboardSync,
   formatWhatsAppPhoneDisplay,
   sendWhatsAppDesktopMessage,
+  type WhatsAppRecipientRole,
 } from "@/lib/service-order-proposal";
+
+function parseRecipient(raw: string | null): WhatsAppRecipientRole {
+  if (raw === "motorista" || raw === "cliente" || raw === "contato") return raw;
+  return "contato";
+}
+
+function recipientNoun(role: WhatsAppRecipientRole): string {
+  if (role === "motorista") return "motorista";
+  if (role === "cliente") return "cliente";
+  return "contato";
+}
 
 /**
  * Envio Windows: Compartilhar do sistema + cópia da mensagem.
@@ -16,6 +28,7 @@ import {
 export default function AbrirWhatsAppPage() {
   const [phone, setPhone] = useState("");
   const [fullMessage, setFullMessage] = useState("");
+  const [recipient, setRecipient] = useState<WhatsAppRecipientRole>("contato");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,6 +40,7 @@ export default function AbrirWhatsAppPage() {
     const phoneDigits = (params.get("phone") || "").replace(/\D/g, "");
     const text = (params.get("text") || "").trim();
     const full = (params.get("full") || text).trim();
+    const to = parseRecipient(params.get("to"));
 
     if (phoneDigits.length < 10 || phoneDigits.length > 15) {
       setError("Telefone inválido para abrir o WhatsApp.");
@@ -35,10 +49,12 @@ export default function AbrirWhatsAppPage() {
 
     setPhone(phoneDigits);
     setFullMessage(full);
+    setRecipient(to);
     if (full) copyTextToClipboardSync(full);
   }, []);
 
   const phoneLabel = formatWhatsAppPhoneDisplay(phone) || phone;
+  const who = recipientNoun(recipient);
 
   const copyMessage = () => {
     if (!fullMessage) return;
@@ -55,13 +71,14 @@ export default function AbrirWhatsAppPage() {
     const result = await sendWhatsAppDesktopMessage({
       message: fullMessage,
       phoneDigits: phone,
-      title: "Designação GRX",
+      title: "WhatsApp GRX",
+      recipient,
     });
     setBusy(false);
 
     if (result.mode === "share") {
       setStatus(
-        `Escolha WhatsApp no Compartilhar. Depois pesquise ${phoneLabel} / ${phone} (telefone do motorista) e envie.`
+        `Escolha WhatsApp no Compartilhar. Depois pesquise ${phoneLabel} / ${phone} (telefone do ${who}) e envie.`
       );
       return;
     }
@@ -88,13 +105,14 @@ export default function AbrirWhatsAppPage() {
       ) : (
         <>
           <p className="text-sm text-slate-600">
-            Contato: <strong>{phoneLabel}</strong>
+            {who.charAt(0).toUpperCase() + who.slice(1)}: <strong>{phoneLabel}</strong>
             <span className="text-slate-500"> ({phone})</span>
           </p>
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
             1) Clique em <strong>Copiar e enviar no WhatsApp</strong>
             <br />
-            2) Escolha WhatsApp e busque o telefone: <strong>{phoneLabel}</strong> ({phone})
+            2) Escolha WhatsApp e busque o telefone do {who}:{" "}
+            <strong>{phoneLabel}</strong> ({phone})
             <br />
             3) Envie (a mensagem já vai no compartilhamento; se precisar, Ctrl+V)
           </p>
