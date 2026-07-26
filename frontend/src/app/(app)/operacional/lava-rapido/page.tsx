@@ -35,6 +35,10 @@ import {
   listWashHistoryForPlate,
 } from "@/lib/patio-settings-api";
 import {
+  ensurePatioTicketToken,
+  patioTicketPublicUrl,
+} from "@/lib/patio-ticket-api";
+import {
   buildSmsShareHref,
   buildWashReadySmsMessage,
   buildWashReadyWhatsApp,
@@ -88,6 +92,8 @@ export default function LavaRapidoPage() {
   const [quotedPrice, setQuotedPrice] = useState<number | null>(null);
   /** Telefone digitado na lista quando a ordem / cadastro não tem. */
   const [phoneDraftById, setPhoneDraftById] = useState<Record<string, string>>({});
+  /** Link público /ticket/[token] por ordem (aviso Pronto). */
+  const [ticketUrlById, setTicketUrlById] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState<{
     plate: string;
@@ -173,6 +179,33 @@ export default function LavaRapidoPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Gera link público do ticket para ordens abertas/prontas (vai no WhatsApp/SMS).
+  useEffect(() => {
+    const openRows = rows.filter((r) => r.status === "Aberto" || r.status === "Pronto");
+    if (openRows.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (const row of openRows) {
+        if (cancelled) return;
+        if (ticketUrlById[row.id]) continue;
+        if (row.public_ticket_token) {
+          const url = patioTicketPublicUrl(row.public_ticket_token);
+          setTicketUrlById((m) => (m[row.id] ? m : { ...m, [row.id]: url }));
+          continue;
+        }
+        const result = await ensurePatioTicketToken(supabase, "car_wash", row.id);
+        if (cancelled || !result.token) continue;
+        const url = patioTicketPublicUrl(result.token);
+        setTicketUrlById((m) => (m[row.id] ? m : { ...m, [row.id]: url }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // ticketUrlById propositalmente fora: evita loop; só reage a novas linhas/status.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- preload por rows
+  }, [rows, supabase]);
 
   useEffect(() => {
     if (!companyId || !form.vehicle_type_id || !form.service_name || !form.service_date) {
@@ -418,12 +451,16 @@ export default function LavaRapidoPage() {
 
     const phone = resolveNotifyPhone(row);
     const phoneOk = Boolean(formatPhoneForWhatsApp(phone));
+    const ticketUrl =
+      ticketUrlById[row.id] ||
+      (row.public_ticket_token ? patioTicketPublicUrl(row.public_ticket_token) : null);
     const share = buildWashReadyWhatsApp({
       companyName,
       plate: row.plate,
       phone,
       clientName: row.client_name,
       serviceName: row.service_name,
+      ticketUrl,
     });
     const waHref =
       share.links.opensDirectChat && washReadyWhatsAppHref(share.links)
@@ -433,6 +470,7 @@ export default function LavaRapidoPage() {
       companyName,
       plate: row.plate,
       clientName: row.client_name,
+      ticketUrl,
     });
     const smsHref = phoneOk ? buildSmsShareHref(phone, smsText) : null;
     const phoneLabel = formatWhatsAppPhoneDisplay(share.links.phoneDigits) || phone;

@@ -4,22 +4,32 @@ import {
   type WhatsAppShareLinks,
 } from "@/lib/service-order-proposal";
 
+function appendTicketLink(lines: string[], ticketUrl?: string | null): string[] {
+  const url = ticketUrl?.trim();
+  if (!url) return lines;
+  return [...lines, "", "Comprovante:", url];
+}
+
 export function buildWashReadyMessage(params: {
   companyName: string;
   plate: string;
   clientName?: string | null;
   serviceName?: string | null;
+  ticketUrl?: string | null;
 }): string {
   const name = params.clientName?.trim();
   const greeting = name ? `Olá, ${name}!` : "Olá!";
-  return [
-    `*${params.companyName}*`,
-    "",
-    greeting,
-    "",
-    `Boa notícia: o *${params.plate}* está pronto para retirada.`,
-    "Pode vir buscar quando quiser 🙂",
-  ].join("\n");
+  return appendTicketLink(
+    [
+      `*${params.companyName}*`,
+      "",
+      greeting,
+      "",
+      `Boa notícia: o *${params.plate}* está pronto para retirada.`,
+      "Pode vir buscar quando quiser 🙂",
+    ],
+    params.ticketUrl
+  ).join("\n");
 }
 
 /** Texto SMS sem markdown/emoji (melhor compatibilidade com app de mensagens). */
@@ -27,15 +37,19 @@ export function buildWashReadySmsMessage(params: {
   companyName: string;
   plate: string;
   clientName?: string | null;
+  ticketUrl?: string | null;
 }): string {
   const name = params.clientName?.trim();
   const greeting = name ? `Olá, ${name}!` : "Olá!";
-  return [
-    params.companyName.trim() || "Lava-rápido",
-    greeting,
-    `Boa notícia: o ${params.plate} está pronto para retirada.`,
-    "Pode vir buscar quando quiser.",
-  ].join("\n");
+  return appendTicketLink(
+    [
+      params.companyName.trim() || "Lava-rápido",
+      greeting,
+      `Boa notícia: o ${params.plate} está pronto para retirada.`,
+      "Pode vir buscar quando quiser.",
+    ],
+    params.ticketUrl
+  ).join("\n");
 }
 
 export function buildWashReadyWhatsApp(params: {
@@ -44,6 +58,7 @@ export function buildWashReadyWhatsApp(params: {
   phone?: string | null;
   clientName?: string | null;
   serviceName?: string | null;
+  ticketUrl?: string | null;
 }) {
   const message = buildWashReadyMessage(params);
   return {
