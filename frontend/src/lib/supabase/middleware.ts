@@ -38,6 +38,7 @@ export async function updateSession(request: NextRequest) {
   const isSetupPage = request.nextUrl.pathname.startsWith("/setup");
   const isPublicProposal = request.nextUrl.pathname.startsWith("/proposta/");
   const isPublicDriverAssignment = request.nextUrl.pathname.startsWith("/designacao/");
+  const isPublicPatioTicket = request.nextUrl.pathname.startsWith("/ticket/");
   const isBillingWebhook = request.nextUrl.pathname.startsWith("/api/billing/webhook");
 
   if (
@@ -46,6 +47,7 @@ export async function updateSession(request: NextRequest) {
     !isAuthFlowPage &&
     !isPublicProposal &&
     !isPublicDriverAssignment &&
+    !isPublicPatioTicket &&
     !isBillingWebhook
   ) {
     const url = request.nextUrl.clone();

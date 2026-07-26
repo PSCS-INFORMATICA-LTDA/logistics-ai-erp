@@ -70,14 +70,16 @@ export function PatioMiniTicket({
       />
 
       <div className="patio-ticket-toolbar flex flex-wrap items-center gap-2 print:hidden">
-        <a href={backHref} className="text-sm text-brand-700 underline">
-          ← Voltar
-        </a>
+        {backHref && backHref !== "#" ? (
+          <a href={backHref} className="text-sm text-brand-700 underline">
+            ← Voltar
+          </a>
+        ) : null}
         <Button type="button" onClick={handlePrint}>
           Imprimir ticket ({paper})
         </Button>
         <p className="w-full text-xs text-slate-500 sm:w-auto">
-          Na impressora, escolha papel {paper} / recibo sem margens grandes.
+          Opcional: se precisar de papel, escolha {paper} na mini impressora.
         </p>
       </div>
 

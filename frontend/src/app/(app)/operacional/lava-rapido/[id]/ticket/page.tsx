@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { PatioMiniTicket } from "@/components/operacional/PatioMiniTicket";
+import { PatioTicketSharePanel } from "@/components/operacional/PatioTicketSharePanel";
 import { useCompany } from "@/lib/company-context";
 import {
   companyDisplayName,
@@ -91,11 +92,25 @@ export default function LavaRapidoTicketPage() {
     lines.push({ label: "Telefone", value: row.phone });
   }
 
+  const companyName = companyDisplayName(company);
+  const totalAmount = row.service_amount != null ? Number(row.service_amount) : null;
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <PatioTicketSharePanel
+        source="car_wash"
+        entryId={row.id}
+        kind="lava-rapido"
+        companyName={companyName}
+        code={row.code}
+        plate={row.plate}
+        phone={row.phone}
+        totalAmount={totalAmount}
+      />
+
       <div className="patio-ticket-toolbar flex flex-wrap gap-2 print:hidden">
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          Papel
+          Papel (impressão opcional)
           <select
             className="rounded-lg border border-slate-300 px-2 py-1"
             value={paper}
@@ -109,14 +124,14 @@ export default function LavaRapidoTicketPage() {
       <PatioMiniTicket
         kind="lava-rapido"
         title="Lava-rápido"
-        companyName={companyDisplayName(company)}
+        companyName={companyName}
         companyDocument={company?.document}
         logoUrl={logoUrl}
         code={row.code}
         plate={row.plate}
         status={row.status}
         lines={lines}
-        totalAmount={row.service_amount != null ? Number(row.service_amount) : null}
+        totalAmount={totalAmount}
         footerNote={
           row.status === "Aberto"
             ? "Ordem em andamento — comprovante provisório."

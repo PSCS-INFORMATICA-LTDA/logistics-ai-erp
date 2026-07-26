@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Alert, Loading } from "@/components/ui/Badge";
 import { PatioMiniTicket } from "@/components/operacional/PatioMiniTicket";
+import { PatioTicketSharePanel } from "@/components/operacional/PatioTicketSharePanel";
 import { useCompany } from "@/lib/company-context";
 import {
   companyDisplayName,
@@ -110,11 +111,25 @@ export default function EstacionamentoTicketPage() {
     lines.push({ label: "Cliente", value: row.client_name });
   }
 
+  const companyName = companyDisplayName(company);
+  const totalAmount = row.total_amount != null ? Number(row.total_amount) : null;
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <PatioTicketSharePanel
+        source="parking"
+        entryId={row.id}
+        kind="estacionamento"
+        companyName={companyName}
+        code={row.code}
+        plate={row.plate}
+        phone={row.phone}
+        totalAmount={totalAmount}
+      />
+
       <div className="patio-ticket-toolbar flex flex-wrap gap-2 print:hidden">
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          Papel
+          Papel (impressão opcional)
           <select
             className="rounded-lg border border-slate-300 px-2 py-1"
             value={paper}
@@ -128,14 +143,14 @@ export default function EstacionamentoTicketPage() {
       <PatioMiniTicket
         kind="estacionamento"
         title="Estacionamento"
-        companyName={companyDisplayName(company)}
+        companyName={companyName}
         companyDocument={company?.document}
         logoUrl={logoUrl}
         code={row.code}
         plate={row.plate}
         status={row.status}
         lines={lines}
-        totalAmount={row.total_amount != null ? Number(row.total_amount) : null}
+        totalAmount={totalAmount}
         footerNote={
           row.status === "Aberto"
             ? "Ticket de entrada — apresente na saída."

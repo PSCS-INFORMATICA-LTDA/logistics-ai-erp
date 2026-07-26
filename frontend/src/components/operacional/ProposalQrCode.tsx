@@ -6,10 +6,16 @@ import { Button } from "@/components/ui/Button";
 type Props = {
   url: string;
   title?: string;
+  hint?: string;
   compact?: boolean;
 };
 
-export function ProposalQrCode({ url, title = "QR Code da proposta", compact = false }: Props) {
+export function ProposalQrCode({
+  url,
+  title = "QR Code da proposta",
+  hint = "O cliente pode escanear com a câmera do celular para abrir o link.",
+  compact = false,
+}: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +61,9 @@ export function ProposalQrCode({ url, title = "QR Code da proposta", compact = f
     if (!dataUrl) return;
     const anchor = document.createElement("a");
     anchor.href = dataUrl;
-    anchor.download = "proposta-grx-qrcode.png";
+    anchor.download = url.includes("/ticket/")
+      ? "comprovante-patio-qrcode.png"
+      : "proposta-grx-qrcode.png";
     anchor.click();
   };
 
@@ -72,9 +80,7 @@ export function ProposalQrCode({ url, title = "QR Code da proposta", compact = f
       {!compact && (
         <div>
           <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            O cliente pode escanear com a câmera do celular para abrir a proposta e aceitar ou recusar.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">{hint}</p>
         </div>
       )}
       <img
