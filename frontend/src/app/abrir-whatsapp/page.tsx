@@ -22,8 +22,8 @@ function recipientNoun(role: WhatsAppRecipientRole): string {
 }
 
 /**
- * Envio Windows: Compartilhar do sistema + cópia da mensagem.
- * Não usa WhatsApp Web (abre chat errado / corta texto).
+ * Ponte Windows: abre direto o chat no WhatsApp Desktop (phone na URL).
+ * Sem painel Compartilhar / sem pesquisar número.
  */
 export default function AbrirWhatsAppPage() {
   const [phone, setPhone] = useState("");
@@ -33,6 +33,7 @@ export default function AbrirWhatsAppPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [autoTried, setAutoTried] = useState(false);
 
   useEffect(() => {
     const raw = window.location.hash.replace(/^#/, "");
@@ -51,6 +52,29 @@ export default function AbrirWhatsAppPage() {
     setFullMessage(full);
     setRecipient(to);
     if (full) copyTextToClipboardSync(full);
+
+    // Abre o chat do contato automaticamente (whatsapp:// com phone).
+    void (async () => {
+      setBusy(true);
+      const result = await sendWhatsAppDesktopMessage({
+        message: full || text || " ",
+        phoneDigits,
+        title: "WhatsApp GRX",
+        recipient: to,
+      });
+      setBusy(false);
+      setAutoTried(true);
+      const label = formatWhatsAppPhoneDisplay(phoneDigits) || phoneDigits;
+      if (result.mode === "protocol") {
+        setStatus(
+          `WhatsApp aberto no chat de ${label}. Se a mensagem não preencheu, use Ctrl+V.`
+        );
+      } else {
+        setStatus(
+          `Mensagem copiada. Se o app não abriu, clique em «Abrir chat no WhatsApp».`
+        );
+      }
+    })();
   }, []);
 
   const phoneLabel = formatWhatsAppPhoneDisplay(phone) || phone;
@@ -65,41 +89,29 @@ export default function AbrirWhatsAppPage() {
   };
 
   const handleSend = async () => {
-    if (!phone || !fullMessage || busy) return;
+    if (!phone || busy) return;
     setBusy(true);
     setStatus(null);
     const result = await sendWhatsAppDesktopMessage({
-      message: fullMessage,
+      message: fullMessage || " ",
       phoneDigits: phone,
       title: "WhatsApp GRX",
       recipient,
     });
     setBusy(false);
 
-    if (result.mode === "share") {
-      setStatus(
-        `Escolha WhatsApp no Compartilhar. Depois pesquise ${phoneLabel} / ${phone} (telefone do ${who}) e envie.`
-      );
-      return;
-    }
-    if (result.mode === "cancelled") {
-      setStatus(
-        `Compartilhar cancelado. Mensagem copiada — no WhatsApp busque ${phoneLabel} e Ctrl+V.`
-      );
-      return;
-    }
     if (result.mode === "protocol") {
       setStatus(
-        `App aberto. Confira o chat de ${phoneLabel}; se precisar, Ctrl+V.`
+        `WhatsApp aberto no chat de ${phoneLabel}. Se precisar, Ctrl+V.`
       );
       return;
     }
-    setStatus(`Mensagem copiada. No WhatsApp busque ${phoneLabel} e Ctrl+V.`);
+    setStatus(`Mensagem copiada. No WhatsApp confira o chat de ${phoneLabel}.`);
   };
 
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-start justify-center gap-4 px-6 py-16">
-      <h1 className="text-xl font-semibold text-slate-900">Enviar no WhatsApp do PC</h1>
+      <h1 className="text-xl font-semibold text-slate-900">Abrindo WhatsApp…</h1>
       {error ? (
         <p className="text-sm text-red-700">{error}</p>
       ) : (
@@ -109,12 +121,8 @@ export default function AbrirWhatsAppPage() {
             <span className="text-slate-500"> ({phone})</span>
           </p>
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
-            1) Clique em <strong>Copiar e enviar no WhatsApp</strong>
-            <br />
-            2) Escolha WhatsApp e busque o telefone do {who}:{" "}
-            <strong>{phoneLabel}</strong> ({phone})
-            <br />
-            3) Envie (a mensagem já vai no compartilhamento; se precisar, Ctrl+V)
+            O app deve abrir <strong>direto no chat</strong> deste número — sem pesquisar.
+            {autoTried ? null : " Aguarde…"}
           </p>
         </>
       )}
@@ -125,18 +133,19 @@ export default function AbrirWhatsAppPage() {
             type="button"
             variant="moss"
             className="w-full px-5 py-3 text-base font-semibold"
-            disabled={busy || !fullMessage}
+            disabled={busy}
             onClick={() => void handleSend()}
           >
-            {busy ? "Abrindo…" : "Copiar e enviar no WhatsApp"}
+            {busy ? "Abrindo…" : "Abrir chat no WhatsApp"}
           </Button>
           <Button
             type="button"
             variant="secondary"
             className="w-full px-5 py-3 text-sm font-semibold"
             onClick={copyMessage}
+            disabled={!fullMessage}
           >
-            {copied ? "Mensagem copiada" : "Só copiar mensagem completa"}
+            {copied ? "Mensagem copiada" : "Só copiar mensagem"}
           </Button>
 
           {fullMessage ? (

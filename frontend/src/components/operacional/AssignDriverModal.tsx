@@ -571,21 +571,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     });
     setWhatsappBusy(false);
 
-    if (result.mode === "share") {
+    if (result.mode === "protocol") {
       setWhatsappStatus(
-        `No painel Compartilhar escolha WhatsApp. Depois pesquise ${phoneLabel} / ${phone} (telefone do motorista na designação) e envie.`
-      );
-    } else if (result.mode === "cancelled") {
-      setWhatsappStatus(
-        `Compartilhar cancelado. Mensagem copiada — no WhatsApp busque ${phoneLabel} e Ctrl+V.`
-      );
-    } else if (result.mode === "protocol") {
-      setWhatsappStatus(
-        `App aberto. Confira o chat de ${phoneLabel}; se precisar, Ctrl+V (mensagem completa já copiada).`
+        `WhatsApp aberto no chat de ${phoneLabel}. Se a mensagem não preencheu, Ctrl+V.`
       );
     } else {
       setWhatsappStatus(
-        `Mensagem copiada. No WhatsApp do PC busque ${phoneLabel} e Ctrl+V.`
+        `Mensagem copiada. Clique de novo ou abra o WhatsApp no chat de ${phoneLabel}.`
       );
     }
 
@@ -711,7 +703,41 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               <div className="flex flex-col gap-2">
                 {sharePayload.whatsappLinks.opensDirectChat &&
                 sharePayload.whatsappLinks.phoneDigits ? (
-                  isWindowsWhatsAppDesktop() ? (
+                  (sharePayload.whatsappLinks.desktopHref ||
+                    sharePayload.whatsappLinks.primaryHref) &&
+                  (sharePayload.whatsappLinks.desktopHref ||
+                    sharePayload.whatsappLinks.primaryHref)!.startsWith("whatsapp://") ? (
+                    <WhatsAppAppAnchor
+                      id="assign-driver-whatsapp-open"
+                      href={
+                        sharePayload.whatsappLinks.desktopHref ||
+                        sharePayload.whatsappLinks.primaryHref
+                      }
+                      title={`WhatsApp — ${
+                        formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
+                        selectedDriver?.phone ||
+                        "motorista"
+                      }`}
+                      aria-label={`Abrir WhatsApp para ${shareDriverName}`}
+                      className={cn(
+                        glassAction("green", true),
+                        "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold",
+                        (saving || whatsappBusy) && "pointer-events-none opacity-50"
+                      )}
+                      onMouseDown={handleWhatsAppShareMouseDown}
+                      onOpen={() => {
+                        setWhatsappStatus(
+                          `WhatsApp aberto no chat de ${
+                            formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
+                            sharePayload.whatsappLinks.phoneDigits
+                          }. Se a mensagem não preencheu, Ctrl+V.`
+                        );
+                      }}
+                    >
+                      <WhatsAppIcon className="h-5 w-5" />
+                      Abrir WhatsApp
+                    </WhatsAppAppAnchor>
+                  ) : isWindowsWhatsAppDesktop() ? (
                     <button
                       type="button"
                       id="assign-driver-whatsapp-open"
@@ -730,7 +756,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                       onClick={() => void handleWindowsWhatsAppSend()}
                     >
                       <WhatsAppIcon className="h-5 w-5" />
-                      {whatsappBusy ? "Abrindo…" : "Copiar e enviar no WhatsApp"}
+                      {whatsappBusy ? "Abrindo…" : "Abrir chat no WhatsApp"}
                     </button>
                   ) : whatsappOpenHref.startsWith("whatsapp://") ||
                     whatsappOpenHref.startsWith("/abrir-whatsapp") ? (
@@ -792,8 +818,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                 </p>
               ) : (
                 <p className="text-xs text-slate-600">
-                  No Windows: Compartilhar → WhatsApp → pesquise o telefone do motorista (o número
-                  também vai no início da mensagem). Sem WhatsApp Web.
+                  Abre direto no chat do motorista (WhatsApp Desktop). Se o texto não preencher,
+                  use Ctrl+V (mensagem já copiada).
                 </p>
               )}
             </div>

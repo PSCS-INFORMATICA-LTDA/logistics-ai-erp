@@ -611,15 +611,9 @@ export type WhatsAppRecipientRole = "motorista" | "cliente" | "contato";
 export type WhatsAppShareLinkOptions = {
   /** Abre o app sem fixar chat (útil quando o telefone da OS é placeholder). */
   omitPhone?: boolean;
-  /** Quem recebe: aparece no texto do Compartilhar Windows (“Enviar para o …”). */
+  /** Quem recebe (cliente / motorista / contato) — usado na ponte /abrir-whatsapp. */
   recipient?: WhatsAppRecipientRole;
 };
-
-function whatsappRecipientShareLabel(role: WhatsAppRecipientRole): string {
-  if (role === "motorista") return "o motorista";
-  if (role === "cliente") return "o cliente";
-  return "o contato";
-}
 
 function isMobileWhatsAppDevice(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -833,13 +827,10 @@ export function buildWhatsAppShareLinks(
   );
   const mobileHref = `https://wa.me/${normalized}?text=${encodedText}`;
 
-  // Mobile = wa.me. Windows = ponte /abrir-whatsapp (nunca HTTPS no PC — vira Web).
-  // Outros desktops = protocolo nativo.
-  const primaryHref = isMobileWhatsAppDevice()
-    ? mobileHref
-    : isWindowsWhatsAppDesktop()
-      ? desktopChatOnlyBridgeHref
-      : desktopHref;
+  // Mobile = wa.me.
+  // Windows/PC = whatsapp:// com phone (+ texto curto) → abre o chat certo no app Desktop,
+  // sem painel Compartilhar / sem pesquisar número. Nunca HTTPS no PC (vira Web).
+  const primaryHref = isMobileWhatsAppDevice() ? mobileHref : desktopHref;
 
   return {
     message: messageForShare,
@@ -923,8 +914,8 @@ export function openWhatsAppPreferApp(links: WhatsAppShareLinks): boolean {
     return true;
   }
 
-  // Só o número: no Windows isso abre o app no contato certo com mais estabilidade.
-  const nativeHref = links.desktopChatOnlyHref || links.desktopHref;
+  // Só o número + texto curto: no Windows abre o chat certo no Desktop.
+  const nativeHref = links.desktopHref || links.desktopChatOnlyHref;
   if (!nativeHref || !isWhatsAppNativeHref(nativeHref)) return false;
   launchCustomProtocol(nativeHref);
   return true;
@@ -943,49 +934,30 @@ export type DesktopWhatsAppSendResult = {
 };
 
 /**
- * Caminho realista no Windows/Chrome:
- * 1) copia a mensagem completa
- * 2) tenta o painel Compartilhar do Windows (costuma listar o WhatsApp Desktop)
- * 3) se não der, tenta whatsapp://send?phone= (sem HTTPS/Web)
+ * Windows/Chrome: abre o chat certo no WhatsApp Desktop (sem pesquisar número).
+ * 1) copia a mensagem completa (Ctrl+V se o texto for longo)
+ * 2) whatsapp://send?phone=&text= (protocolo nativo — chat direto)
  */
 export async function sendWhatsAppDesktopMessage(input: {
   message: string;
   phoneDigits: string;
   title?: string;
-  /** Padrão: contato. Use cliente (lava/proposta) ou motorista (designação). */
+  /** Mantido por compatibilidade; o chat abre pelo phone na URL. */
   recipient?: WhatsAppRecipientRole;
 }): Promise<DesktopWhatsAppSendResult> {
   const phone = input.phoneDigits.replace(/\D/g, "");
   const message = input.message.trim();
-  const phoneLabel = formatWhatsAppPhoneDisplay(phone) || phone;
-  const who = whatsappRecipientShareLabel(input.recipient ?? "contato");
-  // Windows Share não deixa pré-selecionar contato — o número vai no topo para buscar no WhatsApp.
-  const shareText = phone
-    ? `Enviar para ${who}: ${phoneLabel} (${phone})\n\n${message}`
-    : message;
-  const copied = shareText ? copyTextToClipboardSync(shareText) : false;
+  const copied = message ? copyTextToClipboardSync(message) : false;
 
   if (!phone || phone.length < 10) {
     return { copied, mode: "clipboard-only" };
   }
 
-  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-    try {
-      await navigator.share({
-        title: input.title?.trim() || "WhatsApp",
-        text: shareText,
-      });
-      return { copied, mode: "share" };
-    } catch (err) {
-      const name = err instanceof DOMException ? err.name : "";
-      if (name === "AbortError") {
-        return { copied, mode: "cancelled" };
-      }
-      // Continua para o protocolo nativo.
-    }
-  }
+  const nativeText = truncateTextForWhatsAppNativeUrl(plainTextForWhatsAppUrl(message));
+  const href = nativeText
+    ? `whatsapp://send?phone=${phone}&text=${encodeURIComponent(nativeText)}`
+    : `whatsapp://send?phone=${phone}`;
 
-  const href = `whatsapp://send?phone=${phone}`;
   try {
     window.location.href = href;
   } catch {

@@ -51,6 +51,7 @@ import {
   type WashLoyaltyProgress,
 } from "@/lib/wash-loyalty";
 import {
+  copyTextToClipboardSync,
   formatPhoneForWhatsApp,
   formatWhatsAppPhoneDisplay,
 } from "@/lib/service-order-proposal";
@@ -503,6 +504,7 @@ export default function LavaRapidoPage() {
                 : "Avisar no WhatsApp que o veículo está pronto"
             }
             className={cn(glassAction("green", true), SHARE_ICON_BTN)}
+            onMouseDown={() => copyTextToClipboardSync(share.message)}
             onOpen={() => persistReadyStatus(row, phone)}
           >
             <WhatsAppIcon className="h-5 w-5" />
