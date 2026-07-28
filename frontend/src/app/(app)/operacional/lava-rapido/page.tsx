@@ -495,9 +495,10 @@ export default function LavaRapidoPage() {
           message={waMessage}
           referenceType="car_wash_ready"
           referenceId={row.id}
+          showWebOption
           title={
             phoneLabel
-              ? `WhatsApp — veículo pronto · ${phoneLabel}`
+              ? `WhatsApp Desktop — ${phoneLabel}`
               : "Avisar no WhatsApp que o veículo está pronto"
           }
           aria-label={
@@ -505,10 +506,20 @@ export default function LavaRapidoPage() {
               ? `Avisar no WhatsApp ${phoneLabel} que o veículo está pronto`
               : "Avisar no WhatsApp que o veículo está pronto"
           }
-          onOpenRequested={() => {
+          onOpenRequested={(meta) => {
             persistReadyStatus(row, phone);
+            const who = phoneLabel || phone;
+            if (meta?.mode === "web") {
+              setInfo(`Abrindo WhatsApp Web para ${who}.`);
+              return;
+            }
             setInfo(
-              `WhatsApp Desktop aberto para ${phoneLabel || phone}. Se a mensagem não preencheu, use Ctrl+V.`
+              `Pedimos ao Windows abrir o WhatsApp para ${who}. ` +
+                `Olhe a barra de tarefas (o app da Store muitas vezes abre minimizado). ` +
+                (meta?.copied
+                  ? "Mensagem copiada: no chat use Ctrl+V. "
+                  : "") +
+                `Se nada aparecer, clique em «Usar WhatsApp Web».`
             );
           }}
           onInvalidPhone={() =>

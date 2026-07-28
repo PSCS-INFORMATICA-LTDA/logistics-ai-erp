@@ -1,7 +1,7 @@
 /**
  * Utilitário único de abertura do WhatsApp (proposta, designação, lava-rápido, ticket).
- * Windows: whatsapp:// só com phone (texto longo no protocolo falha / vira Web).
- * Mensagem completa vai para a área de transferência (Ctrl+V).
+ * Windows: whatsapp:// só com phone (texto longo falha / vira Web).
+ * Mensagem completa → área de transferência (Ctrl+V).
  */
 
 export type WhatsAppOpenResult = {
@@ -12,12 +12,11 @@ export type WhatsAppOpenResult = {
   error?: string;
 };
 
-/** Debounce curto — só evita double-click, não trava o usuário. */
 let lastNativePhone = "";
 let lastNativeLaunchAt = 0;
-const NATIVE_DEBOUNCE_MS = 1200;
+const NATIVE_DEBOUNCE_MS = 2000;
 
-/** Somente dígitos com DDI (BR → 55…). Sem +, espaços, parênteses ou hífens. */
+/** Somente dígitos com DDI (BR → 55…). */
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
@@ -38,7 +37,7 @@ function isMobileDevice(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
 }
 
-/** Cópia síncrona no gesto do clique (não usar após await). */
+/** Cópia síncrona no gesto do clique. */
 export function copyWhatsAppMessageSync(text: string): boolean {
   if (typeof document === "undefined" || !text) return false;
   try {
@@ -48,7 +47,9 @@ export function copyWhatsAppMessageSync(text: string): boolean {
     textarea.style.position = "fixed";
     textarea.style.left = "-9999px";
     document.body.appendChild(textarea);
+    textarea.focus();
     textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
     const ok = document.execCommand("copy");
     document.body.removeChild(textarea);
     return ok;
@@ -58,9 +59,7 @@ export function copyWhatsAppMessageSync(text: string): boolean {
 }
 
 /**
- * URL nativa.
- * Windows: só phone — URL longa com text quebra e o Chrome/SO caem no Web.
- * Mobile: phone + text curto.
+ * URL nativa — Windows só phone (URL curta).
  */
 export function buildWhatsAppNativeUrl(params: {
   phone: string;
@@ -84,7 +83,6 @@ export function buildWhatsAppNativeUrl(params: {
   return `whatsapp://send?phone=${phoneDigits}&text=${encodeURIComponent(short)}`;
 }
 
-/** URL wa.me — só para a opção secundária "Usar WhatsApp Web". */
 export function buildWhatsAppWebUrl(params: {
   phone: string;
   message?: string;
@@ -99,9 +97,8 @@ export function buildWhatsAppWebUrl(params: {
 }
 
 /**
- * Abre o WhatsApp Desktop no chat do telefone.
- * Usa location.assign no gesto do usuário (Chrome bloqueia <a> sintético oculto).
- * Windows: só phone + mensagem na área de transferência.
+ * Um único disparo de whatsapp:// via location.assign (gesto do botão).
+ * O Chrome registra "Launched external handler"; o app da Store às vezes fica minimizado.
  */
 export function openWhatsApp(params: {
   phone: string;
@@ -142,17 +139,11 @@ export function openWhatsApp(params: {
 
   lastNativePhone = phoneDigits;
   lastNativeLaunchAt = now;
-
-  // Gesto real do usuário: location.assign é o que o Chrome honra para whatsapp://.
-  // URL curta (só phone no Windows) — não cai no Web como a URL longa com text.
   window.location.assign(nativeUrl);
 
   return { ok: true, mode: "native", phoneDigits, copied };
 }
 
-/**
- * Opção secundária explícita: abre wa.me na mesma aba (pode cair no WhatsApp Web).
- */
 export function openWhatsAppWeb(params: {
   phone: string;
   message?: string;
@@ -168,9 +159,12 @@ export function openWhatsAppWeb(params: {
     };
   }
 
+  const message = params.message ?? "";
+  if (message.trim()) copyWhatsAppMessageSync(message);
+
   const webUrl = buildWhatsAppWebUrl({
     phone: phoneDigits,
-    message: params.message ?? "",
+    message,
   });
   if (!webUrl) {
     return {
@@ -183,11 +177,9 @@ export function openWhatsAppWeb(params: {
   }
 
   window.location.assign(webUrl);
-
-  return { ok: true, mode: "web", phoneDigits, copied: false };
+  return { ok: true, mode: "web", phoneDigits, copied: Boolean(message.trim()) };
 }
 
-/** Compat: alias do normalizador usado no restante do ERP. */
 export function formatPhoneForWhatsApp(phone: string | null | undefined): string | null {
   return normalizeWhatsAppPhone(phone);
 }

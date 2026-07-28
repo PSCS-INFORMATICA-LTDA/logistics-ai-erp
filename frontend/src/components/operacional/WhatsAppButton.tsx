@@ -11,9 +11,8 @@ import {
   type WhatsAppReferenceType,
 } from "@/lib/whatsapp-open-log";
 import {
-  buildWhatsAppNativeUrl,
-  copyWhatsAppMessageSync,
   normalizeWhatsAppPhone,
+  openWhatsApp,
   openWhatsAppWeb,
 } from "@/lib/whatsapp";
 
@@ -28,14 +27,15 @@ type Props = {
   "aria-label"?: string;
   disabled?: boolean;
   children?: ReactNode;
+  /** Fallback wa.me — útil quando o Desktop da Store não vem para frente. */
   showWebOption?: boolean;
-  onOpenRequested?: () => void;
+  onOpenRequested?: (meta?: { copied: boolean; mode: string }) => void;
   onInvalidPhone?: () => void;
 };
 
 /**
- * Botão WhatsApp: <a href="whatsapp://…"> real (Chrome exige gesto nativo no link).
- * Windows: só phone na URL; mensagem vai para a área de transferência.
+ * Botão WhatsApp: um clique → um location.assign(whatsapp://).
+ * Web só se showWebOption e o usuário clicar no link secundário.
  */
 export function WhatsAppButton({
   phone,
@@ -55,15 +55,11 @@ export function WhatsAppButton({
   const { companyId } = useCompany();
   const [busy, setBusy] = useState(false);
   const openingRef = useRef(false);
-  const phoneDigits = normalizeWhatsAppPhone(phone);
-  const phoneOk = Boolean(phoneDigits);
-  const nativeHref = phoneOk
-    ? buildWhatsAppNativeUrl({ phone: phoneDigits! })
-    : null;
+  const phoneOk = Boolean(normalizeWhatsAppPhone(phone));
 
-  const logOpen = (digits: string) => {
+  const afterOpen = (phoneDigits: string, meta: { copied: boolean; mode: string }) => {
     window.setTimeout(() => {
-      onOpenRequested?.();
+      onOpenRequested?.(meta);
     }, 0);
 
     void (async () => {
@@ -76,7 +72,7 @@ export function WhatsAppButton({
         await logWhatsAppOpenRequested(supabase, {
           companyId,
           userId: user?.id ?? null,
-          phone: digits,
+          phone: phoneDigits,
           referenceType,
           referenceId,
         });
@@ -84,36 +80,43 @@ export function WhatsAppButton({
         window.setTimeout(() => {
           setBusy(false);
           openingRef.current = false;
-        }, 1500);
+        }, 2000);
       }
     })();
   };
 
-  const handleNativeClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (disabled || busy) {
-      event.preventDefault();
-      return;
-    }
+  const handleNativeClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
 
-    if (!phoneOk || !nativeHref || !phoneDigits) {
-      event.preventDefault();
+    if (disabled || busy || openingRef.current) return;
+
+    if (!phoneOk) {
       onInvalidPhone?.();
-      return;
-    }
-
-    if (openingRef.current) {
-      event.preventDefault();
       return;
     }
 
     openingRef.current = true;
     setBusy(true);
 
-    // Copia a mensagem no mesmo gesto do clique (antes do protocolo).
-    if (message.trim()) copyWhatsAppMessageSync(message);
+    const result = openWhatsApp({ phone: phone!, message });
 
-    // NÃO preventDefault: o navegador segue href=whatsapp:// (único jeito confiável no Chrome).
-    logOpen(phoneDigits);
+    if (!result.ok || !result.phoneDigits) {
+      openingRef.current = false;
+      setBusy(false);
+      onInvalidPhone?.();
+      return;
+    }
+
+    if (result.mode === "debounced") {
+      window.setTimeout(() => {
+        setBusy(false);
+        openingRef.current = false;
+      }, 300);
+      return;
+    }
+
+    afterOpen(result.phoneDigits, { copied: result.copied, mode: result.mode });
   };
 
   const handleWebClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -138,56 +141,49 @@ export function WhatsAppButton({
       return;
     }
 
-    logOpen(result.phoneDigits);
+    afterOpen(result.phoneDigits, { copied: result.copied, mode: result.mode });
   };
-
-  const sharedClass = cn(
-    glassAction("green", true),
-    "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0 no-underline",
-    children ? "h-auto w-full" : undefined,
-    (!phoneOk || disabled || busy) && "pointer-events-none opacity-50",
-    className
-  );
 
   return (
     <span
       className={cn(
         "inline-flex",
-        showWebOption ? "flex-col items-start gap-1.5" : "items-center",
+        showWebOption ? "flex-col items-start gap-1" : "items-center",
         children ? "w-full" : undefined,
         wrapperClassName
       )}
     >
-      {phoneOk && nativeHref ? (
-        <a
-          href={nativeHref}
-          title={
-            title ?? "Abrir WhatsApp Desktop no chat do contato (mensagem: Ctrl+V)"
-          }
-          aria-label={ariaLabel ?? "Abrir WhatsApp Desktop"}
-          className={sharedClass}
-          onClick={handleNativeClick}
-        >
-          {children ?? <WhatsAppIcon className="h-5 w-5" />}
-        </a>
-      ) : (
-        <button
-          type="button"
-          title="Cadastre o telefone para abrir o WhatsApp"
-          aria-label="WhatsApp indisponível — telefone não cadastrado"
-          className={sharedClass}
-          onClick={() => onInvalidPhone?.()}
-        >
-          {children ?? <WhatsAppIcon className="h-5 w-5" />}
-        </button>
-      )}
+      <button
+        type="button"
+        title={
+          title ??
+          (phoneOk
+            ? "Abrir WhatsApp Desktop (mensagem copiada — Ctrl+V)"
+            : "Cadastre o telefone para abrir o WhatsApp")
+        }
+        aria-label={
+          ariaLabel ??
+          (phoneOk ? "Abrir WhatsApp Desktop" : "WhatsApp indisponível — telefone não cadastrado")
+        }
+        disabled={disabled || busy}
+        className={cn(
+          glassAction("green", true),
+          "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0",
+          children ? "h-auto w-full" : undefined,
+          (!phoneOk || disabled) && "opacity-50",
+          className
+        )}
+        onClick={handleNativeClick}
+      >
+        {children ?? <WhatsAppIcon className="h-5 w-5" />}
+      </button>
 
       {showWebOption && phoneOk ? (
         <button
           type="button"
           disabled={disabled || busy}
-          className="max-w-full text-left text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800 disabled:opacity-50"
-          title="Abrir pelo navegador (WhatsApp Web). Use só se o app Desktop não abrir."
+          className="max-w-[11rem] text-left text-[11px] font-medium leading-snug text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 disabled:opacity-50"
+          title="Se o app Desktop não aparecer, abra pelo navegador"
           onClick={handleWebClick}
         >
           Usar WhatsApp Web
