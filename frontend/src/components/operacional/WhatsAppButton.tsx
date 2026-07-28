@@ -10,28 +10,36 @@ import {
   logWhatsAppOpenRequested,
   type WhatsAppReferenceType,
 } from "@/lib/whatsapp-open-log";
-import { normalizeWhatsAppPhone, openWhatsApp } from "@/lib/whatsapp";
+import {
+  normalizeWhatsAppPhone,
+  openWhatsApp,
+  openWhatsAppWeb,
+} from "@/lib/whatsapp";
 
 type Props = {
   phone: string | null | undefined;
   message: string;
   referenceType: WhatsAppReferenceType;
   referenceId: string;
-  /** Classes do botão (padrão: ícone verde compacto). */
+  /** Classes do botão principal (padrão: ícone verde compacto). */
   className?: string;
+  /** Classes do wrapper (ícone + opção Web). */
+  wrapperClassName?: string;
   title?: string;
   "aria-label"?: string;
   disabled?: boolean;
   children?: ReactNode;
-  /** Após solicitar abertura (ex.: marcar status Pronto). Não marca “enviado”. */
+  /** Exibir link secundário "Usar WhatsApp Web" (padrão: true). */
+  showWebOption?: boolean;
+  /** Após solicitar abertura. Não marca “enviado”. */
   onOpenRequested?: () => void;
   /** Telefone inválido / faltando. */
   onInvalidPhone?: () => void;
 };
 
 /**
- * Único botão WhatsApp do ERP (proposta, motorista, lava).
- * Abre via whatsapp:// (sem aba nova); fallback wa.me se a página continuar visível.
+ * Único botão WhatsApp do ERP (proposta, motorista, lava, ticket).
+ * Principal: whatsapp:// na mesma janela. Web: só se o usuário clicar em "Usar WhatsApp Web".
  */
 export function WhatsAppButton({
   phone,
@@ -39,10 +47,12 @@ export function WhatsAppButton({
   referenceType,
   referenceId,
   className,
+  wrapperClassName,
   title,
   "aria-label": ariaLabel,
   disabled,
   children,
+  showWebOption = true,
   onOpenRequested,
   onInvalidPhone,
 }: Props) {
@@ -50,7 +60,29 @@ export function WhatsAppButton({
   const [busy, setBusy] = useState(false);
   const phoneOk = Boolean(normalizeWhatsAppPhone(phone));
 
-  const handleClick = () => {
+  const logOpen = (phoneDigits: string) => {
+    onOpenRequested?.();
+    void (async () => {
+      try {
+        if (!companyId) return;
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        await logWhatsAppOpenRequested(supabase, {
+          companyId,
+          userId: user?.id ?? null,
+          phone: phoneDigits,
+          referenceType,
+          referenceId,
+        });
+      } finally {
+        window.setTimeout(() => setBusy(false), 400);
+      }
+    })();
+  };
+
+  const handleNativeClick = () => {
     if (disabled || busy) return;
 
     if (!phoneOk) {
@@ -67,52 +99,73 @@ export function WhatsAppButton({
       return;
     }
 
-    onOpenRequested?.();
+    logOpen(result.phoneDigits);
+  };
 
-    // Log assíncrono — não bloqueia o protocolo nativo.
-    void (async () => {
-      try {
-        if (!companyId) return;
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        await logWhatsAppOpenRequested(supabase, {
-          companyId,
-          userId: user?.id ?? null,
-          phone: result.phoneDigits!,
-          referenceType,
-          referenceId,
-        });
-      } finally {
-        window.setTimeout(() => setBusy(false), 400);
-      }
-    })();
+  const handleWebClick = () => {
+    if (disabled || busy) return;
+
+    if (!phoneOk) {
+      onInvalidPhone?.();
+      return;
+    }
+
+    setBusy(true);
+    const result = openWhatsAppWeb({ phone: phone!, message });
+
+    if (!result.ok || !result.phoneDigits) {
+      setBusy(false);
+      onInvalidPhone?.();
+      return;
+    }
+
+    logOpen(result.phoneDigits);
   };
 
   return (
-    <button
-      type="button"
-      title={
-        title ??
-        (phoneOk
-          ? "Abrir WhatsApp no chat do contato"
-          : "Cadastre o telefone para abrir o WhatsApp")
-      }
-      aria-label={
-        ariaLabel ??
-        (phoneOk ? "Abrir WhatsApp" : "WhatsApp indisponível — telefone não cadastrado")
-      }
-      disabled={disabled || busy}
+    <span
       className={cn(
-        glassAction("green", true),
-        "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0",
-        (!phoneOk || disabled) && "opacity-50",
-        className
+        "inline-flex flex-wrap items-center gap-2",
+        children ? "w-full flex-col items-stretch sm:flex-row sm:items-center" : undefined,
+        wrapperClassName
       )}
-      onClick={handleClick}
     >
-      {children ?? <WhatsAppIcon className="h-5 w-5" />}
-    </button>
+      <button
+        type="button"
+        title={
+          title ??
+          (phoneOk
+            ? "Abrir WhatsApp Desktop no chat do contato"
+            : "Cadastre o telefone para abrir o WhatsApp")
+        }
+        aria-label={
+          ariaLabel ??
+          (phoneOk ? "Abrir WhatsApp Desktop" : "WhatsApp indisponível — telefone não cadastrado")
+        }
+        disabled={disabled || busy}
+        className={cn(
+          glassAction("green", true),
+          "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0",
+          children ? "h-auto w-full sm:w-auto" : undefined,
+          !phoneOk || disabled ? "opacity-50" : undefined,
+          className
+        )}
+        onClick={handleNativeClick}
+      >
+        {children ?? <WhatsAppIcon className="h-5 w-5" />}
+      </button>
+
+      {showWebOption && phoneOk ? (
+        <button
+          type="button"
+          disabled={disabled || busy}
+          className="text-left text-xs font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 disabled:opacity-50"
+          title="Abrir pelo navegador (WhatsApp Web). Use só se o app Desktop não abrir."
+          onClick={handleWebClick}
+        >
+          Usar WhatsApp Web
+        </button>
+      ) : null}
+    </span>
   );
 }

@@ -361,9 +361,9 @@ export function ServiceOrderProposalView({
 
           {clientPhoneOk && clientPhoneLabel ? (
             <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
-              WhatsApp abre o <strong>app do PC</strong> no chat de{" "}
-              <strong>{clientPhoneLabel}</strong> (cliente da OS), com a mensagem já nesse contato —
-              sem aba nova. O clique registra só a abertura solicitada.
+              O ícone abre o <strong>WhatsApp Desktop</strong> no chat de{" "}
+              <strong>{clientPhoneLabel}</strong>. Só registra a abertura solicitada — não confirma
+              envio. Se o app não abrir, use «Usar WhatsApp Web».
             </p>
           ) : (
             <p className="proposal-toolbar mb-4 text-xs text-amber-800 print:hidden">

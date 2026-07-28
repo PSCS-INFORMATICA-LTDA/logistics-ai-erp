@@ -1,16 +1,17 @@
 /**
- * Utilitário único de abertura do WhatsApp (proposta, designação, lava-rápido).
- * Não usa window.open / target=_blank — evita aba branca no Desktop.
+ * Utilitário único de abertura do WhatsApp (proposta, designação, lava-rápido, ticket).
+ * Fluxo principal: protocolo nativo (app Desktop). WhatsApp Web só sob ação explícita.
+ * Não usa window.open / target=_blank.
  */
 
 export type WhatsAppOpenResult = {
   ok: boolean;
-  mode: "native" | "fallback" | "cancelled" | "invalid-phone";
+  mode: "native" | "web" | "invalid-phone";
   phoneDigits: string | null;
   error?: string;
 };
 
-/** Somente dígitos com DDI (BR → 55…). */
+/** Somente dígitos com DDI (BR → 55…). Sem +, espaços, parênteses ou hífens. */
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
@@ -20,14 +21,27 @@ export function normalizeWhatsAppPhone(phone: string | null | undefined): string
   return digits;
 }
 
-export function buildWhatsAppNativeUrl(phoneDigits: string, message: string): string {
+export function buildWhatsAppNativeUrl(params: {
+  phone: string;
+  message?: string;
+}): string | null {
+  const phoneDigits = normalizeWhatsAppPhone(params.phone);
+  if (!phoneDigits) return null;
+  const message = params.message ?? "";
   const text = encodeURIComponent(message);
   return text
     ? `whatsapp://send?phone=${phoneDigits}&text=${text}`
     : `whatsapp://send?phone=${phoneDigits}`;
 }
 
-export function buildWhatsAppFallbackUrl(phoneDigits: string, message: string): string {
+/** URL wa.me — só para a opção secundária "Usar WhatsApp Web". */
+export function buildWhatsAppWebUrl(params: {
+  phone: string;
+  message?: string;
+}): string | null {
+  const phoneDigits = normalizeWhatsAppPhone(params.phone);
+  if (!phoneDigits) return null;
+  const message = params.message ?? "";
   const text = encodeURIComponent(message);
   return text
     ? `https://wa.me/${phoneDigits}?text=${text}`
@@ -35,15 +49,12 @@ export function buildWhatsAppFallbackUrl(phoneDigits: string, message: string): 
 }
 
 /**
- * Abre o WhatsApp pelo protocolo nativo (mesma aba / handler do SO).
- * Se o usuário permanecer na página (~1,2s e document ainda visível),
- * faz fallback para wa.me na mesma aba (sem window.open).
+ * Abre o WhatsApp Desktop pelo protocolo nativo (mesma janela / handler do SO).
+ * Sem fallback automático para wa.me / WhatsApp Web.
  */
 export function openWhatsApp(params: {
   phone: string;
-  message: string;
-  /** Atraso antes do fallback wa.me (ms). */
-  fallbackDelayMs?: number;
+  message?: string;
 }): WhatsAppOpenResult {
   const phoneDigits = normalizeWhatsAppPhone(params.phone);
   if (!phoneDigits) {
@@ -55,22 +66,58 @@ export function openWhatsApp(params: {
     };
   }
 
-  const message = params.message ?? "";
-  const nativeUrl = buildWhatsAppNativeUrl(phoneDigits, message);
-  const fallbackUrl = buildWhatsAppFallbackUrl(phoneDigits, message);
-  const delay = params.fallbackDelayMs ?? 1200;
+  const nativeUrl = buildWhatsAppNativeUrl({
+    phone: phoneDigits,
+    message: params.message ?? "",
+  });
+  if (!nativeUrl) {
+    return {
+      ok: false,
+      mode: "invalid-phone",
+      phoneDigits: null,
+      error: "Não foi possível montar o link do WhatsApp.",
+    };
+  }
 
-  // Protocolo nativo — NÃO usar window.open (gera aba branca).
+  // Protocolo nativo — NÃO usar window.open (gera aba branca / wa.me).
   window.location.href = nativeUrl;
 
-  window.setTimeout(() => {
-    // Se o usuário foi para o app, a página fica oculta → não abre wa.me.
-    if (typeof document !== "undefined" && document.hidden) return;
-    // Fallback na mesma aba (sem _blank).
-    window.location.href = fallbackUrl;
-  }, delay);
-
   return { ok: true, mode: "native", phoneDigits };
+}
+
+/**
+ * Opção secundária explícita: abre wa.me na mesma aba (pode cair no WhatsApp Web).
+ */
+export function openWhatsAppWeb(params: {
+  phone: string;
+  message?: string;
+}): WhatsAppOpenResult {
+  const phoneDigits = normalizeWhatsAppPhone(params.phone);
+  if (!phoneDigits) {
+    return {
+      ok: false,
+      mode: "invalid-phone",
+      phoneDigits: null,
+      error: "Telefone incompleto. Use DDD + número (com DDI 55 se necessário).",
+    };
+  }
+
+  const webUrl = buildWhatsAppWebUrl({
+    phone: phoneDigits,
+    message: params.message ?? "",
+  });
+  if (!webUrl) {
+    return {
+      ok: false,
+      mode: "invalid-phone",
+      phoneDigits: null,
+      error: "Não foi possível montar o link do WhatsApp Web.",
+    };
+  }
+
+  window.location.href = webUrl;
+
+  return { ok: true, mode: "web", phoneDigits };
 }
 
 /** Compat: alias do normalizador usado no restante do ERP. */
