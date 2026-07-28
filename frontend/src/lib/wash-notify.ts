@@ -23,8 +23,6 @@ export function buildWashReadyMessage(params: {
       "",
       `Seu veículo de placa *${params.plate}* está pronto para retirada.`,
       "",
-      "Pode vir buscar quando quiser 🙂",
-      "",
       "Até logo!",
     ],
     params.ticketUrl
@@ -47,8 +45,6 @@ export function buildWashReadySmsMessage(params: {
       greeting,
       "",
       `Seu veiculo de placa ${params.plate} esta pronto para retirada.`,
-      "",
-      "Pode vir buscar quando quiser.",
       "",
       "Ate logo!",
     ],
