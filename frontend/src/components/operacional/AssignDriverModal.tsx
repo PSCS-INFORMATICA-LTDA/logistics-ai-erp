@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
-import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
+import { WhatsAppButton } from "@/components/operacional/WhatsAppButton";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
@@ -28,9 +28,7 @@ import {
   copyTextToClipboardSync,
   formatPhoneForWhatsApp,
   formatWhatsAppPhoneDisplay,
-  isWindowsWhatsAppDesktop,
   launchPreparedEmailShare,
-  sendWhatsAppDesktopMessage,
 } from "@/lib/service-order-proposal";
 import { glassAction } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
@@ -125,7 +123,6 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
   const [driverPayInput, setDriverPayInput] = useState("");
   const [assistantPayInput, setAssistantPayInput] = useState("");
   const [whatsappStatus, setWhatsappStatus] = useState<string | null>(null);
-  const [whatsappBusy, setWhatsappBusy] = useState(false);
 
   const companyName = company?.trade_name || company?.name || "GRX Transportes e Logística";
   const selectedDriver = drivers.find((d) => d.id === selectedId);
@@ -542,48 +539,14 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     })();
   };
 
-  const handleWhatsAppShareMouseDown = () => {
-    const text = sharePayload?.whatsappMessage || sharePayload?.whatsappLinks.message;
-    if (text) copyTextToClipboardSync(text);
-  };
-
-  // NÃO chamar onAssignmentSent no clique do WhatsApp (remount mata o protocolo).
-  const whatsappOpenHref =
-    sharePayload?.whatsappLinks.opensDirectChat && sharePayload.whatsappLinks.primaryHref
-      ? sharePayload.whatsappLinks.primaryHref
-      : "";
-
-  const handleWindowsWhatsAppSend = async () => {
-    if (!sharePayload?.whatsappLinks.phoneDigits || whatsappBusy) return;
-    const message =
-      sharePayload.whatsappMessage || sharePayload.whatsappLinks.message || "";
-    if (!message.trim()) return;
-
-    setWhatsappBusy(true);
-    setWhatsappStatus(null);
-    const phone = sharePayload.whatsappLinks.phoneDigits;
-    const phoneLabel = formatWhatsAppPhoneDisplay(phone) || phone;
-    const result = await sendWhatsAppDesktopMessage({
-      message,
-      phoneDigits: phone,
-      title: `Designação ${orderDetails.code}`,
-      recipient: "motorista",
-    });
-    setWhatsappBusy(false);
-
-    if (result.mode === "protocol") {
-      setWhatsappStatus(
-        `WhatsApp aberto no chat de ${phoneLabel}. Se a mensagem não preencheu, Ctrl+V.`
-      );
-    } else {
-      setWhatsappStatus(
-        `Mensagem copiada. Clique de novo ou abra o WhatsApp no chat de ${phoneLabel}.`
-      );
-    }
-
-    window.setTimeout(() => {
-      notifyAssignmentSentOnce(selectedId, shareDriverName);
-    }, 1200);
+  const handleWhatsAppShareOpenRequested = () => {
+    const phoneLabel =
+      formatWhatsAppPhoneDisplay(sharePayload?.whatsappLinks.phoneDigits) ||
+      selectedDriver?.phone ||
+      "motorista";
+    setWhatsappStatus(
+      `Solicitada abertura do WhatsApp no chat de ${phoneLabel}. Se o texto não preencher, Ctrl+V.`
+    );
   };
 
   const handleEmailShareClick = () => {
@@ -703,83 +666,30 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
               <div className="flex flex-col gap-2">
                 {sharePayload.whatsappLinks.opensDirectChat &&
                 sharePayload.whatsappLinks.phoneDigits ? (
-                  (sharePayload.whatsappLinks.desktopHref ||
-                    sharePayload.whatsappLinks.primaryHref) &&
-                  (sharePayload.whatsappLinks.desktopHref ||
-                    sharePayload.whatsappLinks.primaryHref)!.startsWith("whatsapp://") ? (
-                    <WhatsAppAppAnchor
-                      id="assign-driver-whatsapp-open"
-                      href={
-                        sharePayload.whatsappLinks.desktopHref ||
-                        sharePayload.whatsappLinks.primaryHref
-                      }
-                      title={`WhatsApp — ${
-                        formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
-                        selectedDriver?.phone ||
-                        "motorista"
-                      }`}
-                      aria-label={`Abrir WhatsApp para ${shareDriverName}`}
-                      className={cn(
-                        glassAction("green", true),
-                        "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold",
-                        (saving || whatsappBusy) && "pointer-events-none opacity-50"
-                      )}
-                      onMouseDown={handleWhatsAppShareMouseDown}
-                      onOpen={() => {
-                        setWhatsappStatus(
-                          `WhatsApp aberto no chat de ${
-                            formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
-                            sharePayload.whatsappLinks.phoneDigits
-                          }. Se a mensagem não preencheu, Ctrl+V.`
-                        );
-                      }}
-                    >
-                      <WhatsAppIcon className="h-5 w-5" />
-                      Abrir WhatsApp
-                    </WhatsAppAppAnchor>
-                  ) : isWindowsWhatsAppDesktop() ? (
-                    <button
-                      type="button"
-                      id="assign-driver-whatsapp-open"
-                      disabled={saving || whatsappBusy}
-                      title={`WhatsApp — ${
-                        formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
-                        selectedDriver?.phone ||
-                        "motorista"
-                      }`}
-                      aria-label={`Enviar designação no WhatsApp para ${shareDriverName}`}
-                      className={cn(
-                        glassAction("green", true),
-                        "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold",
-                        (saving || whatsappBusy) && "pointer-events-none opacity-50"
-                      )}
-                      onClick={() => void handleWindowsWhatsAppSend()}
-                    >
-                      <WhatsAppIcon className="h-5 w-5" />
-                      {whatsappBusy ? "Abrindo…" : "Abrir chat no WhatsApp"}
-                    </button>
-                  ) : whatsappOpenHref.startsWith("whatsapp://") ||
-                    whatsappOpenHref.startsWith("/abrir-whatsapp") ? (
-                    <WhatsAppAppAnchor
-                      id="assign-driver-whatsapp-open"
-                      href={whatsappOpenHref}
-                      title={`WhatsApp app — ${
-                        formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
-                        selectedDriver?.phone ||
-                        "motorista"
-                      }`}
-                      aria-label={`Abrir WhatsApp para ${shareDriverName}`}
-                      className={cn(
-                        glassAction("green", true),
-                        "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold",
-                        saving && "pointer-events-none opacity-50"
-                      )}
-                      onMouseDown={handleWhatsAppShareMouseDown}
-                    >
-                      <WhatsAppIcon className="h-5 w-5" />
-                      Abrir WhatsApp
-                    </WhatsAppAppAnchor>
-                  ) : null
+                  <WhatsAppButton
+                    phone={selectedDriver?.phone || sharePayload.whatsappLinks.phoneDigits}
+                    message={
+                      sharePayload.whatsappMessage || sharePayload.whatsappLinks.message || ""
+                    }
+                    referenceType="driver_assignment"
+                    referenceId={orderDetails.id}
+                    title={`WhatsApp — ${
+                      formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
+                      "motorista"
+                    }`}
+                    aria-label={`Abrir WhatsApp para ${shareDriverName}`}
+                    className="inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold"
+                    disabled={saving}
+                    onOpenRequested={handleWhatsAppShareOpenRequested}
+                    onInvalidPhone={() =>
+                      window.alert(
+                        "Cadastre o telefone do motorista para abrir o WhatsApp no contato dele."
+                      )
+                    }
+                  >
+                    <WhatsAppIcon className="h-5 w-5" />
+                    Abrir WhatsApp
+                  </WhatsAppButton>
                 ) : (
                   <button
                     type="button"
@@ -818,8 +728,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                 </p>
               ) : (
                 <p className="text-xs text-slate-600">
-                  Abre direto no chat do motorista (WhatsApp Desktop). Se o texto não preencher,
-                  use Ctrl+V (mensagem já copiada).
+                  Abre o WhatsApp no chat do motorista (sem aba nova). O clique registra apenas
+                  «abertura solicitada», não confirma envio da mensagem.
                 </p>
               )}
             </div>

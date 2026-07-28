@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
-import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
+import { WhatsAppButton } from "@/components/operacional/WhatsAppButton";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,6 @@ import {
 import {
   buildProposalEmailBody,
   buildWhatsAppProposalText,
-  buildWhatsAppShareLinks,
   formatPhoneForWhatsApp,
   formatServiceDate,
   formatWhatsAppPhoneDisplay,
@@ -114,28 +113,22 @@ export function ServiceOrderProposalView({
     });
   };
 
-  const whatsappShare = useMemo(() => {
+  const whatsappMessage = useMemo(() => {
     const shareUrl = resolveClientProposalShareUrl(publicToken);
     if (!shareUrl) return null;
-    const message = buildWhatsAppProposalText(order, context, shareUrl, { forClient: true });
-    return buildWhatsAppShareLinks(message, order.phone, { recipient: "cliente" });
+    return buildWhatsAppProposalText(order, context, shareUrl, { forClient: true });
   }, [publicToken, order, context]);
 
   const clientPhoneOk =
     Boolean(formatPhoneForWhatsApp(order.phone)) && !isDemoSeedWhatsAppPhone(order.phone);
-  // PC: whatsapp:// (app). Mobile: wa.me.
-  const whatsappHref =
-    whatsappShare?.opensDirectChat && whatsappShare.primaryHref
-      ? whatsappShare.primaryHref
-      : null;
-  const clientPhoneLabel = formatWhatsAppPhoneDisplay(whatsappShare?.phoneDigits);
+  const clientPhoneLabel = formatWhatsAppPhoneDisplay(formatPhoneForWhatsApp(order.phone));
 
   const shareIconBase = "h-10 w-10 shrink-0 p-0";
 
-  const handleWhatsAppAnchorOpen = () => {
+  const handleWhatsAppOpenRequested = () => {
     if (!clientPhoneLabel) return;
     setWhatsappHint(
-      `Abrindo o WhatsApp no chat de ${clientPhoneLabel} (telefone do cliente na OS). A mensagem já vai nesse contato — não use Ctrl+V.`
+      `Solicitada abertura do WhatsApp no chat de ${clientPhoneLabel}. Se o texto não preencher, use Ctrl+V.`
     );
   };
 
@@ -283,28 +276,27 @@ export function ServiceOrderProposalView({
             <Button type="button" onClick={savePdfForWhatsApp}>
               Salvar PDF para cliente
             </Button>
-            {whatsappHref ? (
-              <WhatsAppAppAnchor
-                href={whatsappHref}
+            {whatsappMessage && clientPhoneOk ? (
+              <WhatsAppButton
+                phone={order.phone}
+                message={whatsappMessage}
+                referenceType="service_order_proposal"
+                referenceId={order.id}
                 title={
                   clientPhoneLabel
-                    ? `WhatsApp app — ${clientPhoneLabel}`
+                    ? `WhatsApp — ${clientPhoneLabel}`
                     : "Enviar no WhatsApp"
                 }
                 aria-label={
                   clientPhoneLabel
-                    ? `Enviar proposta no WhatsApp para ${clientPhoneLabel}`
-                    : "Enviar proposta no WhatsApp"
+                    ? `Abrir WhatsApp para ${clientPhoneLabel}`
+                    : "Abrir WhatsApp"
                 }
-                className={cn(
-                  glassAction("green", true),
-                  shareIconBase,
-                  markingSent && "pointer-events-none opacity-50"
-                )}
-                onOpen={handleWhatsAppAnchorOpen}
-              >
-                <WhatsAppIcon className="h-5 w-5" />
-              </WhatsAppAppAnchor>
+                className={cn(shareIconBase, markingSent && "pointer-events-none opacity-50")}
+                disabled={markingSent}
+                onOpenRequested={handleWhatsAppOpenRequested}
+                onInvalidPhone={handleWhatsAppMissingPhone}
+              />
             ) : !clientPhoneOk ? (
               <button
                 type="button"
@@ -367,11 +359,11 @@ export function ServiceOrderProposalView({
             </p>
           )}
 
-          {whatsappShare?.opensDirectChat && clientPhoneLabel ? (
+          {clientPhoneOk && clientPhoneLabel ? (
             <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
               WhatsApp abre o <strong>app do PC</strong> no chat de{" "}
               <strong>{clientPhoneLabel}</strong> (cliente da OS), com a mensagem já nesse contato —
-              sem colar no chat errado e sem WhatsApp Web.
+              sem aba nova. O clique registra só a abertura solicitada.
             </p>
           ) : (
             <p className="proposal-toolbar mb-4 text-xs text-amber-800 print:hidden">

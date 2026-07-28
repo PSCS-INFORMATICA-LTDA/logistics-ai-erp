@@ -1,8 +1,4 @@
-import {
-  buildWhatsAppShareLinks,
-  formatPhoneForWhatsApp,
-  type WhatsAppShareLinks,
-} from "@/lib/service-order-proposal";
+import { formatPhoneForWhatsApp } from "@/lib/whatsapp";
 
 function appendTicketLink(lines: string[], ticketUrl?: string | null): string[] {
   const url = ticketUrl?.trim();
@@ -52,30 +48,6 @@ export function buildWashReadySmsMessage(params: {
   ).join("\n");
 }
 
-export function buildWashReadyWhatsApp(params: {
-  companyName: string;
-  plate: string;
-  phone?: string | null;
-  clientName?: string | null;
-  serviceName?: string | null;
-  ticketUrl?: string | null;
-}) {
-  const message = buildWashReadyMessage(params);
-  return {
-    message,
-    links: buildWhatsAppShareLinks(message, params.phone, { recipient: "cliente" }),
-  };
-}
-
-/**
- * Mesmo critério da proposta/OS: `primaryHref` (WhatsAppAppAnchor).
- * Windows → /abrir-whatsapp; mobile → wa.me; outros → whatsapp://.
- */
-export function washReadyWhatsAppHref(links: WhatsAppShareLinks): string {
-  if (!links.opensDirectChat) return "";
-  return links.primaryHref || "";
-}
-
 export function canUseDeviceSms(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
@@ -103,12 +75,5 @@ export function buildSmsShareHref(phone: string | null | undefined, text: string
   if (!digits) return null;
   const body = encodeURIComponent(text.replace(/\*/g, "").trim());
   if (!body) return `sms:${digits}`;
-  // ?& = Android (?body) + iOS (&body)
   return `sms:${digits}?&body=${body}`;
-}
-
-/** Navega na mesma aba — evita bloqueio de popup do target=_blank. */
-export function launchShareHref(href: string): void {
-  if (!href) return;
-  window.location.assign(href);
 }

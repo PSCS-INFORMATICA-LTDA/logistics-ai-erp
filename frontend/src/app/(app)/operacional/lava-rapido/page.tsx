@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { DataTableScroll } from "@/components/ui/DataTableScroll";
 import { GroupedTableBodies } from "@/components/ui/GroupedTableBodies";
 import { GlassSelect } from "@/components/ui/GlassSelect";
-import { SmsIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
+import { SmsIcon } from "@/components/icons/ShareIcons";
 import { PatioPaymentProofClip } from "@/components/operacional/PatioPaymentProofClip";
 import { SmsShareAnchor } from "@/components/operacional/SmsShareAnchor";
-import { WhatsAppAppAnchor } from "@/components/operacional/WhatsAppAppAnchor";
+import { WhatsAppButton } from "@/components/operacional/WhatsAppButton";
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { companyDisplayName } from "@/lib/company-logo";
@@ -41,8 +41,7 @@ import {
 import {
   buildSmsShareHref,
   buildWashReadySmsMessage,
-  buildWashReadyWhatsApp,
-  washReadyWhatsAppHref,
+  buildWashReadyMessage,
 } from "@/lib/wash-notify";
 import {
   computeWashLoyaltyProgress,
@@ -51,7 +50,6 @@ import {
   type WashLoyaltyProgress,
 } from "@/lib/wash-loyalty";
 import {
-  copyTextToClipboardSync,
   formatPhoneForWhatsApp,
   formatWhatsAppPhoneDisplay,
 } from "@/lib/service-order-proposal";
@@ -455,18 +453,13 @@ export default function LavaRapidoPage() {
     const ticketUrl =
       ticketUrlById[row.id] ||
       (row.public_ticket_token ? patioTicketPublicUrl(row.public_ticket_token) : null);
-    const share = buildWashReadyWhatsApp({
+    const waMessage = buildWashReadyMessage({
       companyName,
       plate: row.plate,
-      phone,
       clientName: row.client_name,
       serviceName: row.service_name,
       ticketUrl,
     });
-    const waHref =
-      share.links.opensDirectChat && washReadyWhatsAppHref(share.links)
-        ? washReadyWhatsAppHref(share.links)
-        : "";
     const smsText = buildWashReadySmsMessage({
       companyName,
       plate: row.plate,
@@ -474,7 +467,8 @@ export default function LavaRapidoPage() {
       ticketUrl,
     });
     const smsHref = phoneOk ? buildSmsShareHref(phone, smsText) : null;
-    const phoneLabel = formatWhatsAppPhoneDisplay(share.links.phoneDigits) || phone;
+    const phoneLabel =
+      formatWhatsAppPhoneDisplay(formatPhoneForWhatsApp(phone)) || phone;
     const draftValue = phoneDraftById[row.id] ?? row.phone ?? phoneFromClientCadastro(row.client_name);
 
     return (
@@ -490,40 +484,28 @@ export default function LavaRapidoPage() {
             title="Telefone do cadastro vazio — preencha para avisar"
           />
         ) : null}
-        {waHref ? (
-          <WhatsAppAppAnchor
-            href={waHref}
-            title={
-              phoneLabel
-                ? `WhatsApp — veículo pronto · ${phoneLabel}`
-                : "Avisar no WhatsApp que o veículo está pronto"
-            }
-            aria-label={
-              phoneLabel
-                ? `Avisar no WhatsApp ${phoneLabel} que o veículo está pronto`
-                : "Avisar no WhatsApp que o veículo está pronto"
-            }
-            className={cn(glassAction("green", true), SHARE_ICON_BTN)}
-            onMouseDown={() => copyTextToClipboardSync(share.message)}
-            onOpen={() => persistReadyStatus(row, phone)}
-          >
-            <WhatsAppIcon className="h-5 w-5" />
-          </WhatsAppAppAnchor>
-        ) : (
-          <button
-            type="button"
-            className={cn(glassAction("green", true), SHARE_ICON_BTN, "opacity-50")}
-            title="Informe o telefone (cadastro ou manual) para abrir o WhatsApp"
-            aria-label="WhatsApp indisponível — telefone não cadastrado"
-            onClick={() =>
-              setError(
-                "Selecione o cliente cadastrado (puxa o telefone) ou digite DDD + número para avisar."
-              )
-            }
-          >
-            <WhatsAppIcon className="h-5 w-5" />
-          </button>
-        )}
+        <WhatsAppButton
+          phone={phone}
+          message={waMessage}
+          referenceType="car_wash_ready"
+          referenceId={row.id}
+          title={
+            phoneLabel
+              ? `WhatsApp — veículo pronto · ${phoneLabel}`
+              : "Avisar no WhatsApp que o veículo está pronto"
+          }
+          aria-label={
+            phoneLabel
+              ? `Avisar no WhatsApp ${phoneLabel} que o veículo está pronto`
+              : "Avisar no WhatsApp que o veículo está pronto"
+          }
+          onOpenRequested={() => persistReadyStatus(row, phone)}
+          onInvalidPhone={() =>
+            setError(
+              "Selecione o cliente cadastrado (puxa o telefone) ou digite DDD + número para avisar."
+            )
+          }
+        />
         {smsHref ? (
           <SmsShareAnchor
             href={smsHref}

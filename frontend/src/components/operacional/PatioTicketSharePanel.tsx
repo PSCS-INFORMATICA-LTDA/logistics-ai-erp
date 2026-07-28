@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ProposalQrCode } from "@/components/operacional/ProposalQrCode";
+import { WhatsAppButton } from "@/components/operacional/WhatsAppButton";
+import { WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { glassField } from "@/lib/liquid-glass-styles";
 import {
-  buildPatioTicketWhatsAppShare,
+  buildPatioTicketWhatsAppMessage,
   ensurePatioTicketToken,
   patioTicketPublicUrl,
   type PatioTicketSource,
@@ -66,17 +68,16 @@ export function PatioTicketSharePanel({
   }, [phone]);
 
   const publicUrl = token ? patioTicketPublicUrl(token) : "";
-  const share = publicUrl
-    ? buildPatioTicketWhatsAppShare({
+  const message = publicUrl
+    ? buildPatioTicketWhatsAppMessage({
         kind,
         companyName,
         code,
         plate,
-        phone: phoneDraft,
         totalAmount,
         publicUrl,
       })
-    : null;
+    : "";
 
   const copyLink = async () => {
     if (!publicUrl) return;
@@ -89,9 +90,9 @@ export function PatioTicketSharePanel({
   };
 
   const copyMessage = async () => {
-    if (!share?.message) return;
+    if (!message) return;
     try {
-      await navigator.clipboard.writeText(share.message);
+      await navigator.clipboard.writeText(message);
       setStatus("Mensagem copiada. Cole no WhatsApp se precisar.");
     } catch {
       setStatus("Não foi possível copiar a mensagem.");
@@ -102,14 +103,9 @@ export function PatioTicketSharePanel({
     return <p className="text-sm text-slate-500">Gerando link e QR do ticket…</p>;
   }
 
-  if (error || !token || !share) {
+  if (error || !token || !message) {
     return <Alert variant="error">{error ?? "Ticket público indisponível."}</Alert>;
   }
-
-  const waHref =
-    share.links.opensDirectChat && share.links.primaryHref
-      ? share.links.primaryHref
-      : "";
 
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:hidden">
@@ -132,19 +128,23 @@ export function PatioTicketSharePanel({
       </label>
 
       <div className="flex flex-wrap gap-2">
-        {waHref ? (
-          <a
-            href={waHref}
-            className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
-            onClick={() => void copyMessage()}
-          >
-            Enviar no WhatsApp
-          </a>
-        ) : (
-          <Button type="button" variant="secondary" onClick={() => void copyMessage()}>
-            Copiar mensagem WhatsApp
-          </Button>
-        )}
+        <WhatsAppButton
+          phone={phoneDraft}
+          message={message}
+          referenceType="patio_ticket"
+          referenceId={entryId}
+          className="inline-flex h-11 w-auto items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          onOpenRequested={() => setStatus("Abertura do WhatsApp solicitada.")}
+          onInvalidPhone={() =>
+            setStatus("Informe o telefone do cliente (DDD + número) para abrir o WhatsApp.")
+          }
+        >
+          <WhatsAppIcon className="h-5 w-5" />
+          Enviar no WhatsApp
+        </WhatsAppButton>
+        <Button type="button" variant="secondary" onClick={() => void copyMessage()}>
+          Copiar mensagem WhatsApp
+        </Button>
         <Button type="button" variant="secondary" onClick={() => void copyLink()}>
           Copiar link
         </Button>

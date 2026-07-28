@@ -591,14 +591,9 @@ export function buildProposalEmailBody(
   return lines.join("\n");
 }
 
-export function formatPhoneForWhatsApp(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
-  if (digits.startsWith("55") && digits.length >= 12) return digits;
-  return digits;
-}
+import { formatPhoneForWhatsApp, normalizeWhatsAppPhone, openWhatsApp } from "@/lib/whatsapp";
+
+export { formatPhoneForWhatsApp, normalizeWhatsAppPhone };
 
 /** Telefone fictício do seed demo (OS001) — não existe no WhatsApp. */
 export function isDemoSeedWhatsAppPhone(phone: string | null | undefined): boolean {
@@ -1075,17 +1070,8 @@ export function openWhatsAppDesktopSync(
   text: string,
   phone?: string | null
 ): WhatsAppShareResult {
-  const links = buildWhatsAppShareLinks(text, phone);
-  if (!links.opensDirectChat || !links.primaryHref) {
-    return { copied: false, mode: "clipboard-only" };
-  }
-
-  if (isMobileWhatsAppDevice()) {
-    window.open(links.mobileHref, "_blank", "noopener,noreferrer");
-    return { copied: false, mode: "mobile-web" };
-  }
-
-  openWhatsAppPreferApp(links);
+  const result = openWhatsApp({ phone: phone ?? "", message: text });
+  if (!result.ok) return { copied: false, mode: "clipboard-only" };
   return { copied: false, mode: "desktop-app" };
 }
 
