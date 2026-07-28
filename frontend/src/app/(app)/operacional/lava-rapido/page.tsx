@@ -499,7 +499,12 @@ export default function LavaRapidoPage() {
               ? `Avisar no WhatsApp ${phoneLabel} que o veículo está pronto`
               : "Avisar no WhatsApp que o veículo está pronto"
           }
-          onOpenRequested={() => persistReadyStatus(row, phone)}
+          onOpenRequested={() => {
+            persistReadyStatus(row, phone);
+            setInfo(
+              "WhatsApp Desktop aberto no chat do cliente. Se a mensagem não preencheu, use Ctrl+V."
+            );
+          }}
           onInvalidPhone={() =>
             setError(
               "Selecione o cliente cadastrado (puxa o telefone) ou digite DDD + número para avisar."

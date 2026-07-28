@@ -128,7 +128,7 @@ export function ServiceOrderProposalView({
   const handleWhatsAppOpenRequested = () => {
     if (!clientPhoneLabel) return;
     setWhatsappHint(
-      `Solicitada abertura do WhatsApp no chat de ${clientPhoneLabel}. Se o texto não preencher, use Ctrl+V.`
+      `Solicitada abertura do WhatsApp Desktop no chat de ${clientPhoneLabel}. Mensagem copiada — se não preencher, use Ctrl+V.`
     );
   };
 

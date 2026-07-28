@@ -88,7 +88,7 @@ export function WhatsAppButton({
         window.setTimeout(() => {
           setBusy(false);
           openingRef.current = false;
-        }, 1200);
+        }, 4000);
       }
     })();
   };

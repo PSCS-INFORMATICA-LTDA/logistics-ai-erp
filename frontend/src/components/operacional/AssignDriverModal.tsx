@@ -545,7 +545,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       selectedDriver?.phone ||
       "motorista";
     setWhatsappStatus(
-      `Solicitada abertura do WhatsApp no chat de ${phoneLabel}. Se o texto não preencher, Ctrl+V.`
+      `Solicitada abertura do WhatsApp Desktop no chat de ${phoneLabel}. Mensagem copiada — se não preencher, Ctrl+V.`
     );
   };
 

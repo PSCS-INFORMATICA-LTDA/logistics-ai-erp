@@ -1,19 +1,21 @@
 /**
  * Utilitário único de abertura do WhatsApp (proposta, designação, lava-rápido, ticket).
- * Fluxo principal: protocolo nativo (app Desktop). WhatsApp Web só sob ação explícita.
- * Não usa window.open / target=_blank / location.href no fluxo nativo.
+ * Windows: whatsapp:// só com phone (texto longo no protocolo falha / vira Web).
+ * Mensagem completa vai para a área de transferência (Ctrl+V).
  */
 
 export type WhatsAppOpenResult = {
   ok: boolean;
   mode: "native" | "web" | "invalid-phone" | "debounced";
   phoneDigits: string | null;
+  copied: boolean;
   error?: string;
 };
 
-/** Evita disparar o protocolo duas vezes no mesmo clique (Chrome logava 2x). */
+/** Debounce por telefone (não pela URL completa — o texto muda e furava o lock). */
+let lastNativePhone = "";
 let lastNativeLaunchAt = 0;
-let lastNativeLaunchUrl = "";
+const NATIVE_DEBOUNCE_MS = 4000;
 
 /** Somente dígitos com DDI (BR → 55…). Sem +, espaços, parênteses ou hífens. */
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
@@ -25,17 +27,62 @@ export function normalizeWhatsAppPhone(phone: string | null | undefined): string
   return digits;
 }
 
+function isWindowsDesktop(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /Windows/i.test(ua) && !/Android|iPhone|iPad|iPod/i.test(ua);
+}
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+}
+
+/** Cópia síncrona no gesto do clique (não usar após await). */
+export function copyWhatsAppMessageSync(text: string): boolean {
+  if (typeof document === "undefined" || !text) return false;
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * URL nativa.
+ * Windows: só phone — URL longa com text quebra e o Chrome/SO caem no Web.
+ * Mobile: phone + text (protocolo tolera melhor).
+ */
 export function buildWhatsAppNativeUrl(params: {
   phone: string;
   message?: string;
 }): string | null {
   const phoneDigits = normalizeWhatsAppPhone(params.phone);
   if (!phoneDigits) return null;
-  const message = params.message ?? "";
-  const text = encodeURIComponent(message);
-  return text
-    ? `whatsapp://send?phone=${phoneDigits}&text=${text}`
-    : `whatsapp://send?phone=${phoneDigits}`;
+
+  if (isWindowsDesktop()) {
+    return `whatsapp://send?phone=${phoneDigits}`;
+  }
+
+  const message = (params.message ?? "").trim();
+  if (!message) return `whatsapp://send?phone=${phoneDigits}`;
+
+  // Mobile / outros: texto curto no protocolo.
+  const max = 500;
+  const short =
+    encodeURIComponent(message).length <= max
+      ? message
+      : `${message.slice(0, 180).trim()}…`;
+  return `whatsapp://send?phone=${phoneDigits}&text=${encodeURIComponent(short)}`;
 }
 
 /** URL wa.me — só para a opção secundária "Usar WhatsApp Web". */
@@ -53,18 +100,9 @@ export function buildWhatsAppWebUrl(params: {
 }
 
 /**
- * Dispara whatsapp:// sem navegar a aba do ERP.
- * location.href = whatsapp:// faz o Chrome tratar como navegação da aba
- * (Desktop abre, mas a aba pode seguir para Web/QR).
+ * Dispara whatsapp:// sem navegar a aba do ERP (sem location.href).
  */
 function launchNativeProtocol(url: string): void {
-  const now = Date.now();
-  if (url === lastNativeLaunchUrl && now - lastNativeLaunchAt < 2500) {
-    return;
-  }
-  lastNativeLaunchUrl = url;
-  lastNativeLaunchAt = now;
-
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.rel = "noopener noreferrer";
@@ -75,8 +113,8 @@ function launchNativeProtocol(url: string): void {
 }
 
 /**
- * Abre o WhatsApp Desktop pelo protocolo nativo (sem mudar a URL da aba).
- * Sem fallback automático para wa.me / WhatsApp Web.
+ * Abre o WhatsApp Desktop no chat do telefone.
+ * Windows: protocolo só com phone + mensagem na área de transferência.
  */
 export function openWhatsApp(params: {
   phone: string;
@@ -88,31 +126,38 @@ export function openWhatsApp(params: {
       ok: false,
       mode: "invalid-phone",
       phoneDigits: null,
+      copied: false,
       error: "Telefone incompleto. Use DDD + número (com DDI 55 se necessário).",
     };
   }
 
+  const now = Date.now();
+  if (phoneDigits === lastNativePhone && now - lastNativeLaunchAt < NATIVE_DEBOUNCE_MS) {
+    return { ok: true, mode: "debounced", phoneDigits, copied: false };
+  }
+
+  const message = params.message ?? "";
+  const copied = message.trim() ? copyWhatsAppMessageSync(message) : false;
+
   const nativeUrl = buildWhatsAppNativeUrl({
     phone: phoneDigits,
-    message: params.message ?? "",
+    message: isMobileDevice() ? message : undefined,
   });
   if (!nativeUrl) {
     return {
       ok: false,
       mode: "invalid-phone",
       phoneDigits: null,
+      copied,
       error: "Não foi possível montar o link do WhatsApp.",
     };
   }
 
-  const now = Date.now();
-  if (nativeUrl === lastNativeLaunchUrl && now - lastNativeLaunchAt < 2500) {
-    return { ok: true, mode: "debounced", phoneDigits };
-  }
-
+  lastNativePhone = phoneDigits;
+  lastNativeLaunchAt = now;
   launchNativeProtocol(nativeUrl);
 
-  return { ok: true, mode: "native", phoneDigits };
+  return { ok: true, mode: "native", phoneDigits, copied };
 }
 
 /**
@@ -128,6 +173,7 @@ export function openWhatsAppWeb(params: {
       ok: false,
       mode: "invalid-phone",
       phoneDigits: null,
+      copied: false,
       error: "Telefone incompleto. Use DDD + número (com DDI 55 se necessário).",
     };
   }
@@ -141,13 +187,14 @@ export function openWhatsAppWeb(params: {
       ok: false,
       mode: "invalid-phone",
       phoneDigits: null,
+      copied: false,
       error: "Não foi possível montar o link do WhatsApp Web.",
     };
   }
 
   window.location.assign(webUrl);
 
-  return { ok: true, mode: "web", phoneDigits };
+  return { ok: true, mode: "web", phoneDigits, copied: false };
 }
 
 /** Compat: alias do normalizador usado no restante do ERP. */
