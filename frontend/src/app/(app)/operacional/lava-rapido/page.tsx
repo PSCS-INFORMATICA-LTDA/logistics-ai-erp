@@ -346,10 +346,13 @@ export default function LavaRapidoPage() {
 
   const resolveNotifyPhone = useCallback(
     (row: CarWashServiceRow) => {
+      // Rascunho da linha tem prioridade (usuário pode corrigir o número antes do WhatsApp).
+      if (Object.prototype.hasOwnProperty.call(phoneDraftById, row.id)) {
+        const draft = phoneDraftById[row.id]?.trim() || "";
+        if (draft && formatPhoneForWhatsApp(draft)) return draft;
+      }
       const fromRow = row.phone?.trim() || "";
       if (fromRow && formatPhoneForWhatsApp(fromRow)) return fromRow;
-      const draft = phoneDraftById[row.id]?.trim() || "";
-      if (draft && formatPhoneForWhatsApp(draft)) return draft;
       return phoneFromClientCadastro(row.client_name);
     },
     [phoneDraftById, phoneFromClientCadastro]
@@ -364,7 +367,8 @@ export default function LavaRapidoPage() {
           status: row.status === "Aberto" ? "Pronto" : row.status,
           ready_notified_at: new Date().toISOString(),
         };
-        if (phoneToSave?.trim() && !row.phone?.trim()) {
+        // Sempre grava o telefone usado no aviso (permite corrigir número errado na OS).
+        if (phoneToSave?.trim() && formatPhoneForWhatsApp(phoneToSave)) {
           patch.phone = phoneToSave.trim();
         }
         const { error: updError } = await supabase
@@ -469,21 +473,23 @@ export default function LavaRapidoPage() {
     const smsHref = phoneOk ? buildSmsShareHref(phone, smsText) : null;
     const phoneLabel =
       formatWhatsAppPhoneDisplay(formatPhoneForWhatsApp(phone)) || phone;
-    const draftValue = phoneDraftById[row.id] ?? row.phone ?? phoneFromClientCadastro(row.client_name);
+    const draftValue =
+      phoneDraftById[row.id] ??
+      row.phone?.trim() ??
+      phoneFromClientCadastro(row.client_name);
 
     return (
       <div className="flex flex-wrap items-center gap-2">
-        {!phoneOk ? (
-          <input
-            className={cn(glassField(true), "min-w-[9.5rem] max-w-[11rem] text-xs")}
-            placeholder="DDD + telefone"
-            value={draftValue}
-            onChange={(e) =>
-              setPhoneDraftById((m) => ({ ...m, [row.id]: e.target.value }))
-            }
-            title="Telefone do cadastro vazio — preencha para avisar"
-          />
-        ) : null}
+        <input
+          className={cn(glassField(true), "min-w-[9.5rem] max-w-[11rem] text-xs")}
+          placeholder="DDD + telefone"
+          value={draftValue}
+          onChange={(e) =>
+            setPhoneDraftById((m) => ({ ...m, [row.id]: e.target.value }))
+          }
+          title="Telefone que receberá o WhatsApp/SMS desta ordem (pode corrigir)"
+          aria-label={`Telefone do aviso da ordem ${row.code}`}
+        />
         <WhatsAppButton
           phone={phone}
           message={waMessage}
@@ -502,12 +508,12 @@ export default function LavaRapidoPage() {
           onOpenRequested={() => {
             persistReadyStatus(row, phone);
             setInfo(
-              "WhatsApp Desktop aberto no chat do cliente. Se a mensagem não preencheu, use Ctrl+V."
+              `WhatsApp Desktop aberto para ${phoneLabel || phone}. Se a mensagem não preencheu, use Ctrl+V.`
             );
           }}
           onInvalidPhone={() =>
             setError(
-              "Selecione o cliente cadastrado (puxa o telefone) ou digite DDD + número para avisar."
+              "Informe DDD + telefone no campo ao lado do ícone WhatsApp desta ordem."
             )
           }
         />
@@ -538,7 +544,7 @@ export default function LavaRapidoPage() {
             title="Informe o telefone para SMS"
             aria-label="SMS indisponível — telefone não cadastrado"
             onClick={() =>
-              setError("Informe o telefone (cadastro ou manual) para SMS.")
+              setError("Informe DDD + telefone no campo ao lado do ícone para avisar por SMS.")
             }
           >
             <SmsIcon className="h-5 w-5" />
@@ -555,8 +561,8 @@ export default function LavaRapidoPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Lava-rápido</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Ícones WhatsApp/SMS (mesmo fluxo da proposta), telefone do cadastro do cliente, ticket e
-          fidelidade. Parâmetros em{" "}
+          Ícones WhatsApp/SMS usam o telefone da própria ordem (campo ao lado do ícone). O telefone
+          do formulário acima vale só para nova ordem. Fidelidade e ticket:{" "}
           <Link href="/configuracoes/parametros-patio" className="text-brand-700 underline">
             Parâmetros do Pátio
           </Link>
@@ -671,7 +677,7 @@ export default function LavaRapidoPage() {
             </label>
             <label className="block space-y-1">
               <span className="text-sm font-medium text-slate-700">
-                Telefone (puxa do cadastro; pode editar)
+                Telefone da nova ordem (não altera ordens já abertas)
               </span>
               <input
                 className={glassField(true)}
