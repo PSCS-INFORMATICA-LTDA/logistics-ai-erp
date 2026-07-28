@@ -1,15 +1,19 @@
 /**
  * Utilitário único de abertura do WhatsApp (proposta, designação, lava-rápido, ticket).
  * Fluxo principal: protocolo nativo (app Desktop). WhatsApp Web só sob ação explícita.
- * Não usa window.open / target=_blank.
+ * Não usa window.open / target=_blank / location.href no fluxo nativo.
  */
 
 export type WhatsAppOpenResult = {
   ok: boolean;
-  mode: "native" | "web" | "invalid-phone";
+  mode: "native" | "web" | "invalid-phone" | "debounced";
   phoneDigits: string | null;
   error?: string;
 };
+
+/** Evita disparar o protocolo duas vezes no mesmo clique (Chrome logava 2x). */
+let lastNativeLaunchAt = 0;
+let lastNativeLaunchUrl = "";
 
 /** Somente dígitos com DDI (BR → 55…). Sem +, espaços, parênteses ou hífens. */
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
@@ -49,7 +53,29 @@ export function buildWhatsAppWebUrl(params: {
 }
 
 /**
- * Abre o WhatsApp Desktop pelo protocolo nativo (mesma janela / handler do SO).
+ * Dispara whatsapp:// sem navegar a aba do ERP.
+ * location.href = whatsapp:// faz o Chrome tratar como navegação da aba
+ * (Desktop abre, mas a aba pode seguir para Web/QR).
+ */
+function launchNativeProtocol(url: string): void {
+  const now = Date.now();
+  if (url === lastNativeLaunchUrl && now - lastNativeLaunchAt < 2500) {
+    return;
+  }
+  lastNativeLaunchUrl = url;
+  lastNativeLaunchAt = now;
+
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.rel = "noopener noreferrer";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+/**
+ * Abre o WhatsApp Desktop pelo protocolo nativo (sem mudar a URL da aba).
  * Sem fallback automático para wa.me / WhatsApp Web.
  */
 export function openWhatsApp(params: {
@@ -79,8 +105,12 @@ export function openWhatsApp(params: {
     };
   }
 
-  // Protocolo nativo — NÃO usar window.open (gera aba branca / wa.me).
-  window.location.href = nativeUrl;
+  const now = Date.now();
+  if (nativeUrl === lastNativeLaunchUrl && now - lastNativeLaunchAt < 2500) {
+    return { ok: true, mode: "debounced", phoneDigits };
+  }
+
+  launchNativeProtocol(nativeUrl);
 
   return { ok: true, mode: "native", phoneDigits };
 }
@@ -115,7 +145,7 @@ export function openWhatsAppWeb(params: {
     };
   }
 
-  window.location.href = webUrl;
+  window.location.assign(webUrl);
 
   return { ok: true, mode: "web", phoneDigits };
 }

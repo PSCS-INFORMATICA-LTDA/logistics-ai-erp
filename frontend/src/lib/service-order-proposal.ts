@@ -949,23 +949,10 @@ export async function sendWhatsAppDesktopMessage(input: {
   }
 
   const nativeText = truncateTextForWhatsAppNativeUrl(plainTextForWhatsAppUrl(message));
-  const href = nativeText
-    ? `whatsapp://send?phone=${phone}&text=${encodeURIComponent(nativeText)}`
-    : `whatsapp://send?phone=${phone}`;
-
-  try {
-    window.location.href = href;
-  } catch {
-    try {
-      const anchor = document.createElement("a");
-      anchor.href = href;
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-    } catch {
-      return { copied, mode: "clipboard-only" };
-    }
+  // Reusa o lançamento único (sem location.href na aba).
+  const result = openWhatsApp({ phone, message: nativeText || message || " " });
+  if (!result.ok) {
+    return { copied, mode: "clipboard-only" };
   }
   return { copied, mode: "protocol" };
 }

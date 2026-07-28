@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { useCompany } from "@/lib/company-context";
 import { createClient } from "@/lib/supabase/client";
@@ -31,8 +31,7 @@ type Props = {
   children?: ReactNode;
   /**
    * Link secundário "Usar WhatsApp Web".
-   * Padrão false: em tabelas/ícones o texto colado ao ícone era clicado por engano (wa.me → Web/QR).
-   * Ative só em painéis com espaço, onde o link fica abaixo do botão principal.
+   * Padrão false: em tabelas/ícones o texto colado ao ícone era clicado por engano.
    */
   showWebOption?: boolean;
   /** Após solicitar abertura. Não marca “enviado”. */
@@ -43,7 +42,7 @@ type Props = {
 
 /**
  * Único botão WhatsApp do ERP (proposta, motorista, lava, ticket).
- * Principal: whatsapp:// (Desktop). Web: só com showWebOption e clique explícito no link.
+ * Principal: whatsapp:// via <a> (sem navegar a aba). Web: só com showWebOption.
  */
 export function WhatsAppButton({
   phone,
@@ -62,10 +61,15 @@ export function WhatsAppButton({
 }: Props) {
   const { companyId } = useCompany();
   const [busy, setBusy] = useState(false);
+  const openingRef = useRef(false);
   const phoneOk = Boolean(normalizeWhatsAppPhone(phone));
 
   const logOpen = (phoneDigits: string) => {
-    onOpenRequested?.();
+    // Adia callback/DB para não remountar no meio do gesto do protocolo.
+    window.setTimeout(() => {
+      onOpenRequested?.();
+    }, 0);
+
     void (async () => {
       try {
         if (!companyId) return;
@@ -81,43 +85,64 @@ export function WhatsAppButton({
           referenceId,
         });
       } finally {
-        window.setTimeout(() => setBusy(false), 400);
+        window.setTimeout(() => {
+          setBusy(false);
+          openingRef.current = false;
+        }, 1200);
       }
     })();
   };
 
-  const handleNativeClick = () => {
-    if (disabled || busy) return;
+  const handleNativeClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (disabled || busy || openingRef.current) return;
 
     if (!phoneOk) {
       onInvalidPhone?.();
       return;
     }
 
+    openingRef.current = true;
     setBusy(true);
     const result = openWhatsApp({ phone: phone!, message });
 
     if (!result.ok || !result.phoneDigits) {
+      openingRef.current = false;
       setBusy(false);
       onInvalidPhone?.();
+      return;
+    }
+
+    if (result.mode === "debounced") {
+      window.setTimeout(() => {
+        setBusy(false);
+        openingRef.current = false;
+      }, 400);
       return;
     }
 
     logOpen(result.phoneDigits);
   };
 
-  const handleWebClick = () => {
-    if (disabled || busy) return;
+  const handleWebClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (disabled || busy || openingRef.current) return;
 
     if (!phoneOk) {
       onInvalidPhone?.();
       return;
     }
 
+    openingRef.current = true;
     setBusy(true);
     const result = openWhatsAppWeb({ phone: phone!, message });
 
     if (!result.ok || !result.phoneDigits) {
+      openingRef.current = false;
       setBusy(false);
       onInvalidPhone?.();
       return;
@@ -130,9 +155,7 @@ export function WhatsAppButton({
     <span
       className={cn(
         "inline-flex",
-        showWebOption
-          ? "flex-col items-start gap-1.5"
-          : "items-center",
+        showWebOption ? "flex-col items-start gap-1.5" : "items-center",
         children ? "w-full" : undefined,
         wrapperClassName
       )}
