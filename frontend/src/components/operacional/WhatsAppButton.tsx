@@ -147,8 +147,7 @@ export function WhatsAppButton({
   return (
     <span
       className={cn(
-        "inline-flex",
-        showWebOption ? "flex-col items-start gap-1" : "items-center",
+        "inline-flex flex-wrap items-center gap-2",
         children ? "w-full" : undefined,
         wrapperClassName
       )}
@@ -169,7 +168,7 @@ export function WhatsAppButton({
         className={cn(
           glassAction("green", true),
           "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0",
-          children ? "h-auto w-full" : undefined,
+          children ? "h-auto w-full sm:w-auto" : undefined,
           (!phoneOk || disabled) && "opacity-50",
           className
         )}
@@ -182,11 +181,17 @@ export function WhatsAppButton({
         <button
           type="button"
           disabled={disabled || busy}
-          className="max-w-[11rem] text-left text-[11px] font-medium leading-snug text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 disabled:opacity-50"
-          title="Se o app Desktop não aparecer, abra pelo navegador"
+          className={cn(
+            glassAction("emerald", true),
+            "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 px-2.5 text-xs font-semibold",
+            (disabled || busy) && "opacity-50"
+          )}
+          title="Abrir no navegador (WhatsApp Web) — use se o app Desktop não aparecer"
+          aria-label="Usar WhatsApp Web"
           onClick={handleWebClick}
         >
-          Usar WhatsApp Web
+          <WhatsAppIcon className="h-4 w-4" />
+          Web
         </button>
       ) : null}
     </span>
