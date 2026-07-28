@@ -11,8 +11,9 @@ import {
   type WhatsAppReferenceType,
 } from "@/lib/whatsapp-open-log";
 import {
+  buildWhatsAppNativeUrl,
+  copyWhatsAppMessageSync,
   normalizeWhatsAppPhone,
-  openWhatsApp,
   openWhatsAppWeb,
 } from "@/lib/whatsapp";
 
@@ -21,28 +22,20 @@ type Props = {
   message: string;
   referenceType: WhatsAppReferenceType;
   referenceId: string;
-  /** Classes do botão principal (padrão: ícone verde compacto). */
   className?: string;
-  /** Classes do wrapper (ícone + opção Web). */
   wrapperClassName?: string;
   title?: string;
   "aria-label"?: string;
   disabled?: boolean;
   children?: ReactNode;
-  /**
-   * Link secundário "Usar WhatsApp Web".
-   * Padrão false: em tabelas/ícones o texto colado ao ícone era clicado por engano.
-   */
   showWebOption?: boolean;
-  /** Após solicitar abertura. Não marca “enviado”. */
   onOpenRequested?: () => void;
-  /** Telefone inválido / faltando. */
   onInvalidPhone?: () => void;
 };
 
 /**
- * Único botão WhatsApp do ERP (proposta, motorista, lava, ticket).
- * Principal: whatsapp:// via <a> (sem navegar a aba). Web: só com showWebOption.
+ * Botão WhatsApp: <a href="whatsapp://…"> real (Chrome exige gesto nativo no link).
+ * Windows: só phone na URL; mensagem vai para a área de transferência.
  */
 export function WhatsAppButton({
   phone,
@@ -62,10 +55,13 @@ export function WhatsAppButton({
   const { companyId } = useCompany();
   const [busy, setBusy] = useState(false);
   const openingRef = useRef(false);
-  const phoneOk = Boolean(normalizeWhatsAppPhone(phone));
+  const phoneDigits = normalizeWhatsAppPhone(phone);
+  const phoneOk = Boolean(phoneDigits);
+  const nativeHref = phoneOk
+    ? buildWhatsAppNativeUrl({ phone: phoneDigits! })
+    : null;
 
-  const logOpen = (phoneDigits: string) => {
-    // Adia callback/DB para não remountar no meio do gesto do protocolo.
+  const logOpen = (digits: string) => {
     window.setTimeout(() => {
       onOpenRequested?.();
     }, 0);
@@ -80,7 +76,7 @@ export function WhatsAppButton({
         await logWhatsAppOpenRequested(supabase, {
           companyId,
           userId: user?.id ?? null,
-          phone: phoneDigits,
+          phone: digits,
           referenceType,
           referenceId,
         });
@@ -88,42 +84,36 @@ export function WhatsAppButton({
         window.setTimeout(() => {
           setBusy(false);
           openingRef.current = false;
-        }, 4000);
+        }, 1500);
       }
     })();
   };
 
-  const handleNativeClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleNativeClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (disabled || busy) {
+      event.preventDefault();
+      return;
+    }
 
-    if (disabled || busy || openingRef.current) return;
-
-    if (!phoneOk) {
+    if (!phoneOk || !nativeHref || !phoneDigits) {
+      event.preventDefault();
       onInvalidPhone?.();
+      return;
+    }
+
+    if (openingRef.current) {
+      event.preventDefault();
       return;
     }
 
     openingRef.current = true;
     setBusy(true);
-    const result = openWhatsApp({ phone: phone!, message });
 
-    if (!result.ok || !result.phoneDigits) {
-      openingRef.current = false;
-      setBusy(false);
-      onInvalidPhone?.();
-      return;
-    }
+    // Copia a mensagem no mesmo gesto do clique (antes do protocolo).
+    if (message.trim()) copyWhatsAppMessageSync(message);
 
-    if (result.mode === "debounced") {
-      window.setTimeout(() => {
-        setBusy(false);
-        openingRef.current = false;
-      }, 400);
-      return;
-    }
-
-    logOpen(result.phoneDigits);
+    // NÃO preventDefault: o navegador segue href=whatsapp:// (único jeito confiável no Chrome).
+    logOpen(phoneDigits);
   };
 
   const handleWebClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -151,6 +141,14 @@ export function WhatsAppButton({
     logOpen(result.phoneDigits);
   };
 
+  const sharedClass = cn(
+    glassAction("green", true),
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0 no-underline",
+    children ? "h-auto w-full" : undefined,
+    (!phoneOk || disabled || busy) && "pointer-events-none opacity-50",
+    className
+  );
+
   return (
     <span
       className={cn(
@@ -160,30 +158,29 @@ export function WhatsAppButton({
         wrapperClassName
       )}
     >
-      <button
-        type="button"
-        title={
-          title ??
-          (phoneOk
-            ? "Abrir WhatsApp Desktop no chat do contato"
-            : "Cadastre o telefone para abrir o WhatsApp")
-        }
-        aria-label={
-          ariaLabel ??
-          (phoneOk ? "Abrir WhatsApp Desktop" : "WhatsApp indisponível — telefone não cadastrado")
-        }
-        disabled={disabled || busy}
-        className={cn(
-          glassAction("green", true),
-          "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0",
-          children ? "h-auto w-full" : undefined,
-          !phoneOk || disabled ? "opacity-50" : undefined,
-          className
-        )}
-        onClick={handleNativeClick}
-      >
-        {children ?? <WhatsAppIcon className="h-5 w-5" />}
-      </button>
+      {phoneOk && nativeHref ? (
+        <a
+          href={nativeHref}
+          title={
+            title ?? "Abrir WhatsApp Desktop no chat do contato (mensagem: Ctrl+V)"
+          }
+          aria-label={ariaLabel ?? "Abrir WhatsApp Desktop"}
+          className={sharedClass}
+          onClick={handleNativeClick}
+        >
+          {children ?? <WhatsAppIcon className="h-5 w-5" />}
+        </a>
+      ) : (
+        <button
+          type="button"
+          title="Cadastre o telefone para abrir o WhatsApp"
+          aria-label="WhatsApp indisponível — telefone não cadastrado"
+          className={sharedClass}
+          onClick={() => onInvalidPhone?.()}
+        >
+          {children ?? <WhatsAppIcon className="h-5 w-5" />}
+        </button>
+      )}
 
       {showWebOption && phoneOk ? (
         <button

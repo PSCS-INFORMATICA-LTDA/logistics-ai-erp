@@ -12,10 +12,10 @@ export type WhatsAppOpenResult = {
   error?: string;
 };
 
-/** Debounce por telefone (não pela URL completa — o texto muda e furava o lock). */
+/** Debounce curto — só evita double-click, não trava o usuário. */
 let lastNativePhone = "";
 let lastNativeLaunchAt = 0;
-const NATIVE_DEBOUNCE_MS = 4000;
+const NATIVE_DEBOUNCE_MS = 1200;
 
 /** Somente dígitos com DDI (BR → 55…). Sem +, espaços, parênteses ou hífens. */
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
@@ -60,7 +60,7 @@ export function copyWhatsAppMessageSync(text: string): boolean {
 /**
  * URL nativa.
  * Windows: só phone — URL longa com text quebra e o Chrome/SO caem no Web.
- * Mobile: phone + text (protocolo tolera melhor).
+ * Mobile: phone + text curto.
  */
 export function buildWhatsAppNativeUrl(params: {
   phone: string;
@@ -76,7 +76,6 @@ export function buildWhatsAppNativeUrl(params: {
   const message = (params.message ?? "").trim();
   if (!message) return `whatsapp://send?phone=${phoneDigits}`;
 
-  // Mobile / outros: texto curto no protocolo.
   const max = 500;
   const short =
     encodeURIComponent(message).length <= max
@@ -100,21 +99,9 @@ export function buildWhatsAppWebUrl(params: {
 }
 
 /**
- * Dispara whatsapp:// sem navegar a aba do ERP (sem location.href).
- */
-function launchNativeProtocol(url: string): void {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.rel = "noopener noreferrer";
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-}
-
-/**
  * Abre o WhatsApp Desktop no chat do telefone.
- * Windows: protocolo só com phone + mensagem na área de transferência.
+ * Usa location.assign no gesto do usuário (Chrome bloqueia <a> sintético oculto).
+ * Windows: só phone + mensagem na área de transferência.
  */
 export function openWhatsApp(params: {
   phone: string;
@@ -155,7 +142,10 @@ export function openWhatsApp(params: {
 
   lastNativePhone = phoneDigits;
   lastNativeLaunchAt = now;
-  launchNativeProtocol(nativeUrl);
+
+  // Gesto real do usuário: location.assign é o que o Chrome honra para whatsapp://.
+  // URL curta (só phone no Windows) — não cai no Web como a URL longa com text.
+  window.location.assign(nativeUrl);
 
   return { ok: true, mode: "native", phoneDigits, copied };
 }
