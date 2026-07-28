@@ -495,10 +495,9 @@ export default function LavaRapidoPage() {
           message={waMessage}
           referenceType="car_wash_ready"
           referenceId={row.id}
-          showWebOption
           title={
             phoneLabel
-              ? `WhatsApp Desktop — ${phoneLabel}`
+              ? `WhatsApp — ${phoneLabel}`
               : "Avisar no WhatsApp que o veículo está pronto"
           }
           aria-label={
@@ -508,19 +507,11 @@ export default function LavaRapidoPage() {
           }
           onOpenRequested={(meta) => {
             persistReadyStatus(row, phone);
-            const who = phoneLabel || phone;
-            if (meta?.mode === "web") {
-              setInfo(`Abrindo WhatsApp Web para ${who}.`);
-              return;
+            if (meta?.mode === "compose-panel") {
+              setInfo(
+                `Painel WhatsApp aberto para ${phoneLabel || phone}. Copie/cole ou tente Desktop/Web pelo painel.`
+              );
             }
-            setInfo(
-              `Pedimos ao Windows abrir o WhatsApp para ${who}. ` +
-                `Olhe a barra de tarefas (o app da Store muitas vezes abre minimizado). ` +
-                (meta?.copied
-                  ? "Mensagem copiada: no chat use Ctrl+V. "
-                  : "") +
-                `Se nada aparecer, clique em «Usar WhatsApp Web».`
-            );
           }}
           onInvalidPhone={() =>
             setError(
