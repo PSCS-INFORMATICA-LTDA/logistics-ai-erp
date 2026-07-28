@@ -21,8 +21,11 @@ export function buildWashReadyMessage(params: {
       "",
       greeting,
       "",
-      `Boa notícia: o *${params.plate}* está pronto para retirada.`,
+      `Seu veículo de placa *${params.plate}* está pronto para retirada.`,
+      "",
       "Pode vir buscar quando quiser 🙂",
+      "",
+      "Até logo!",
     ],
     params.ticketUrl
   ).join("\n");
@@ -40,9 +43,14 @@ export function buildWashReadySmsMessage(params: {
   return appendTicketLink(
     [
       params.companyName.trim() || "Lava-rápido",
+      "",
       greeting,
-      `Boa notícia: o ${params.plate} está pronto para retirada.`,
+      "",
+      `Seu veiculo de placa ${params.plate} esta pronto para retirada.`,
+      "",
       "Pode vir buscar quando quiser.",
+      "",
+      "Ate logo!",
     ],
     params.ticketUrl
   ).join("\n");
