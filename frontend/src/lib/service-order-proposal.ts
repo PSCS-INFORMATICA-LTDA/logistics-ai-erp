@@ -592,7 +592,6 @@ export function buildProposalEmailBody(
 }
 
 import { formatPhoneForWhatsApp, normalizeWhatsAppPhone, openWhatsApp } from "@/lib/whatsapp";
-import { installWhatsAppNavigationAudit, waAuditLog } from "@/lib/whatsapp-audit";
 
 export { formatPhoneForWhatsApp, normalizeWhatsAppPhone };
 
@@ -862,8 +861,6 @@ export function isWhatsAppNativeHref(href: string): boolean {
 
 export function openWhatsAppShareHref(href: string, targetWindow?: Window | null): void {
   if (!href) return;
-  installWhatsAppNavigationAudit();
-  waAuditLog("legacy:openWhatsAppShareHref", { href: href.slice(0, 160) });
   if (isWhatsAppNativeHref(href)) {
     // Não use aba about:blank — o protocolo deve focar o app desktop, sem aba Web.
     if (targetWindow && !targetWindow.closed) {
@@ -956,9 +953,6 @@ export async function sendWhatsAppDesktopMessage(input: {
     ? `whatsapp://send?phone=${phone}&text=${encodeURIComponent(nativeText)}`
     : `whatsapp://send?phone=${phone}`;
 
-  installWhatsAppNavigationAudit();
-  waAuditLog("legacy:sendWhatsAppDesktopMessage", { href: href.slice(0, 160) });
-
   try {
     window.location.href = href;
   } catch {
@@ -977,11 +971,6 @@ export async function sendWhatsAppDesktopMessage(input: {
 }
 
 export function openExternalUrl(url: string, targetWindow?: Window | null): void {
-  installWhatsAppNavigationAudit();
-  waAuditLog("legacy:openExternalUrl", {
-    url: url.slice(0, 160),
-    usesBlank: !(targetWindow && !targetWindow.closed),
-  });
   if (targetWindow && !targetWindow.closed) {
     targetWindow.location.href = url;
     return;
@@ -1064,7 +1053,6 @@ export type WhatsAppShareResult = {
 };
 
 function launchCustomProtocol(url: string) {
-  waAuditLog("legacy:launchCustomProtocol", { url: url.slice(0, 160) });
   // Clique sintético sem target=_blank — entrega o protocolo ao app do PC.
   const anchor = document.createElement("a");
   anchor.setAttribute("href", url);

@@ -673,11 +673,12 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                     }
                     referenceType="driver_assignment"
                     referenceId={orderDetails.id}
-                    title={`WhatsApp — ${
+                    showWebOption
+                    title={`WhatsApp Desktop — ${
                       formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                       "motorista"
                     }`}
-                    aria-label={`Abrir WhatsApp para ${shareDriverName}`}
+                    aria-label={`Abrir WhatsApp Desktop para ${shareDriverName}`}
                     className="inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold"
                     disabled={saving}
                     onOpenRequested={handleWhatsAppShareOpenRequested}
@@ -688,7 +689,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                     }
                   >
                     <WhatsAppIcon className="h-5 w-5" />
-                    Abrir WhatsApp
+                    Abrir WhatsApp Desktop
                   </WhatsAppButton>
                 ) : (
                   <button

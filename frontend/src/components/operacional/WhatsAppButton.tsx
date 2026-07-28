@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { useCompany } from "@/lib/company-context";
 import { createClient } from "@/lib/supabase/client";
@@ -10,10 +10,6 @@ import {
   logWhatsAppOpenRequested,
   type WhatsAppReferenceType,
 } from "@/lib/whatsapp-open-log";
-import {
-  installWhatsAppNavigationAudit,
-  waAuditLog,
-} from "@/lib/whatsapp-audit";
 import {
   normalizeWhatsAppPhone,
   openWhatsApp,
@@ -33,7 +29,11 @@ type Props = {
   "aria-label"?: string;
   disabled?: boolean;
   children?: ReactNode;
-  /** Exibir link secundário "Usar WhatsApp Web" (padrão: true). */
+  /**
+   * Link secundário "Usar WhatsApp Web".
+   * Padrão false: em tabelas/ícones o texto colado ao ícone era clicado por engano (wa.me → Web/QR).
+   * Ative só em painéis com espaço, onde o link fica abaixo do botão principal.
+   */
   showWebOption?: boolean;
   /** Após solicitar abertura. Não marca “enviado”. */
   onOpenRequested?: () => void;
@@ -43,7 +43,7 @@ type Props = {
 
 /**
  * Único botão WhatsApp do ERP (proposta, motorista, lava, ticket).
- * Principal: whatsapp:// na mesma janela. Web: só se o usuário clicar em "Usar WhatsApp Web".
+ * Principal: whatsapp:// (Desktop). Web: só com showWebOption e clique explícito no link.
  */
 export function WhatsAppButton({
   phone,
@@ -56,7 +56,7 @@ export function WhatsAppButton({
   "aria-label": ariaLabel,
   disabled,
   children,
-  showWebOption = true,
+  showWebOption = false,
   onOpenRequested,
   onInvalidPhone,
 }: Props) {
@@ -64,17 +64,7 @@ export function WhatsAppButton({
   const [busy, setBusy] = useState(false);
   const phoneOk = Boolean(normalizeWhatsAppPhone(phone));
 
-  useEffect(() => {
-    installWhatsAppNavigationAudit();
-  }, []);
-
   const logOpen = (phoneDigits: string) => {
-    waAuditLog("onOpenRequested+db-log", {
-      referenceType,
-      referenceId,
-      phoneDigits,
-      note: "não navega; só callback + insert whatsapp_open_events",
-    });
     onOpenRequested?.();
     void (async () => {
       try {
@@ -97,15 +87,6 @@ export function WhatsAppButton({
   };
 
   const handleNativeClick = () => {
-    waAuditLog("1-clique-botao-nativo", {
-      referenceType,
-      referenceId,
-      phone,
-      messageLength: message?.length ?? 0,
-      busy,
-      disabled: Boolean(disabled),
-    });
-
     if (disabled || busy) return;
 
     if (!phoneOk) {
@@ -126,13 +107,6 @@ export function WhatsAppButton({
   };
 
   const handleWebClick = () => {
-    waAuditLog("1-clique-botao-web-secundario", {
-      referenceType,
-      referenceId,
-      phone,
-      messageLength: message?.length ?? 0,
-    });
-
     if (disabled || busy) return;
 
     if (!phoneOk) {
@@ -155,8 +129,11 @@ export function WhatsAppButton({
   return (
     <span
       className={cn(
-        "inline-flex flex-wrap items-center gap-2",
-        children ? "w-full flex-col items-stretch sm:flex-row sm:items-center" : undefined,
+        "inline-flex",
+        showWebOption
+          ? "flex-col items-start gap-1.5"
+          : "items-center",
+        children ? "w-full" : undefined,
         wrapperClassName
       )}
     >
@@ -176,7 +153,7 @@ export function WhatsAppButton({
         className={cn(
           glassAction("green", true),
           "inline-flex h-10 w-10 shrink-0 items-center justify-center p-0",
-          children ? "h-auto w-full sm:w-auto" : undefined,
+          children ? "h-auto w-full" : undefined,
           !phoneOk || disabled ? "opacity-50" : undefined,
           className
         )}
@@ -189,7 +166,7 @@ export function WhatsAppButton({
         <button
           type="button"
           disabled={disabled || busy}
-          className="text-left text-xs font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 disabled:opacity-50"
+          className="max-w-full text-left text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800 disabled:opacity-50"
           title="Abrir pelo navegador (WhatsApp Web). Use só se o app Desktop não abrir."
           onClick={handleWebClick}
         >

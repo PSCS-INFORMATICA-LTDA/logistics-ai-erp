@@ -363,7 +363,7 @@ export function ServiceOrderProposalView({
             <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
               O ícone abre o <strong>WhatsApp Desktop</strong> no chat de{" "}
               <strong>{clientPhoneLabel}</strong>. Só registra a abertura solicitada — não confirma
-              envio. Se o app não abrir, use «Usar WhatsApp Web».
+              envio.
             </p>
           ) : (
             <p className="proposal-toolbar mb-4 text-xs text-amber-800 print:hidden">

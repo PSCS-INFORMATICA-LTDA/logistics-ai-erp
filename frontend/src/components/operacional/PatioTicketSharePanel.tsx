@@ -133,14 +133,15 @@ export function PatioTicketSharePanel({
           message={message}
           referenceType="patio_ticket"
           referenceId={entryId}
+          showWebOption
           className="inline-flex h-11 w-auto items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-          onOpenRequested={() => setStatus("Abertura do WhatsApp solicitada.")}
+          onOpenRequested={() => setStatus("Abertura do WhatsApp Desktop solicitada.")}
           onInvalidPhone={() =>
             setStatus("Informe o telefone do cliente (DDD + número) para abrir o WhatsApp.")
           }
         >
           <WhatsAppIcon className="h-5 w-5" />
-          Enviar no WhatsApp
+          Abrir WhatsApp Desktop
         </WhatsAppButton>
         <Button type="button" variant="secondary" onClick={() => void copyMessage()}>
           Copiar mensagem WhatsApp
