@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { WhatsAppIcon } from "@/components/icons/ShareIcons";
 import { useCompany } from "@/lib/company-context";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,10 @@ import {
   logWhatsAppOpenRequested,
   type WhatsAppReferenceType,
 } from "@/lib/whatsapp-open-log";
+import {
+  installWhatsAppNavigationAudit,
+  waAuditLog,
+} from "@/lib/whatsapp-audit";
 import {
   normalizeWhatsAppPhone,
   openWhatsApp,
@@ -60,7 +64,17 @@ export function WhatsAppButton({
   const [busy, setBusy] = useState(false);
   const phoneOk = Boolean(normalizeWhatsAppPhone(phone));
 
+  useEffect(() => {
+    installWhatsAppNavigationAudit();
+  }, []);
+
   const logOpen = (phoneDigits: string) => {
+    waAuditLog("onOpenRequested+db-log", {
+      referenceType,
+      referenceId,
+      phoneDigits,
+      note: "não navega; só callback + insert whatsapp_open_events",
+    });
     onOpenRequested?.();
     void (async () => {
       try {
@@ -83,6 +97,15 @@ export function WhatsAppButton({
   };
 
   const handleNativeClick = () => {
+    waAuditLog("1-clique-botao-nativo", {
+      referenceType,
+      referenceId,
+      phone,
+      messageLength: message?.length ?? 0,
+      busy,
+      disabled: Boolean(disabled),
+    });
+
     if (disabled || busy) return;
 
     if (!phoneOk) {
@@ -103,6 +126,13 @@ export function WhatsAppButton({
   };
 
   const handleWebClick = () => {
+    waAuditLog("1-clique-botao-web-secundario", {
+      referenceType,
+      referenceId,
+      phone,
+      messageLength: message?.length ?? 0,
+    });
+
     if (disabled || busy) return;
 
     if (!phoneOk) {

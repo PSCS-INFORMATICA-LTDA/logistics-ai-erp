@@ -2,7 +2,14 @@
  * Utilitário único de abertura do WhatsApp (proposta, designação, lava-rápido, ticket).
  * Fluxo principal: protocolo nativo (app Desktop). WhatsApp Web só sob ação explícita.
  * Não usa window.open / target=_blank.
+ *
+ * AUDITORIA: logs [WA-AUDIT] — comportamento de abertura inalterado.
  */
+
+import {
+  installWhatsAppNavigationAudit,
+  waAuditLog,
+} from "@/lib/whatsapp-audit";
 
 export type WhatsAppOpenResult = {
   ok: boolean;
@@ -29,9 +36,15 @@ export function buildWhatsAppNativeUrl(params: {
   if (!phoneDigits) return null;
   const message = params.message ?? "";
   const text = encodeURIComponent(message);
-  return text
+  const url = text
     ? `whatsapp://send?phone=${phoneDigits}&text=${text}`
     : `whatsapp://send?phone=${phoneDigits}`;
+  waAuditLog("2-construcao-url-nativa", {
+    phoneDigits,
+    messageLength: message.length,
+    urlPreview: url.slice(0, 160),
+  });
+  return url;
 }
 
 /** URL wa.me — só para a opção secundária "Usar WhatsApp Web". */
@@ -43,9 +56,15 @@ export function buildWhatsAppWebUrl(params: {
   if (!phoneDigits) return null;
   const message = params.message ?? "";
   const text = encodeURIComponent(message);
-  return text
+  const url = text
     ? `https://wa.me/${phoneDigits}?text=${text}`
     : `https://wa.me/${phoneDigits}`;
+  waAuditLog("2-construcao-url-web (wa.me)", {
+    phoneDigits,
+    messageLength: message.length,
+    urlPreview: url.slice(0, 160),
+  });
+  return url;
 }
 
 /**
@@ -56,8 +75,11 @@ export function openWhatsApp(params: {
   phone: string;
   message?: string;
 }): WhatsAppOpenResult {
+  installWhatsAppNavigationAudit();
+
   const phoneDigits = normalizeWhatsAppPhone(params.phone);
   if (!phoneDigits) {
+    waAuditLog("openWhatsApp-invalid-phone", { phone: params.phone });
     return {
       ok: false,
       mode: "invalid-phone",
@@ -79,6 +101,11 @@ export function openWhatsApp(params: {
     };
   }
 
+  waAuditLog("3-abertura-protocolo-nativo", {
+    via: "openWhatsApp → window.location.href",
+    urlPreview: nativeUrl.slice(0, 160),
+  });
+
   // Protocolo nativo — NÃO usar window.open (gera aba branca / wa.me).
   window.location.href = nativeUrl;
 
@@ -92,8 +119,11 @@ export function openWhatsAppWeb(params: {
   phone: string;
   message?: string;
 }): WhatsAppOpenResult {
+  installWhatsAppNavigationAudit();
+
   const phoneDigits = normalizeWhatsAppPhone(params.phone);
   if (!phoneDigits) {
+    waAuditLog("openWhatsAppWeb-invalid-phone", { phone: params.phone });
     return {
       ok: false,
       mode: "invalid-phone",
@@ -114,6 +144,11 @@ export function openWhatsAppWeb(params: {
       error: "Não foi possível montar o link do WhatsApp Web.",
     };
   }
+
+  waAuditLog("4-navegacao-wa.me", {
+    via: "openWhatsAppWeb → window.location.href",
+    urlPreview: webUrl.slice(0, 160),
+  });
 
   window.location.href = webUrl;
 
