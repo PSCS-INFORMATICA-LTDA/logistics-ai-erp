@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
+import { MailIcon, SmsIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
+import { SmsShareAnchor } from "@/components/operacional/SmsShareAnchor";
 import { WhatsAppButton } from "@/components/operacional/WhatsAppButton";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { glassAction } from "@/lib/liquid-glass-styles";
+import { buildSmsShareHref, plainTextForSms } from "@/lib/wash-notify";
 import { formatServiceCategories } from "@/lib/service-order-categories";
 import {
   billablePerDiemTotal,
@@ -122,6 +124,11 @@ export function ServiceOrderProposalView({
   const clientPhoneOk =
     Boolean(formatPhoneForWhatsApp(order.phone)) && !isDemoSeedWhatsAppPhone(order.phone);
   const clientPhoneLabel = formatWhatsAppPhoneDisplay(formatPhoneForWhatsApp(order.phone));
+  const smsHref =
+    whatsappMessage && clientPhoneOk
+      ? buildSmsShareHref(order.phone, plainTextForSms(whatsappMessage))
+      : null;
+  const smsPlain = whatsappMessage ? plainTextForSms(whatsappMessage) : "";
 
   const shareIconBase = "h-10 w-10 shrink-0 p-0";
 
@@ -132,9 +139,17 @@ export function ServiceOrderProposalView({
     );
   };
 
+  const handleSmsDesktopHint = () => {
+    setWhatsappHint(
+      clientPhoneLabel
+        ? `SMS: mensagem copiada para ${clientPhoneLabel}. No PC use o celular ou «Vincular ao telefone»; se o app não abrir, cole no SMS.`
+        : "SMS: mensagem copiada. No PC o ideal é o celular."
+    );
+  };
+
   const handleWhatsAppMissingPhone = () => {
     setWhatsappHint(
-      "Cadastre o telefone do cliente na OS (ou no cadastro) para o WhatsApp abrir direto no contato certo. Sem telefone não enviamos — evita mensagem na pessoa errada."
+      "Cadastre o telefone do cliente na OS (ou no cadastro) para o WhatsApp/SMS abrir no contato certo. Sem telefone não enviamos — evita mensagem na pessoa errada."
     );
   };
 
@@ -319,6 +334,39 @@ export function ServiceOrderProposalView({
                 <WhatsAppIcon className="h-5 w-5" />
               </button>
             )}
+            {smsHref && smsPlain ? (
+              <SmsShareAnchor
+                href={smsHref}
+                message={smsPlain}
+                title={
+                  clientPhoneLabel ? `SMS — ${clientPhoneLabel}` : "Enviar por SMS"
+                }
+                aria-label={
+                  clientPhoneLabel
+                    ? `Abrir SMS para ${clientPhoneLabel}`
+                    : "Abrir SMS"
+                }
+                className={cn(
+                  glassAction("sky", true),
+                  shareIconBase,
+                  "inline-flex items-center justify-center",
+                  markingSent && "pointer-events-none opacity-50"
+                )}
+                onDesktopHint={handleSmsDesktopHint}
+              >
+                <SmsIcon className="h-5 w-5" />
+              </SmsShareAnchor>
+            ) : (
+              <button
+                type="button"
+                title="Cadastre o telefone do cliente para abrir o SMS no contato certo"
+                aria-label="SMS indisponível — telefone do cliente não cadastrado"
+                className={cn(glassAction("sky", true), shareIconBase, "opacity-50")}
+                onClick={handleWhatsAppMissingPhone}
+              >
+                <SmsIcon className="h-5 w-5" />
+              </button>
+            )}
             <button
               type="button"
               title="Enviar por e-mail"
@@ -349,7 +397,7 @@ export function ServiceOrderProposalView({
           </div>
 
           <p className="proposal-toolbar mb-4 text-sm text-slate-500 print:hidden">
-            Fluxo sugerido: registre o envio (link com aceite) → ícones WhatsApp ou e-mail
+            Fluxo sugerido: registre o envio (link com aceite) → ícones WhatsApp, SMS ou e-mail
             (texto + link público) → opcional: anexe o PDF salvo com o clipe no WhatsApp.
           </p>
 
@@ -361,14 +409,13 @@ export function ServiceOrderProposalView({
 
           {clientPhoneOk && clientPhoneLabel ? (
             <p className="proposal-toolbar mb-4 text-xs text-slate-500 print:hidden">
-              O ícone abre o <strong>WhatsApp Desktop</strong> no chat de{" "}
-              <strong>{clientPhoneLabel}</strong>. Só registra a abertura solicitada — não confirma
-              envio.
+              WhatsApp / SMS abrem no contato de <strong>{clientPhoneLabel}</strong>. O clique
+              registra apenas a abertura solicitada — não confirma envio.
             </p>
           ) : (
             <p className="proposal-toolbar mb-4 text-xs text-amber-800 print:hidden">
-              Para enviar pelo WhatsApp, informe o telefone do cliente na OS. Assim o app abre direto no
-              contato certo.
+              Para enviar por WhatsApp ou SMS, informe o telefone do cliente na OS. Assim o app
+              abre direto no contato certo.
             </p>
           )}
 

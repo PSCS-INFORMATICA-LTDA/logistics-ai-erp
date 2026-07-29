@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MailIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
+import { MailIcon, SmsIcon, WhatsAppIcon } from "@/components/icons/ShareIcons";
+import { SmsShareAnchor } from "@/components/operacional/SmsShareAnchor";
 import { WhatsAppButton } from "@/components/operacional/WhatsAppButton";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Badge";
@@ -24,6 +25,7 @@ import {
   type DriverAssignmentPayDetails,
   type DriverAssignmentSharePayload,
 } from "@/lib/service-order-driver-assignment";
+import { buildSmsShareHref, plainTextForSms } from "@/lib/wash-notify";
 import {
   copyTextToClipboardSync,
   formatPhoneForWhatsApp,
@@ -549,6 +551,16 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     );
   };
 
+  const handleSmsDesktopHint = () => {
+    const phoneLabel =
+      formatWhatsAppPhoneDisplay(sharePayload?.whatsappLinks.phoneDigits) ||
+      selectedDriver?.phone ||
+      "motorista";
+    setWhatsappStatus(
+      `SMS: mensagem copiada para ${phoneLabel}. No PC use o celular ou «Vincular ao telefone»; se o app não abrir, cole no SMS.`
+    );
+  };
+
   const handleEmailShareClick = () => {
     if (!sharePayload) {
       window.alert("E-mail do motorista não cadastrado ou conteúdo ainda não preparado.");
@@ -650,7 +662,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
             <div className="space-y-4">
               <p className="text-sm text-emerald-800">
                 Designação registrada para <strong>{shareDriverName}</strong>. Envie pelo WhatsApp
-                do PC no número{" "}
+                ou SMS no número{" "}
                 <strong>
                   {formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
                     "cadastrado"}
@@ -709,6 +721,53 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                     Abrir WhatsApp
                   </button>
                 )}
+                {(() => {
+                  const driverPhone =
+                    selectedDriver?.phone || sharePayload.whatsappLinks.phoneDigits;
+                  const smsText = plainTextForSms(
+                    sharePayload.whatsappMessage || sharePayload.whatsappLinks.message || ""
+                  );
+                  const smsHref = buildSmsShareHref(driverPhone, smsText);
+                  const phoneLabel =
+                    formatWhatsAppPhoneDisplay(sharePayload.whatsappLinks.phoneDigits) ||
+                    "motorista";
+                  if (smsHref && smsText) {
+                    return (
+                      <SmsShareAnchor
+                        href={smsHref}
+                        message={smsText}
+                        title={`SMS — ${phoneLabel}`}
+                        aria-label={`Abrir SMS para ${shareDriverName}`}
+                        className={cn(
+                          glassAction("sky", true),
+                          "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold"
+                        )}
+                        onDesktopHint={handleSmsDesktopHint}
+                      >
+                        <SmsIcon className="h-5 w-5" />
+                        Enviar por SMS
+                      </SmsShareAnchor>
+                    );
+                  }
+                  return (
+                    <button
+                      type="button"
+                      title="Cadastre o telefone do motorista"
+                      className={cn(
+                        glassAction("sky", true),
+                        "inline-flex h-12 w-full items-center justify-center gap-2 px-4 text-base font-semibold opacity-50"
+                      )}
+                      onClick={() =>
+                        window.alert(
+                          "Cadastre o telefone do motorista para abrir o SMS no contato dele."
+                        )
+                      }
+                    >
+                      <SmsIcon className="h-5 w-5" />
+                      Enviar por SMS
+                    </button>
+                  );
+                })()}
                 {sharePayload.emailBundle ? (
                   <button
                     type="button"
@@ -729,8 +788,8 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
                 </p>
               ) : (
                 <p className="text-xs text-slate-600">
-                  Abre o WhatsApp no chat do motorista (sem aba nova). O clique registra apenas
-                  «abertura solicitada», não confirma envio da mensagem.
+                  WhatsApp / SMS abrem no chat do motorista. O clique registra apenas «abertura
+                  solicitada», não confirma envio da mensagem.
                 </p>
               )}
             </div>

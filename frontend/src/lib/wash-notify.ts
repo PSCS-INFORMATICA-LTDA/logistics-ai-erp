@@ -77,7 +77,12 @@ export function phoneDigitsForSms(phone: string | null | undefined): string | nu
 export function buildSmsShareHref(phone: string | null | undefined, text: string): string | null {
   const digits = phoneDigitsForSms(phone);
   if (!digits) return null;
-  const body = encodeURIComponent(text.replace(/\*/g, "").trim());
+  const body = encodeURIComponent(plainTextForSms(text));
   if (!body) return `sms:${digits}`;
   return `sms:${digits}?&body=${body}`;
+}
+
+/** Remove markdown leve (*negrito*) para corpo de SMS. */
+export function plainTextForSms(text: string): string {
+  return text.replace(/\*/g, "").trim();
 }
