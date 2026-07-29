@@ -81,6 +81,18 @@ export const APP_SCREENS: AppScreen[] = [
     group: "DRE",
     href: "/dre/rateio-os",
   },
+  {
+    key: "financeiro.contas-a-pagar",
+    label: "Contas a Pagar",
+    group: "Financeiro",
+    href: "/financeiro/contas-a-pagar",
+  },
+  {
+    key: "financeiro.contas",
+    label: "Contas Financeiras",
+    group: "Financeiro",
+    href: "/financeiro/contas",
+  },
   { key: "cadastros.socios", label: "Sócios", group: "Cadastros", href: "/cadastros/socios" },
   { key: "cadastros.veiculos", label: "Veículos", group: "Cadastros", href: "/cadastros/veiculos" },
   {

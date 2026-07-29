@@ -39,6 +39,13 @@ const NAV: NavItem[] = [
     ],
   },
   {
+    label: "Financeiro",
+    children: [
+      { href: "/financeiro/contas-a-pagar", label: "Contas a Pagar" },
+      { href: "/financeiro/contas", label: "Contas Financeiras" },
+    ],
+  },
+  {
     label: "Cadastros",
     children: [
       { href: "/cadastros/socios", label: "Sócios" },

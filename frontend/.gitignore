@@ -21,6 +21,7 @@
 # misc
 .DS_Store
 *.pem
+!*.pem.example
 
 # debug
 npm-debug.log*
@@ -28,10 +29,22 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files (nunca versionar)
 .env*.local
+.env.vercel.tmp
+.env*.backup*
+.env*.tmp
 
-# typescript
+# typescript / vercel
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# artefatos locais Contas a Pagar / inspeção
+.tmp-*
+.tmp_*
+**/.tmp-*
+**/_debug-*
+frontend/.tmp-dev-ap-multicompany.json
+frontend/.tmp-video-frames*/
+frontend/.tmp-video-frames-*/

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "verify:dev-env": "node scripts/verify-dev-environment.mjs",
     "test:dashboard-excel": "node scripts/test-dashboard-excel-export.mjs && npx tsx scripts/test-dashboard-excel-export.ts"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "@types/react-dom": "^19.1.5",
     "eslint": "^9.27.0",
     "eslint-config-next": "^15.3.3",
+    "supabase": "^2.110.0",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.8.3"
   }

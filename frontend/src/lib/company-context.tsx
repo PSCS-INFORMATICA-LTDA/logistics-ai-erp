@@ -38,6 +38,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       .from("company_members")
       .select("company_id, companies(*)")
       .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -51,7 +52,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refresh();
+    void refresh();
+    // Montagem: carrega empresa uma vez. refresh é estável o bastante para o ciclo de vida do provider.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- evita loop com supabase client recriado
   }, []);
 
   return (

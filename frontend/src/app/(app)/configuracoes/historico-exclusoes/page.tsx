@@ -56,6 +56,8 @@ const ENTITY_TYPE_OPTIONS = [
   { value: "service_orders", label: "Ordem de serviço" },
   { value: "traffic_infractions", label: "Infração" },
   { value: "financial_transactions", label: "Lançamento DRE" },
+  { value: "accounts_payable", label: "Contas a Pagar" },
+  { value: "company_financial_accounts", label: "Conta financeira" },
   { value: "vehicle_ownership", label: "Participação" },
   { value: "chart_of_accounts", label: "Conta DRE" },
 ];

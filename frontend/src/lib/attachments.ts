@@ -14,7 +14,10 @@ export type AttachmentEntityType =
   | "service_order"
   | "vehicle_event"
   | "traffic_infraction"
-  | "compliance_document";
+  | "compliance_document"
+  | "accounts_payable"
+  | "accounts_payable_payment"
+  | "company_financial_account";
 
 export type Attachment = {
   id: string;

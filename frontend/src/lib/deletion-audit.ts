@@ -18,6 +18,8 @@ export const SOFT_RESTORABLE_ENTITY_TYPES = new Set([
   "vehicles",
   "partners",
   "drivers",
+  "accounts_payable",
+  "company_financial_accounts",
 ]);
 
 export const HARD_RESTORABLE_ENTITY_TYPES = new Set([
@@ -42,10 +44,12 @@ export const ENTITY_TYPE_LABELS: Record<string, string> = {
   vehicles: "Veículo",
   partners: "Sócio",
   drivers: "Motorista",
-  service_orders: "Ordem de serviço",
-  traffic_infractions: "Infração",
   financial_transactions: "Lançamento DRE",
+  accounts_payable: "Contas a Pagar",
+  company_financial_accounts: "Conta financeira",
   vehicle_ownership: "Participação",
+  traffic_infractions: "Infração",
+  service_orders: "Ordem de serviço",
   chart_of_accounts: "Conta DRE",
 };
 
