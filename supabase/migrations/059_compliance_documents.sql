@@ -214,3 +214,8 @@ COMMENT ON TABLE public.compliance_documents IS
   'Documentos vigentes e histórico de renovações (is_current / root_id / version).';
 COMMENT ON TABLE public.compliance_alert_outbox IS
   'Alertas de vencimento documental com deduplicação por período.';
+
+-- Seed de tipos sugeridos (PREFIXO, CVS, ANTT, ARTESP, EMTU, AET, CRLV, SEGURO,
+-- OUTROS, TA): aplicado por empresa no app via seedDefaultDocumentTypes()
+-- (frontend/src/lib/compliance-documents-api.ts), para não amarrar company_id
+-- fixo de GRX na migration multiempresa.

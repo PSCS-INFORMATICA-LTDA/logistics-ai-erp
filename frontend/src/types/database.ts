@@ -371,3 +371,70 @@ export const DRE_CLASSIFICATIONS = [
 ] as const;
 
 export const TRANSACTION_TYPES = ["Receita", "Despesa", "Outros"] as const;
+
+/** Tipos de documentos/licenças (empresa ou veículo) — migration 059. */
+export type DocumentTypeRow = {
+  id: string;
+  company_id: string;
+  name: string;
+  acronym: string | null;
+  issuing_body: string | null;
+  applies_to: "company" | "vehicle";
+  requires_expiry: boolean;
+  is_required: boolean;
+  vehicle_categories: string[];
+  alert_days_first: number;
+  alert_days_second: number;
+  alert_days_critical: number;
+  alert_days_urgent: number;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** Documento vigente ou histórico de renovação — migration 059. */
+export type ComplianceDocumentRow = {
+  id: string;
+  company_id: string;
+  owner_type: "company" | "vehicle";
+  owner_id: string;
+  document_type_id: string;
+  document_number: string | null;
+  issuing_body: string | null;
+  issued_at: string | null;
+  expires_at: string | null;
+  no_expiry: boolean;
+  renewal_start_date: string | null;
+  renewal_status: "none" | "in_renewal";
+  manual_status: "suspended" | "not_applicable" | null;
+  alert_days_first: number | null;
+  alert_days_second: number | null;
+  alert_days_critical: number | null;
+  alert_days_urgent: number | null;
+  responsible_name: string | null;
+  responsible_user_id: string | null;
+  notes: string | null;
+  is_active: boolean;
+  root_id: string | null;
+  version_number: number;
+  is_current: boolean;
+  supersedes_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+/** Outbox de alertas documentais — migration 059. */
+export type ComplianceAlertOutboxRow = {
+  id: string;
+  company_id: string;
+  document_id: string;
+  user_id: string | null;
+  alert_tier: "first" | "second" | "critical" | "urgent" | "expired";
+  period_key: string;
+  title: string;
+  body: string | null;
+  read_at: string | null;
+  created_at: string;
+};

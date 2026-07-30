@@ -497,16 +497,26 @@ export function VehicleComplianceDocumentsPanel({
         )}
       </section>
 
-      <ComplianceDocumentHistory
-        companyId={companyId}
-        versions={history}
-        loading={historyLoading}
-        emptyHint={
-          historyRootId
-            ? "Sem versões neste documento."
-            : "Clique em Histórico em um documento para ver versões (atual e anteriores)."
-        }
-      />
+      {/* C — Histórico de renovações */}
+      <section className={`space-y-3 ${glassFilterPanel()}`}>
+        <h3 className="text-sm font-semibold text-slate-900">
+          C. Histórico de renovações
+        </h3>
+        <p className="text-xs text-slate-500">
+          Versões anteriores do documento selecionado (a vigente fica em{" "}
+          <span className="font-medium">A. Documentos do veículo</span>).
+        </p>
+        <ComplianceDocumentHistory
+          companyId={companyId}
+          versions={history}
+          loading={historyLoading}
+          emptyHint={
+            historyRootId
+              ? "Sem versões neste documento."
+              : "Clique em Histórico em um documento da seção A para ver versões (atual e anteriores)."
+          }
+        />
+      </section>
     </div>
   );
 }
