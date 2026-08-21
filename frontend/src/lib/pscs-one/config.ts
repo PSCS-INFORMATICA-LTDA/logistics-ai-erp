@@ -28,6 +28,6 @@ export function pscsOneCallbackUri(
 ): string {
   return (
     source.PSCS_ONE_REDIRECT_URI?.trim() ||
-    "http://localhost:3002/auth/pscs-one/callback"
+    "https://logistics-ai-erp-dev.vercel.app/auth/pscs-one/callback"
   );
 }
