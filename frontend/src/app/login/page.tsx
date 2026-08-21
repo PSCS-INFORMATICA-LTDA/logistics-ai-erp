@@ -28,7 +28,10 @@ function LoginForm() {
   useEffect(() => {
     const urlError = searchParams.get("error");
     const confirmed = searchParams.get("confirmed");
-    if (urlError) setError(urlError);
+    const ssoReason = searchParams.get("reason");
+    if (urlError) {
+      setError(ssoReason ? `${urlError} (${ssoReason})` : urlError);
+    }
     if (confirmed === "1") {
       setInfo("E-mail confirmado. Agora você pode entrar com sua senha.");
       setMode("login");

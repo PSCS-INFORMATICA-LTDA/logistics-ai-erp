@@ -34,6 +34,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.startsWith("/login");
   const isAuthFlowPage =
     request.nextUrl.pathname.startsWith("/auth/callback") ||
+    request.nextUrl.pathname.startsWith("/auth/pscs-one") ||
     request.nextUrl.pathname.startsWith("/auth/redefinir-senha");
   const isSetupPage = request.nextUrl.pathname.startsWith("/setup");
   const isPublicProposal = request.nextUrl.pathname.startsWith("/proposta/");
@@ -58,15 +59,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  const mappedCompanyId = request.cookies.get("pscs_one_mapped_company_id")?.value ?? null;
+
   if (user && isAuthPage) {
     const next = request.nextUrl.searchParams.get("next");
     if (next?.startsWith("/")) {
-      const forbidden = await resolveForbiddenRedirect(supabase, user.id, next);
+      const forbidden = await resolveForbiddenRedirect(supabase, user.id, next, mappedCompanyId);
       const dest = forbidden ?? next;
       return NextResponse.redirect(new URL(dest, request.nextUrl.origin));
     }
     const url = request.nextUrl.clone();
-    url.pathname = await resolvePostLoginPath(supabase, user.id);
+    url.pathname = await resolvePostLoginPath(supabase, user.id, mappedCompanyId);
     url.search = "";
     return NextResponse.redirect(url);
   }
@@ -93,7 +96,8 @@ export async function updateSession(request: NextRequest) {
       const forbiddenTo = await resolveForbiddenRedirect(
         supabase,
         user.id,
-        pathname
+        pathname,
+        mappedCompanyId,
       );
       if (forbiddenTo && forbiddenTo !== pathname) {
         const url = request.nextUrl.clone();

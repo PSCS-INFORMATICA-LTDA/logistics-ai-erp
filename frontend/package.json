@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "verify:dev-env": "node scripts/verify-dev-environment.mjs",
+    "prebuild": "node scripts/guard-sso-dev-supabase.mjs",
+    "test:sso": "npx tsx --test scripts/test-pscs-one-sso.ts",
     "test:dashboard-excel": "node scripts/test-dashboard-excel-export.mjs && npx tsx scripts/test-dashboard-excel-export.ts"
   },
   "dependencies": {

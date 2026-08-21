@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { mappedCompanyIdFromCookieHeader, pickMappedMembership } from "@/lib/pscs-one/preferMappedMembership";
 import type { Company } from "@/types/database";
 
 type CompanyContextValue = {
@@ -34,13 +35,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: membership } = await supabase
+    const { data: memberships } = await supabase
       .from("company_members")
       .select("company_id, companies(*)")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: true });
+
+    const mappedCompanyId = mappedCompanyIdFromCookieHeader(document.cookie);
+    const membership = pickMappedMembership(memberships ?? [], mappedCompanyId);
 
     if (membership?.companies) {
       const c = membership.companies as unknown as Company;
