@@ -1,5 +1,5 @@
 import { identityFromTokenPayload } from "./callbackFlow";
-import { pscsOneCallbackUri, pscsOneClientId, pscsOneTokenUrl } from "./config";
+import { pscsOneCallbackUri, pscsOneClientId, pscsOneTokenUrl, sanitizeEnvString } from "./config";
 import type { PscsOneIdentityV1 } from "./types";
 
 export class PscsOneIdentityService {
@@ -10,7 +10,7 @@ export class PscsOneIdentityService {
   }
 
   static async exchangeAuthorizationCode(code: string): Promise<PscsOneIdentityV1> {
-    const clientSecret = process.env.PSCS_ONE_CLIENT_SECRET?.trim();
+    const clientSecret = sanitizeEnvString(process.env.PSCS_ONE_CLIENT_SECRET);
     if (!clientSecret) {
       throw new Error("sso_client_unconfigured");
     }
