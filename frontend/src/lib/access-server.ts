@@ -1,11 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { APP_SCREENS, screenKeyFromPath } from "@/lib/app-screens";
+import { pickMappedMembership } from "@/lib/pscs-one/preferMappedMembership";
 
 type Membership = {
   company_id: string;
   role: string | null;
   partner_id: string | null;
 };
+
+async function loadMembership(
+  supabase: SupabaseClient,
+  userId: string,
+  mappedCompanyId?: string | null,
+): Promise<Membership | null> {
+  const { data: memberships } = await supabase
+    .from("company_members")
+    .select("company_id, role, partner_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  return (pickMappedMembership(memberships ?? [], mappedCompanyId) as Membership | undefined) ?? null;
+}
 
 /**
  * Se o usuário não pode ver a rota atual, devolve o href da primeira tela liberada.
@@ -14,16 +28,10 @@ type Membership = {
 export async function resolveForbiddenRedirect(
   supabase: SupabaseClient,
   userId: string,
-  pathname: string
+  pathname: string,
+  mappedCompanyId?: string | null,
 ): Promise<string | null> {
-  const { data: membership } = await supabase
-    .from("company_members")
-    .select("company_id, role, partner_id")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  const member = membership as Membership | null;
+  const member = await loadMembership(supabase, userId, mappedCompanyId);
   if (!member?.company_id) return null;
   if (member.role === "admin" || !member.partner_id) return null;
 
@@ -52,16 +60,10 @@ export async function resolveForbiddenRedirect(
 /** Destino pós-login para sócio com permissões finas. */
 export async function resolvePostLoginPath(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  mappedCompanyId?: string | null,
 ): Promise<string> {
-  const { data: membership } = await supabase
-    .from("company_members")
-    .select("company_id, role, partner_id")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  const member = membership as Membership | null;
+  const member = await loadMembership(supabase, userId, mappedCompanyId);
   if (!member?.company_id || member.role === "admin" || !member.partner_id) {
     return "/dashboard";
   }
