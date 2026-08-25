@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { hasAuthSession, mapPasswordAuthError } from "@/lib/auth/password-login";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/route";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +10,10 @@ type PasswordLoginBody = {
 };
 
 /**
- * Server-side password login — establishes the same Supabase auth cookies that
- * middleware and Server Components expect (parity with /auth/callback and SSO).
+ * Server-side password login — establishes Supabase auth cookies on the HTTP
+ * response (same contract as PSCS One SSO via createRouteHandlerClient).
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   let body: PasswordLoginBody;
   try {
     body = (await request.json()) as PasswordLoginBody;
@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "E-mail e senha são obrigatórios." }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const response = NextResponse.json({ ok: true });
+  const supabase = createRouteHandlerClient(request, response);
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
@@ -48,5 +49,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return response;
 }
