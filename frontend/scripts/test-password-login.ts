@@ -7,6 +7,7 @@ import {
   hasAuthSession,
   mapPasswordAuthError,
   sanitizeAuthNextPath,
+  submitPasswordLogin,
 } from "../src/lib/auth/password-login.ts";
 
 describe("password login helpers", () => {
@@ -39,6 +40,40 @@ describe("password login helpers", () => {
     assert.equal(hasAuthSession(null), false);
     assert.equal(hasAuthSession({}), false);
     assert.equal(hasAuthSession({ access_token: "token" }), true);
+  });
+
+  it("maps API login failures from submitPasswordLogin", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "E-mail ou senha incorretos." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    try {
+      const result = await submitPasswordLogin("fixture@example.test", "probe");
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.error, "E-mail ou senha incorretos.");
+        assert.equal(result.status, 401);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("accepts successful submitPasswordLogin responses", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    try {
+      const result = await submitPasswordLogin("fixture@example.test", "probe");
+      assert.equal(result.ok, true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

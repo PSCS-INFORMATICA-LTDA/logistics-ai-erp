@@ -32,6 +32,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  const isPasswordLoginApi = request.nextUrl.pathname === "/api/auth/password";
   const isAuthFlowPage =
     request.nextUrl.pathname.startsWith("/auth/callback") ||
     request.nextUrl.pathname.startsWith("/auth/pscs-one") ||
@@ -45,6 +46,7 @@ export async function updateSession(request: NextRequest) {
   if (
     !user &&
     !isAuthPage &&
+    !isPasswordLoginApi &&
     !isAuthFlowPage &&
     !isPublicProposal &&
     !isPublicDriverAssignment &&

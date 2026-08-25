@@ -9,9 +9,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { getAuthCallbackUrl } from "@/lib/auth-urls";
 import {
-  hasAuthSession,
   mapPasswordAuthError,
   sanitizeAuthNextPath,
+  submitPasswordLogin,
 } from "@/lib/auth/password-login";
 import { createClient } from "@/lib/supabase/client";
 
@@ -123,31 +123,18 @@ function LoginForm() {
       return;
     }
 
+    let navigated = false;
     try {
-      const { data, error: err } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
-      });
+      const result = await submitPasswordLogin(normalizedEmail, password);
 
-      if (err) {
+      if (!result.ok) {
         setPassword("");
-        setError(mapPasswordAuthError(err));
+        setError(result.error);
         return;
       }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const session = data.session ?? sessionData.session;
-      if (!hasAuthSession(session)) {
-        setPassword("");
-        setError(
-          "Não foi possível iniciar a sessão. Confirme seu e-mail ou tente novamente.",
-        );
-        return;
-      }
-
-      // Full navigation (not client router) so middleware sees auth cookies and the
-      // post-login shell loads fresh HTML/chunks — matches magic-link/SSO behavior.
       const dest = sanitizeAuthNextPath(searchParams.get("next"));
+      navigated = true;
       window.location.assign(dest);
     } catch (caught) {
       setPassword("");
@@ -155,7 +142,7 @@ function LoginForm() {
         mapPasswordAuthError(caught instanceof Error ? { message: caught.message } : null),
       );
     } finally {
-      setLoading(false);
+      if (!navigated) setLoading(false);
     }
     return;
   };
