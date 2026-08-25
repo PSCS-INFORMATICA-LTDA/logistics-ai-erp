@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { getAuthCallbackUrl } from "@/lib/auth-urls";
+import {
+  hasAuthSession,
+  mapPasswordAuthError,
+  sanitizeAuthNextPath,
+} from "@/lib/auth/password-login";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup" | "forgot";
@@ -52,7 +57,6 @@ function LoginForm() {
     setError(null);
     setInfo(null);
 
-    const next = searchParams.get("next") || "/dashboard";
     const normalizedEmail = email.trim().toLowerCase();
 
     if (mode === "signup") {
@@ -119,20 +123,40 @@ function LoginForm() {
       return;
     }
 
-    const { error: err } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
-    if (err) {
-      setError(err.message);
-      setLoading(false);
-      return;
-    }
+    try {
+      const { data, error: err } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
 
-    // Full navigation (not client router) so middleware sees auth cookies and the
-    // post-login shell loads fresh HTML/chunks — matches magic-link/SSO behavior.
-    const dest = next.startsWith("/") ? next : "/dashboard";
-    window.location.assign(dest);
+      if (err) {
+        setPassword("");
+        setError(mapPasswordAuthError(err));
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = data.session ?? sessionData.session;
+      if (!hasAuthSession(session)) {
+        setPassword("");
+        setError(
+          "Não foi possível iniciar a sessão. Confirme seu e-mail ou tente novamente.",
+        );
+        return;
+      }
+
+      // Full navigation (not client router) so middleware sees auth cookies and the
+      // post-login shell loads fresh HTML/chunks — matches magic-link/SSO behavior.
+      const dest = sanitizeAuthNextPath(searchParams.get("next"));
+      window.location.assign(dest);
+    } catch (caught) {
+      setPassword("");
+      setError(
+        mapPasswordAuthError(caught instanceof Error ? { message: caught.message } : null),
+      );
+    } finally {
+      setLoading(false);
+    }
     return;
   };
 
