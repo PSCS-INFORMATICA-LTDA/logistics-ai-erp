@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sanitizeAuthNextPath } from "@/lib/auth/password-login";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -8,8 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const nextRaw = url.searchParams.get("next") || "/dashboard";
-  const next = nextRaw.startsWith("/") ? nextRaw : "/dashboard";
+  const next = sanitizeAuthNextPath(url.searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();
