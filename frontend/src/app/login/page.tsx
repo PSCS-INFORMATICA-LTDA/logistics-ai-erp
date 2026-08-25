@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/brand/AuthShell";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +21,6 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
@@ -130,9 +129,11 @@ function LoginForm() {
       return;
     }
 
-    router.push(next);
-    router.refresh();
-    setLoading(false);
+    // Full navigation (not client router) so middleware sees auth cookies and the
+    // post-login shell loads fresh HTML/chunks — matches magic-link/SSO behavior.
+    const dest = next.startsWith("/") ? next : "/dashboard";
+    window.location.assign(dest);
+    return;
   };
 
   const title =
