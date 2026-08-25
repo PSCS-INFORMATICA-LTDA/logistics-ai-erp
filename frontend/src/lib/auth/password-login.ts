@@ -37,3 +37,38 @@ export function mapPasswordAuthError(
 export function hasAuthSession(session: unknown): boolean {
   return Boolean(session && typeof session === "object" && "access_token" in session);
 }
+
+export type PasswordLoginResult =
+  | { ok: true }
+  | { ok: false; error: string; status: number };
+
+/** Browser → server password login; cookies are set by the route handler. */
+export async function submitPasswordLogin(
+  email: string,
+  password: string,
+): Promise<PasswordLoginResult> {
+  const res = await fetch("/api/auth/password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ email, password }),
+  });
+
+  let payload: { error?: string; ok?: boolean } = {};
+  try {
+    payload = (await res.json()) as typeof payload;
+  } catch {
+    payload = {};
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        typeof payload.error === "string" ? payload.error : mapPasswordAuthError(null),
+      status: res.status,
+    };
+  }
+
+  return { ok: true };
+}
