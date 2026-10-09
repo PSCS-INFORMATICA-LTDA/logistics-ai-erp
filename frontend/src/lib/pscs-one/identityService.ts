@@ -1,6 +1,10 @@
 import { identityFromTokenPayload } from "./callbackFlow";
 import { pscsOneCallbackUri, pscsOneClientId, pscsOneTokenUrl, sanitizeEnvString } from "./config";
-import type { PscsOneIdentityV1 } from "./types";
+import type {
+  PscsOneCoreAuthSessionV1,
+  PscsOneIdentityV1,
+  PscsOneTokenExchangeV1,
+} from "./types";
 
 export class PscsOneIdentityService {
   static assertLogisticsProduct(identity: PscsOneIdentityV1): void {
@@ -9,7 +13,7 @@ export class PscsOneIdentityService {
     }
   }
 
-  static async exchangeAuthorizationCode(code: string): Promise<PscsOneIdentityV1> {
+  static async exchangeAuthorizationCode(code: string): Promise<PscsOneTokenExchangeV1> {
     const clientSecret = sanitizeEnvString(process.env.PSCS_ONE_CLIENT_SECRET);
     if (!clientSecret) {
       throw new Error("sso_client_unconfigured");
@@ -31,13 +35,21 @@ export class PscsOneIdentityService {
     const payload = (await response.json().catch(() => ({}))) as {
       ok?: boolean;
       reason?: string;
-      identity?: PscsOneIdentityV1;
+      identity?: PscsOneTokenExchangeV1["identity"];
+      core_auth?: PscsOneCoreAuthSessionV1;
     };
 
     if (!response.ok) {
       throw new Error(payload.reason || "token_exchange_denied");
     }
 
-    return identityFromTokenPayload(payload);
+    const identity = identityFromTokenPayload(payload);
+    const core_auth = normalizeCoreAuth(payload.core_auth);
+    return core_auth ? { identity, core_auth } : { identity };
   }
+}
+
+function normalizeCoreAuth(raw: PscsOneCoreAuthSessionV1 | undefined): PscsOneCoreAuthSessionV1 | undefined {
+  if (!raw?.access_token || !raw.refresh_token || !raw.expires_at) return undefined;
+  return raw;
 }

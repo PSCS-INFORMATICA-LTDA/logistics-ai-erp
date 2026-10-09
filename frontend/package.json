@@ -12,6 +12,8 @@
     "test:sso": "npx tsx --test scripts/test-pscs-one-sso.ts scripts/test-password-login.ts",
     "test:membership": "npx tsx --test scripts/test-company-members-self-join.ts",
     "test:freight-demo": "npx tsx --test scripts/test-freight-demo-dev.ts",
+    "test:core-ar": "npx tsx --test scripts/test-core-ar-consumer.ts",
+    "qa:core-ar:dev": "npx tsx scripts/core-ar-dev-live.mjs",
     "demo:freight:seed": "node scripts/freight-demo-dev.mjs seed",
     "demo:freight:verify": "node scripts/freight-demo-dev.mjs verify",
     "test:dashboard-excel": "node scripts/test-dashboard-excel-export.mjs && npx tsx scripts/test-dashboard-excel-export.ts"
