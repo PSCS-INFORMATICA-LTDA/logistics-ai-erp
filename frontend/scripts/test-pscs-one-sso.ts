@@ -23,7 +23,7 @@ const identity = {
 
 function deps(overrides = {}) {
   return {
-    exchangeAuthorizationCode: async () => identity,
+    exchangeAuthorizationCode: async () => ({ identity }),
     ensureLocalUser: async () => ({
       authUserId: "22222222-2222-4222-8222-222222222222",
       email: identity.email,
@@ -129,6 +129,28 @@ describe("callback flow", () => {
     if (ok.ok) {
       assert.equal(ok.location, "https://example.test/dashboard");
       assert.equal(ok.cookieNames.includes("pscs_one_mapped_company_id"), true);
+      assert.equal(ok.cookieNames.includes("pscs_one_core_company_id"), true);
+    }
+  });
+
+  it("stores Core session cookie when token exchange includes core_auth", async () => {
+    const ok = await executePscsOneCallback(
+      { code: "abc", origin: "https://example.test" },
+      deps({
+        exchangeAuthorizationCode: async () => ({
+          identity,
+          core_auth: {
+            access_token: "at",
+            refresh_token: "rt",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            user_id: identity.user_id,
+          },
+        }),
+      }),
+    );
+    assert.equal(ok.ok, true);
+    if (ok.ok) {
+      assert.equal(ok.cookieNames.includes("pscs_one_core_session"), true);
     }
   });
 });

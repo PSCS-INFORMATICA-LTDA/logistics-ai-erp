@@ -1,4 +1,8 @@
-import type { PscsOneIdentityV1 } from "./types";
+import {
+  PSCS_ONE_CORE_COMPANY_COOKIE,
+  PSCS_ONE_CORE_SESSION_COOKIE,
+} from "./core/config";
+import type { PscsOneIdentityV1, PscsOneTokenExchangeV1 } from "./types";
 import { publicPscsOneSsoReason } from "./errors";
 
 export type PscsOneSsoStage =
@@ -21,7 +25,7 @@ export type SsoCookieWrite = {
 };
 
 export type PscsOneCallbackDeps = {
-  exchangeAuthorizationCode: (code: string) => Promise<PscsOneIdentityV1>;
+  exchangeAuthorizationCode: (code: string) => Promise<PscsOneTokenExchangeV1>;
   ensureLocalUser: (identity: PscsOneIdentityV1) => Promise<{
     authUserId: string;
     email: string;
@@ -71,12 +75,13 @@ export async function executePscsOneCallback(
     return { ok: false, stage: "callback_params", reason: "missing_code" };
   }
 
-  let identity: PscsOneIdentityV1;
+  let exchange: PscsOneTokenExchangeV1;
   try {
-    identity = await deps.exchangeAuthorizationCode(code);
+    exchange = await deps.exchangeAuthorizationCode(code);
   } catch (error) {
     return { ok: false, stage: "token_exchange", reason: publicPscsOneSsoReason(error) };
   }
+  const { identity, core_auth: coreAuth } = exchange;
 
   let local: { authUserId: string; email: string; tokenHash: string };
   try {
@@ -111,7 +116,33 @@ export async function executePscsOneCallback(
       path: "/",
       maxAge: 60 * 60 * 8,
     },
+    {
+      name: PSCS_ONE_CORE_COMPANY_COOKIE,
+      value: identity.company_id,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true,
+      path: "/",
+      maxAge: 60 * 60 * 8,
+    },
   ];
+
+  if (coreAuth) {
+    cookies.push({
+      name: PSCS_ONE_CORE_SESSION_COOKIE,
+      value: JSON.stringify({
+        access_token: coreAuth.access_token,
+        refresh_token: coreAuth.refresh_token,
+        expires_at: coreAuth.expires_at,
+        user_id: coreAuth.user_id ?? identity.user_id,
+      }),
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true,
+      path: "/",
+      maxAge: 60 * 60 * 8,
+    });
+  }
   try {
     deps.writeCookies(cookies);
   } catch (error) {
