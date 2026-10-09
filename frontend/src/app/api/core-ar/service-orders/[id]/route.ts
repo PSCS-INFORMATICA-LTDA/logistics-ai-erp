@@ -41,6 +41,7 @@ export async function GET(
     const coreSession = requireCoreArSession(request.headers.get("cookie"));
     const view = await loadServiceOrderCoreArView({
       supabase,
+      authUserId: user.id,
       serviceOrderId,
       cookieHeader: request.headers.get("cookie"),
       coreSession,

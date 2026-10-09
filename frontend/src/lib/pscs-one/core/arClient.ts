@@ -102,6 +102,19 @@ export class PscsOneCoreArClient {
     if (payload.ok !== true || !Array.isArray(payload.receivables)) {
       throw new CoreArError("core_invalid_response", "Core receivable list payload is invalid.", 502);
     }
-    return payload.receivables[0] ?? null;
+    const matches = payload.receivables.filter(
+      (row) => row.source_entity_id === input.serviceOrderId,
+    );
+    if (matches.length === 0) {
+      return null;
+    }
+    if (matches.length > 1) {
+      throw new CoreArError(
+        "core_invalid_response",
+        "Core returned more than one receivable for the same source_entity_id.",
+        502,
+      );
+    }
+    return matches[0] ?? null;
   }
 }

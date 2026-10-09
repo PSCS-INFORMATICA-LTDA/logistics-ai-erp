@@ -51,6 +51,7 @@ function sumPaymentAmounts(amounts: string[]): string {
 
 export async function loadServiceOrderCoreArView(input: {
   supabase: SupabaseClient;
+  authUserId: string;
   serviceOrderId: string;
   cookieHeader: string | null | undefined;
   coreSession: CoreArAuthSessionWithUser;
@@ -80,6 +81,25 @@ export async function loadServiceOrderCoreArView(input: {
   }
   if (!order) {
     throw new CoreArError("receivable_not_found", "Service order not found.", 404);
+  }
+
+  const { data: membership, error: membershipError } = await input.supabase
+    .from("company_members")
+    .select("id")
+    .eq("user_id", input.authUserId)
+    .eq("company_id", order.company_id)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw new CoreArError(
+      "core_unavailable",
+      "Could not verify company membership.",
+      502,
+      membershipError.message,
+    );
+  }
+  if (!membership) {
+    throw new CoreArError("core_unauthorized", "You are not a member of this company.", 403);
   }
 
   assertLogisticsCompanyMatchesMapping({

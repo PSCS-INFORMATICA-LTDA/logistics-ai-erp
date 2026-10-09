@@ -121,6 +121,7 @@ describe("Core AR client", () => {
       serviceOrderId: fixtureReceivable.source_entity_id!,
     });
     assert.equal(found?.receivable_id, fixtureReceivable.receivable_id);
+    assert.equal(found?.source_entity_id, fixtureReceivable.source_entity_id);
 
     const detail = await client.getReceivable(fixtureReceivable.receivable_id);
     assert.equal(detail.original_amount, "800.00");

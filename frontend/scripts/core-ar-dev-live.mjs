@@ -11,9 +11,12 @@ const CORE_DEV_REF = "uvyaqklvqcakwfvfopof";
 const PROD_REF = "tqeenmswotxqainkyyct";
 
 const OS_ID = "0c62b273-260c-4965-b015-91b73eeaf8ed";
+const WRONG_OS_ID = "00000000-0000-4000-8000-000000000001";
 const LOGISTICS_COMPANY = "bcd3c6c9-0e4a-4356-addd-4af925725576";
 const CORE_COMPANY = "c0b00000-0000-4000-8000-00000000000b";
 const EXPECTED_RECEIVABLE = "c1b8e615-d725-4e66-acb3-5efe44aa1dd9";
+const CORE_API_BASE =
+  (process.env.PSCS_ONE_CORE_API_BASE_URL || "https://pscs-core.vercel.app").replace(/\/+$/, "");
 
 function refFromUrl(url) {
   const match = String(url || "").trim().match(/^https:\/\/([a-z0-9]+)\.supabase\.co\/?$/i);
@@ -51,13 +54,79 @@ async function mintCoreSession() {
   };
 }
 
+async function coreGet(session, path) {
+  const cookie = buildCoreSupabaseAuthCookieHeader(session, {
+    PSCS_ONE_CORE_SUPABASE_PROJECT_REF: CORE_DEV_REF,
+  });
+  const response = await fetch(`${CORE_API_BASE}${path}`, {
+    headers: { Accept: "application/json", Cookie: cookie },
+    cache: "no-store",
+  });
+  const text = await response.text();
+  let body = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { raw: text.slice(0, 120) };
+  }
+  return { status: response.status, body };
+}
+
+async function assertSourceFilterContract(session) {
+  const partial = await coreGet(
+    session,
+    `/api/receivables?company_id=${CORE_COMPANY}&source_system=logistics_ai`,
+  );
+  if (partial.status !== 400 || partial.body?.error?.code !== "VALIDATION_ERROR") {
+    throw new Error(
+      `source partial tuple gate failed: expected HTTP 400 VALIDATION_ERROR, got ${partial.status} ${partial.body?.error?.code || partial.body?.ok}`,
+    );
+  }
+
+  const wrong = await coreGet(
+    session,
+    `/api/receivables?company_id=${CORE_COMPANY}&source_system=logistics_ai&source_entity_type=service_order&source_entity_id=${WRONG_OS_ID}`,
+  );
+  if (wrong.status !== 200 || wrong.body?.ok !== true) {
+    throw new Error(`source wrong-id query failed: HTTP ${wrong.status}`);
+  }
+  const wrongIds = (wrong.body.receivables || []).map((r) => r.receivable_id);
+  if (wrongIds.includes(EXPECTED_RECEIVABLE)) {
+    throw new Error("source filters not applied: wrong source_entity_id still returned demo receivable");
+  }
+  if (wrongIds.length !== 0) {
+    throw new Error(`expected zero receivables for wrong source_entity_id, got ${wrongIds.length}`);
+  }
+
+  const full = await coreGet(
+    session,
+    `/api/receivables?company_id=${CORE_COMPANY}&source_system=logistics_ai&source_entity_type=service_order&source_entity_id=${OS_ID}`,
+  );
+  if (full.status !== 200 || full.body?.ok !== true) {
+    throw new Error(`source full tuple query failed: HTTP ${full.status}`);
+  }
+  const fullRows = full.body.receivables || [];
+  if (fullRows.length !== 1) {
+    throw new Error(`expected exactly one receivable for official source tuple, got ${fullRows.length}`);
+  }
+  if (fullRows[0]?.receivable_id !== EXPECTED_RECEIVABLE) {
+    throw new Error("official source tuple did not resolve to the expected receivable id");
+  }
+  if (fullRows[0]?.source_entity_id !== OS_ID) {
+    throw new Error("Core row source_entity_id mismatch");
+  }
+}
+
 async function main() {
   assertDevOnly();
   const session = await mintCoreSession();
+
+  await assertSourceFilterContract(session);
+
   const client = new PscsOneCoreArClient(session, {
     env: {
       PSCS_ONE_CORE_SUPABASE_PROJECT_REF: CORE_DEV_REF,
-      PSCS_ONE_CORE_API_BASE_URL: "https://pscs-core.vercel.app",
+      PSCS_ONE_CORE_API_BASE_URL: CORE_API_BASE,
     },
   });
 
@@ -68,6 +137,9 @@ async function main() {
   if (!receivable) throw new Error("receivable correlation missing");
   if (receivable.receivable_id !== EXPECTED_RECEIVABLE) {
     throw new Error("receivable id mismatch");
+  }
+  if (receivable.source_entity_id !== OS_ID) {
+    throw new Error("client receivable source_entity_id mismatch");
   }
   if (Number(receivable.original_amount) !== 800) throw new Error("original_amount mismatch");
   if (Number(receivable.posted_amount) !== 800) throw new Error("posted_amount mismatch");
@@ -101,10 +173,11 @@ async function main() {
   const driverTotal = (driverTx ?? []).reduce((acc, row) => acc + Number(row.amount || 0), 0);
   if (driverTotal !== 150) throw new Error("driver expense mismatch");
 
-  // Sanity: cookie builder works (same path used by client)
   buildCoreSupabaseAuthCookieHeader(session, { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: CORE_DEV_REF });
 
   console.log("core-ar-dev-live OK", {
+    SOURCE_CORRELATION: "PASS",
+    MULTI_RECEIVABLE_CORRELATION: "PASS",
     LOGISTICS_FREIGHT_CODE: "PSCS-FREIGHT-DEMO-001",
     LOGISTICS_OS_ID: OS_ID,
     LOGISTICS_COMPANY,
