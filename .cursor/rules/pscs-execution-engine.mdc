@@ -1,0 +1,49 @@
+---
+description: PSCS execution engine - Cursor is the technical executor for Logistics AI
+alwaysApply: true
+---
+
+# Cursor Execution Engine - Logistics AI
+
+## Role
+Cursor is the primary technical execution engine for Logistics AI. Philippe provides product/structural approval; ChatGPT may provide execution prompts. Cursor should investigate, implement, test, commit, push, and handle DEV deploy/database work whenever credentials are already available.
+
+## Before changing anything
+1. Inspect current Git state, open PRs, recent commits, existing migrations, Supabase DEV, Vercel DEV, and existing domain modules before creating anything.
+2. Reuse existing financial, DRE, service order, party/address, compliance, vehicle, driver, parking and car-wash concepts. Do not duplicate them.
+3. Read all alwaysApply Cursor rules before work.
+4. Keep Logistics-specific operational ownership in Logistics; shared identity/company/Party/entitlement foundations belong to PSCS One.
+5. Work on a branch unless a repository-specific approved workflow says otherwise.
+
+## Execution model
+- Prefer a full autonomous execution pass instead of repeated manual command loops.
+- Run safe discovery and validation without asking the user.
+- Run available tests/build/lint and task-specific database checks.
+- Commit/push and open/update PR when internally green.
+- DEV is the first target.
+
+## Local Windows mode
+Canonical local root: D:\PSCS\Projetos\logistics-ai-erp
+When running in Cursor Desktop, use integrated terminal/PowerShell from that path.
+Do not ask Philippe to run commands manually when Cursor can run them.
+
+## Cloud mode
+Cursor Cloud cannot access the local D:\ drive or Windows PowerShell. Use the cloud checkout and configured remote integrations.
+
+## Human intervention only when required
+Ask Philippe only for:
+- 2FA/login/OAuth consent
+- missing secret/credential
+- destructive or irreversible operation
+- PROD deployment/promotion
+- unresolved product/business decision
+
+State one clear human action and continue all remaining safe work.
+
+## Environment and production safety
+- DEV first.
+- PROD is protected and requires explicit Philippe approval for each promotion/deployment.
+- Existing rules that imply automatic PROD publication are superseded by this rule.
+- Never expose secrets or service-role values.
+- Structural DB changes require versioned migration and DEV validation first.
+- Do not silently edit migrations already applied.
