@@ -311,10 +311,11 @@ async function main() {
     process.exit(1);
   }
 
-  const [{ data: vehicles }, { data: drivers }, { data: existing }] = await Promise.all([
+  const [{ data: vehicles }, { data: drivers }, { data: existing }, { data: clients }] = await Promise.all([
     sb.from("vehicles").select("id, plate").eq("company_id", COMPANY_ID),
     sb.from("drivers").select("id, name, document").eq("company_id", COMPANY_ID),
     sb.from("service_orders").select("code").eq("company_id", COMPANY_ID),
+    sb.from("clients").select("id, name, trade_name, status, deleted_at").eq("company_id", COMPANY_ID),
   ]);
 
   const plateToId = new Map(
@@ -330,6 +331,26 @@ async function main() {
       d.id,
     ])
   );
+  const clientMatchKey = (value) => String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  const clientsByKey = new Map();
+  for (const client of clients || []) {
+    if (client.deleted_at || client.status !== "Ativo") continue;
+    for (const raw of [client.name, client.trade_name]) {
+      const key = clientMatchKey(raw);
+      if (!key) continue;
+      const bucket = clientsByKey.get(key) ?? new Set();
+      bucket.add(client.id);
+      clientsByKey.set(key, bucket);
+    }
+  }
+  const resolveImportClientId = (rawName) => {
+    const key = clientMatchKey(rawName);
+    if (!key) return { clientId: null, reason: null };
+    const bucket = clientsByKey.get(key);
+    if (!bucket || bucket.size === 0) return { clientId: null, reason: "cliente sem cadastro único" };
+    if (bucket.size > 1) return { clientId: null, reason: "cliente ambíguo no cadastro" };
+    return { clientId: [...bucket][0], reason: null };
+  };
 
   console.log("Lendo", XLSX);
   const wb = new ExcelJS.Workbook();
@@ -374,7 +395,9 @@ async function main() {
     const missing = [];
     if (!plate) missing.push("placa");
     if (plate && !vehicleId) missing.push(`veículo sem cadastro (${plate})`);
+    const clientLink = resolveImportClientId(block.client);
     if (!block.client) missing.push("cliente");
+    else if (clientLink.reason) missing.push(clientLink.reason);
     if (!block.origin) missing.push("origem");
     if (!block.destination) missing.push("destino");
     if (!block.driver) missing.push("motorista");
@@ -413,6 +436,7 @@ async function main() {
       driver_assignment_response: driverId ? "accepted" : "pending",
       proposal_response: "accepted",
       proposal_accepted_at: serviceDate ? `${serviceDate}T12:00:00.000Z` : new Date().toISOString(),
+      client_id: clientLink.clientId,
       client_name: block.client || "[SEM DADO: cliente]",
       phone: block.phone || null,
       service_name: serviceName.slice(0, 200),
@@ -456,6 +480,8 @@ async function main() {
     blocos: allBlocks.length,
     prontos: ready.length,
     gaps: gaps.length,
+    clientes_vinculados: ready.filter((row) => row.client_id).length,
+    clientes_sem_vinculo: ready.filter((row) => !row.client_id).length,
   });
 
   fs.mkdirSync(OUT_DIR, { recursive: true });

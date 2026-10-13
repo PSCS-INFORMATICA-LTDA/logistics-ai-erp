@@ -140,6 +140,7 @@ export type ServiceOrder = {
   model: string | null;
   year: number | null;
   vehicle_type: string | null;
+  client_id: string | null;
   client_name: string | null;
   phone: string | null;
   service_name: string;

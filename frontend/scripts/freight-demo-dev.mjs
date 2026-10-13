@@ -173,7 +173,7 @@ async function findOrder(supabase) {
   const { data, error } = await supabase
     .from("service_orders")
     .select(
-      "id, company_id, code, service_type, status, vehicle_id, driver_id, client_name, service_amount, freight_agreed_amount, proposal_response, proposal_token, driver_assignment_response, notes"
+      "id, company_id, code, service_type, status, vehicle_id, driver_id, client_id, client_name, service_amount, freight_agreed_amount, proposal_response, proposal_token, driver_assignment_response, notes"
     )
     .eq("company_id", TARGET_COMPANY_ID)
     .eq("code", ORDER_CODE)
@@ -222,6 +222,7 @@ function printSummary(order, expense) {
 async function assertJourney(supabase, ctx, order) {
   if (!order) fail("fixture ausente");
   if (order.company_id !== TARGET_COMPANY_ID) fail("OS fora da company mapeada");
+  if (order.client_id !== TARGET_CLIENT_ID) fail("client_id da OS não é o cliente mapeado");
   if (order.client_name !== ctx.client.name) fail("cliente da OS não é o cliente mapeado");
   if (order.service_type !== "Frete") fail("tipo diferente de Frete");
   if (order.status !== "Concluido") fail("OS não concluída");
@@ -255,6 +256,7 @@ export async function runSeed(supabase) {
       service_type: "Frete",
       service_date: today,
       plate: ctx.vehicle.plate,
+      client_id: TARGET_CLIENT_ID,
       client_name: ctx.client.name,
       service_name: "Frete",
       service_categories: ["Frete"],
