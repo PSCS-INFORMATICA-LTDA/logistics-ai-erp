@@ -298,7 +298,16 @@ function OrdensServicoPageContent() {
     (orderId: string, driverId: string, driverName: string) => {
       setListRows((rows) =>
         rows.map((row) =>
-          row.id === orderId ? { ...row, driver_id: driverId, driver_name: driverName } : row
+          row.id === orderId
+            ? {
+                ...row,
+                driver_id: driverId,
+                proposed_driver_id: driverId,
+                driver_assignment_response: "accepted" as const,
+                driver_assignment_accepted_at: new Date().toISOString(),
+                driver_name: driverName,
+              }
+            : row
         )
       );
       setListRefreshKey((key) => key + 1);
@@ -378,6 +387,9 @@ function OrdensServicoPageContent() {
               driver_assignment_response: "pending" as const,
               driver_assignment_accepted_at: null,
               driver_assignment_rejected_at: null,
+              driver_assignment_token: null,
+              driver_assignment_pay_amount: null,
+              driver_assignment_assistant_pay_amount: null,
               driver_id: null,
               driver_name: undefined,
               driver_assignment_rejected_driver_ids: [],
