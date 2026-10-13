@@ -26,6 +26,7 @@ import { fetchActiveFleetVehicles, fleetVehicleLabel } from "@/lib/fleet-vehicle
 import { requiresPerDiem } from "@/lib/freight-per-diem";
 import { isTruckCategory } from "@/lib/transport-van-estimate";
 import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
+import { serviceOrderClientLinkStatus } from "@/lib/service-order-client";
 import {
   canEditServiceOrder,
   canDeleteServiceOrder,
@@ -57,7 +58,7 @@ import {
   serviceOrderShowsVehiclePhoto,
 } from "@/lib/service-order-field-visibility";
 import { normalizePassengers } from "@/lib/service-order-passengers";
-import type { DreAccount, Driver, DriverAssignmentResponse, Vehicle } from "@/types/database";
+import type { Client, DreAccount, Driver, DriverAssignmentResponse, Vehicle } from "@/types/database";
 import {
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE_LABELS,
@@ -117,6 +118,7 @@ function OrdensServicoPageContent() {
   const [listRows, setListRows] = useState<ServiceOrderListRow[]>([]);
   const [listRefreshKey, setListRefreshKey] = useState(0);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [clients, setClients] = useState<Pick<Client, "id" | "name" | "trade_name" | "status">[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehiclesError, setVehiclesError] = useState<string | null>(null);
   const [dreAccounts, setDreAccounts] = useState<DreAccount[]>([]);
@@ -143,10 +145,17 @@ function OrdensServicoPageContent() {
   useEffect(() => {
     if (!companyId) return;
     void (async () => {
-      const [driversRes, fleetRes, dreRes] = await Promise.all([
+      const [driversRes, clientsRes, fleetRes, dreRes] = await Promise.all([
         supabase
           .from("drivers")
           .select("id, code, name, status, active_for_operations")
+          .eq("company_id", companyId)
+          .eq("status", "Ativo")
+          .is("deleted_at", null)
+          .order("name"),
+        supabase
+          .from("clients")
+          .select("id, name, trade_name, status")
           .eq("company_id", companyId)
           .eq("status", "Ativo")
           .is("deleted_at", null)
@@ -162,6 +171,7 @@ function OrdensServicoPageContent() {
       ]);
 
       setDrivers((driversRes.data as Driver[]) ?? []);
+      setClients((clientsRes.data as Pick<Client, "id" | "name" | "trade_name" | "status">[]) ?? []);
       setVehicles(fleetRes.vehicles);
       setVehiclesError(fleetRes.error);
       setDreAccounts((dreRes.data as DreAccount[]) ?? []);
@@ -575,6 +585,21 @@ function OrdensServicoPageContent() {
         },
         { key: "plate", label: "Placa" },
         {
+          key: "client_name",
+          label: "Cliente",
+          render: (r) => {
+            const linked = serviceOrderClientLinkStatus(r) === "LINKED";
+            return (
+              <span>
+                {r.client_name || "—"}
+                {linked ? null : (
+                  <span className="mt-0.5 block text-xs text-amber-700">Sem vínculo</span>
+                )}
+              </span>
+            );
+          },
+        },
+        {
           key: "service_type",
           label: "Tipo",
           render: (r) => serviceTypeLabel(r.service_type),
@@ -707,6 +732,7 @@ function OrdensServicoPageContent() {
             plate: item?.plate ?? "",
             vehicle_type: item?.vehicle_type ?? "",
             driver_id: item?.driver_id ?? "",
+            client_id: item?.client_id ?? "",
             client_name: item?.client_name ?? "",
             phone: item?.phone ?? "",
             service_categories:
@@ -773,9 +799,31 @@ function OrdensServicoPageContent() {
               window.alert("Informe o valor (R$) da OS.");
               return;
             }
-            if (!String(data.client_name ?? "").trim()) {
-              window.alert("Informe o cliente.");
+            const clientId = String(data.client_id ?? "").trim();
+            const isNewOrder = !item?.id;
+            if (isNewOrder && !clientId) {
+              window.alert("Selecione o cliente cadastrado desta empresa.");
               return;
+            }
+            if (!isNewOrder && item?.client_id && !clientId) {
+              window.alert("Mantenha o cliente vinculado ou escolha outro do cadastro.");
+              return;
+            }
+            if (clientId) {
+              const selected = clients.find((client) => client.id === clientId);
+              const keepingCurrent = item?.client_id === clientId;
+              if (!selected && !keepingCurrent) {
+                window.alert("Cliente inválido para esta empresa.");
+                return;
+              }
+              if (selected && selected.status !== "Ativo" && !keepingCurrent) {
+                window.alert("Cliente inativo ou excluído. Escolha um cliente ativo.");
+                return;
+              }
+              data.client_id = clientId;
+              if (selected) data.client_name = selected.name;
+            } else {
+              data.client_id = null;
             }
             if (!String(data.phone ?? "").trim()) {
               window.alert("Informe o telefone do cliente.");
@@ -1095,10 +1143,50 @@ function OrdensServicoPageContent() {
                       options: driverOptions,
                     },
                     { name: "service_amount", label: "Valor (R$)", type: "number", required: true },
-                    { name: "client_name", label: "Cliente", required: true },
+                    {
+                      name: "client_id",
+                      label: "Cliente",
+                      type: "select",
+                      required: !item?.id,
+                      options: [
+                        {
+                          value: "",
+                          label: item?.id
+                            ? "— OS legada sem vínculo —"
+                            : "— Selecione o cliente —",
+                        },
+                        ...clients.map((client) => ({
+                          value: client.id,
+                          label: client.trade_name
+                            ? `${client.name} (${client.trade_name})`
+                            : client.name,
+                        })),
+                        ...(item?.client_id && !clients.some((client) => client.id === item.client_id)
+                          ? [
+                              {
+                                value: item.client_id,
+                                label: `${item.client_name || "Cliente atual"} (cadastro atual)`,
+                              },
+                            ]
+                          : []),
+                      ],
+                    },
                     { name: "phone", label: "Telefone", required: true },
                   ]}
                 />
+
+                <p className="text-xs text-slate-500">
+                  {serviceOrderClientLinkStatus({
+                    client_id: String(form.client_id ?? "").trim() || null,
+                  }) === "LINKED"
+                    ? `Nome gravado na OS: ${
+                        clients.find((client) => client.id === form.client_id)?.name ??
+                        String(form.client_name ?? "—")
+                      }.`
+                    : item?.id
+                      ? "OS legada sem cliente vinculado. Selecione o cadastro para corrigir. O fechamento atual não é bloqueado."
+                      : "Selecione um cliente do cadastro desta empresa. O nome fica gravado na OS."}
+                </p>
 
                 <ServiceOrderOperationalPanel
                   form={form}
