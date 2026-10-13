@@ -590,7 +590,9 @@ export function ServiceOrderRowActions({
         onClose={() => setAssignOpen(false)}
         onAssigned={(driverId, driverName) => {
           onDriverAssigned?.(row.id, driverId, driverName);
-          window.alert(`Motorista ${driverName} designado para ${row.code}.`);
+          window.alert(
+            `Motorista ${driverName} confirmado na ${row.code}. A ordem aparece como «Motorista confirmado».`
+          );
         }}
         onAssignmentSent={(driverId, driverName) => {
           onAssignmentSent?.(row.id, driverId, driverName);

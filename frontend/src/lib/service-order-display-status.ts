@@ -1,4 +1,5 @@
 import { PROPOSAL_RESPONSE_LABELS, type DriverAssignmentResponse, type ServiceOrder } from "@/types/database";
+import { isCanonicalDriverConfirmed } from "@/lib/driver-confirmed";
 import { DRIVER_ASSIGNMENT_RESPONSE_LABELS } from "@/lib/service-order-driver-assignment";
 
 export type ServiceOrderStatusRow = Pick<
@@ -31,19 +32,10 @@ export function isProposalAcceptedByClient(row: ServiceOrderStatusRow): boolean 
 
 /**
  * Motorista confirmado na OS.
- * - Fluxo normal: aceitou a designação (`driver_assignment_response = accepted`).
- * - Import/legado: já veio com `driver_id` sem WhatsApp/designação pendente.
+ * Mesma regra de complete_service_order: driver_id + aceite canônico.
  */
 export function isDriverConfirmedOnServiceOrder(row: ServiceOrderStatusRow): boolean {
-  if (!row.driver_id) return false;
-  const assignment = (row.driver_assignment_response ?? "pending") as DriverAssignmentResponse;
-  if (assignment === "accepted") return true;
-  if (assignment === "rejected") return false;
-  // Designação formal enviada e ainda aguardando aceite do motorista
-  if (row.driver_assignment_sent_at && row.proposed_driver_id) return false;
-  // Import / cadastro legado: motorista já vinculado, sem fluxo de designação
-  if (!row.driver_assignment_sent_at && !row.proposed_driver_id) return true;
-  return false;
+  return isCanonicalDriverConfirmed(row);
 }
 
 export function isServiceOrderCompleted(row: ServiceOrderStatusRow): boolean {
@@ -109,7 +101,6 @@ export function resolveServiceOrderDisplayStatus(row: ServiceOrderStatusRow): st
     return "Concluido";
   }
 
-  // Import/legado com motorista já na OS: libera a mesma fase de «Motorista confirmado»
   if (isDriverConfirmedOnServiceOrder(row)) {
     return DRIVER_ASSIGNMENT_RESPONSE_LABELS.accepted;
   }

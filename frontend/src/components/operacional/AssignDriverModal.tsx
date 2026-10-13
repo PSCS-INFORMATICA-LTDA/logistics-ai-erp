@@ -411,8 +411,19 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       return;
     }
 
+    let pay: DriverAssignmentPayDetails | null = null;
+    if (driverPayInput.trim() || assistantPayInput.trim()) {
+      pay = resolvePayDetails();
+      if (!pay) return;
+    }
+
     setSaving(true);
-    const { error: saveError } = await assignServiceOrderDriver(supabase, order.id, selectedId);
+    const { error: saveError } = await assignServiceOrderDriver(
+      supabase,
+      order.id,
+      selectedId,
+      pay
+    );
     setSaving(false);
 
     if (saveError) {

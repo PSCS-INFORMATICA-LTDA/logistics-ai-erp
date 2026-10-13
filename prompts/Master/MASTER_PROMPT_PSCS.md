@@ -2,7 +2,7 @@
 
 **Prioridade máxima neste Workspace.** Em conflito com outros documentos, este arquivo prevalece.
 
-Última atualização: 2026-07-13
+Última atualização: 2026-10-13
 
 ---
 
@@ -91,7 +91,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Multiempresa | `companies` + `company_members` + RLS desde o schema V1. |
 | Código cadastro | Padrão Philippe: código **numérico sequencial 8 posições** (`00000001…`), campo **aberto/editável**. Já em **Clientes, Fornecedores, Veículos, Sócios, Motoristas**. Unicidade por empresa (`UNIQUE company_id+code` no banco + bloqueio amigável no `CrudPage`). Códigos legados (`VEI001`/`SOC001`/`MOT001`) preservados na edição até o usuário trocar. |
 | Nº legado OS/Invoice | Campo `legacy_number` na **OS** e em **lançamentos DRE**: número do sistema antigo (Invoice/OS/COT) para o Rafael consultar; o código interno 8 dígitos continua separado. Pesquisa na lista de OS inclui esse número. SQL `apply-058-legacy-number.sql`. |
-| OS importada c/ motorista | Import/legado com `driver_id` sem designação WhatsApp conta como **Motorista confirmado** (libera Concluir frete / acompanhamento / DRE). SQL `apply-060-import-driver-confirmed.sql` (backfill + `complete_service_order`). Sem valor na designação: lançar **na linha** em DRE → Despesas Motorista (Valor motorista / Valor ajudante → Lançar no DRE) com OS vinculada; duplicata por OS+conta bloqueada também em Lançamentos da empresa. |
+| OS / motorista confirmado | **DRIVER_CONFIRMED** é um só contrato: `driver_assignment_response = accepted` e `driver_id` definido. UI, «Confirmar sem link», designação pública e `complete_service_order` usam essa regra (migration `080_canonical_driver_confirmed.sql`). `driver_id` sozinho não confirma. Reabrir proposta limpa designação, token e valores de motorista/ajudante. Sem valor na designação: lançar **na linha** em DRE → Despesas Motorista (Valor motorista / Valor ajudante → Lançar no DRE) com OS vinculada; duplicata por OS+conta bloqueada também em Lançamentos da empresa. |
 | Documentos / licenças | **Parâmetros → Documentos e licenças**: abas **Tipos** → **Documentos por placa** → **TA**. Renovação versionada (`is_current`, histórico, limpa alerta da versão antiga). Em renovação/Suspenso no relatório sem apagar validade. SQL `apply-059`. **Operacional → Documentos a vencer**: abas **Frota e empresa** + **Motoristas (CNH / CNH-AVC)** para acompanhar envio e vencimentos sem sair do Operacional. |
 | Documento único | **CNPJ/CPF não pode repetir** na mesma empresa em Clientes, Fornecedores, Motoristas e Sócios. **Código único** (8 dígitos) em todos os cadastros com código, inclusive **Veículos** — o padrão Philippe é no código, não na placa. SQL: `apply-053-unique-party-documents.sql`. |
 
