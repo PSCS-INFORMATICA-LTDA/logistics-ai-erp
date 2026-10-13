@@ -144,3 +144,34 @@ describe("migration 080 canonical contract", () => {
     assert.match(original029, /driver_assignment_response <> 'accepted' OR v_row.driver_id IS NULL/);
   });
 });
+
+describe("migration 081 execute grants", () => {
+  it("revokes anon and public, and keeps authenticated", () => {
+    const sql = fs
+      .readFileSync(
+        path.join(
+          import.meta.dirname,
+          "..",
+          "..",
+          "supabase",
+          "migrations",
+          "081_driver_confirmed_privilege_hardening.sql",
+        ),
+        "utf8",
+      )
+      .toLowerCase();
+
+    for (const fn of [
+      "public.complete_service_order(uuid)",
+      "public.register_service_order_follow_up(uuid)",
+      "public.reset_proposal_client_response(uuid)",
+    ]) {
+      assert.match(sql, new RegExp(`revoke all on function ${fn.replace(/[().]/g, "\\$&")} from public`));
+      assert.match(sql, new RegExp(`revoke all on function ${fn.replace(/[().]/g, "\\$&")} from anon`));
+      assert.match(sql, new RegExp(`grant execute on function ${fn.replace(/[().]/g, "\\$&")} to authenticated`));
+    }
+    assert.doesNotMatch(sql, /create or replace function/);
+    assert.doesNotMatch(sql, /driver_assignment_response/);
+    assert.doesNotMatch(sql, /accounts_receivable/);
+  });
+});
