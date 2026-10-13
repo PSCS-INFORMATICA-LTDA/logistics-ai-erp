@@ -7,7 +7,22 @@ export type CoreArErrorCode =
   | "tenant_mapping_missing"
   | "receivable_not_found"
   | "core_session_missing"
-  | "core_session_invalid";
+  | "core_session_invalid"
+  | "CLIENT_ID_REQUIRED"
+  | "CORE_PARTY_MAPPING_REQUIRED"
+  | "AR_DUE_DATE_RULE_REQUIRED"
+  | "AR_RECONCILIATION_REQUIRED"
+  | "COMMERCIAL_AMOUNT_INVALID"
+  | "COMMERCIAL_AMOUNT_UNSUPPORTED"
+  | "DRIVER_ASSIGNMENT_PENDING"
+  | "DRIVER_ASSIGNMENT_REJECTED"
+  | "PROPOSAL_NOT_ACCEPTED"
+  | "PARTY_COMPANY_MISMATCH"
+  | "IDEMPOTENCY_CONFLICT"
+  | "ISSUED_AT_REQUIRED"
+  | "REFERENCE_CODE_INVALID"
+  | "LOCAL_CLOSE_FAILED"
+  | "SERVICE_ORDER_NOT_CLOSABLE";
 
 export class CoreArError extends Error {
   readonly code: CoreArErrorCode;
@@ -47,6 +62,20 @@ export function mapCoreHttpError(status: number, body: unknown): CoreArError {
       "receivable_not_found",
       remoteMessage || "Receivable not found in Core.",
       404,
+    );
+  }
+  if (status === 409 && remoteCode === "IDEMPOTENCY_CONFLICT") {
+    return new CoreArError(
+      "IDEMPOTENCY_CONFLICT",
+      remoteMessage || "Core receivable already exists with a different payload.",
+      409,
+    );
+  }
+  if (status === 409) {
+    return new CoreArError(
+      "IDEMPOTENCY_CONFLICT",
+      remoteMessage || "Core rejected the receivable payload.",
+      409,
     );
   }
   if (status >= 500) {

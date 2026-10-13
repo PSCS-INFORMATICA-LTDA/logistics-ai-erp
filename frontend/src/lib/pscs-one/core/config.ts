@@ -32,3 +32,27 @@ export function isCoreArConsumerConfigured(
 ): boolean {
   return Boolean(pscsOneCoreSupabaseProjectRef(source) && pscsOneCoreApiBaseUrl(source));
 }
+
+/** Core Supabase URL for the authenticated user session (PostgREST). Server-only. */
+export function pscsOneCoreSupabaseUrl(
+  source: Record<string, string | undefined> = process.env,
+): string | null {
+  const raw =
+    sanitizeEnvString(source.PSCS_ONE_SUPABASE_URL) ||
+    sanitizeEnvString(source.ONE_SUPABASE_URL);
+  return raw ? raw.replace(/\/+$/, "") : null;
+}
+
+/**
+ * Publishable/anon key used only as the Supabase `apikey` header.
+ * The user access token is the authorization. Never a service role key.
+ */
+export function pscsOneCoreSupabaseAnonKey(
+  source: Record<string, string | undefined> = process.env,
+): string | null {
+  const raw =
+    sanitizeEnvString(source.PSCS_ONE_SUPABASE_ANON_KEY) ||
+    sanitizeEnvString(source.ONE_SUPABASE_ANON_KEY);
+  if (!raw || /service[_-]?role/i.test(raw)) return null;
+  return raw;
+}

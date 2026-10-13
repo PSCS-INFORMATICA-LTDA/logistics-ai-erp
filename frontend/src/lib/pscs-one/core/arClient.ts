@@ -3,6 +3,27 @@ import { pscsOneCoreApiBaseUrl } from "./config";
 import { CoreArError, mapCoreHttpError } from "./errors";
 import type { CoreArAuthSessionWithUser, CoreReceivablePayment, CoreReceivableSummary } from "./types";
 
+export const LOGISTICS_AR_SOURCE_SYSTEM = "logistics_ai";
+export const LOGISTICS_AR_SOURCE_ENTITY_TYPE = "service_order";
+
+export type CoreReceivableCreateRequest = {
+  company_id: string;
+  party_id: string;
+  amount: string;
+  currency: "BRL";
+  issued_at: string;
+  due_at: string;
+  reference_code: string;
+  source_system: typeof LOGISTICS_AR_SOURCE_SYSTEM;
+  source_entity_type: typeof LOGISTICS_AR_SOURCE_ENTITY_TYPE;
+  source_entity_id: string;
+};
+
+export type CoreReceivableCreateResult = {
+  created: boolean;
+  receivable: CoreReceivableSummary;
+};
+
 export type CoreArClientOptions = {
   baseUrl?: string;
   env?: Record<string, string | undefined>;
@@ -23,7 +44,10 @@ export class PscsOneCoreArClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  private async coreFetch(path: string): Promise<Response> {
+  private async coreFetch(
+    path: string,
+    init?: { method?: "GET" | "POST"; body?: unknown },
+  ): Promise<Response> {
     let cookie: string;
     try {
       cookie = buildCoreSupabaseAuthCookieHeader(this.session, this.env);
@@ -32,14 +56,20 @@ export class PscsOneCoreArClient {
       throw new CoreArError("core_unconfigured", "Core AR client is not configured.", 503);
     }
 
-    return this.fetchImpl(`${this.baseUrl}${path}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Cookie: cookie,
-      },
-      cache: "no-store",
-    });
+    try {
+      return await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: init?.method ?? "GET",
+        headers: {
+          Accept: "application/json",
+          Cookie: cookie,
+          ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        },
+        body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+        cache: "no-store",
+      });
+    } catch {
+      throw new CoreArError("core_unavailable", "Core AR service unavailable.", 502);
+    }
   }
 
   private async parseJson(response: Response): Promise<unknown> {
@@ -89,8 +119,8 @@ export class PscsOneCoreArClient {
   }): Promise<CoreReceivableSummary | null> {
     const params = new URLSearchParams({
       company_id: input.coreCompanyId,
-      source_system: "logistics_ai",
-      source_entity_type: "service_order",
+      source_system: LOGISTICS_AR_SOURCE_SYSTEM,
+      source_entity_type: LOGISTICS_AR_SOURCE_ENTITY_TYPE,
       source_entity_id: input.serviceOrderId,
     });
     const response = await this.coreFetch(`/api/receivables?${params.toString()}`);
@@ -116,5 +146,24 @@ export class PscsOneCoreArClient {
       );
     }
     return matches[0] ?? null;
+  }
+
+  async createReceivable(input: CoreReceivableCreateRequest): Promise<CoreReceivableCreateResult> {
+    const response = await this.coreFetch("/api/receivables", { method: "POST", body: input });
+    const body = await this.parseJson(response);
+    if (!response.ok) {
+      throw mapCoreHttpError(response.status, body);
+    }
+    const payload = body as {
+      ok?: boolean;
+      created?: boolean;
+      receivable?: CoreReceivableSummary;
+      data?: CoreReceivableSummary;
+    };
+    const receivable = payload.receivable ?? payload.data;
+    if (payload.ok !== true || (payload.created !== true && payload.created !== false) || !receivable?.receivable_id) {
+      throw new CoreArError("core_invalid_response", "Core create receivable payload is invalid.", 502);
+    }
+    return { created: payload.created, receivable };
   }
 }
