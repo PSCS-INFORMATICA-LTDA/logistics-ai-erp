@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AssignDriverModal } from "@/components/operacional/AssignDriverModal";
+import { ServiceOrderReceivableModal } from "@/components/operacional/ServiceOrderReceivableModal";
 import { glassAction } from "@/lib/liquid-glass-styles";
+import { serviceOrderShowsFinanceAction } from "@/lib/pscs-one/core/receivablePresentation";
 import { cn } from "@/lib/utils";
 import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
 import {
@@ -149,6 +151,7 @@ export function ServiceOrderRowActions({
   const [cancellingAssignment, setCancellingAssignment] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [financeOpen, setFinanceOpen] = useState(false);
 
   const canPhoneResponse = isPendingClientProposal(row);
   const canDriverPhoneResponse = isPendingDriverAssignment(row);
@@ -159,6 +162,7 @@ export function ServiceOrderRowActions({
   const canOperationalFollowUp = isFreightInExecution(row);
   const canCompleteFreight = isFreightInExecution(row);
   const completed = isServiceOrderCompleted(row);
+  const showFinance = serviceOrderShowsFinanceAction(row);
   const showDriverVoucher = canViewDriverVoucher(row) || completed;
   const manualCompanyDriverExpense = needsManualCompanyDriverExpense(row);
 
@@ -457,6 +461,18 @@ export function ServiceOrderRowActions({
             DRE
           </Link>
         ) : null}
+        {showFinance ? (
+          <button
+            type="button"
+            title="Financeiro do cliente no PSCS One"
+            aria-label={`Financeiro da OS ${row.code}`}
+            onClick={() => setFinanceOpen(true)}
+            className={`${glassAction("brand", true)} action-icon-btn`}
+          >
+            <span className="sm:hidden">Fin.</span>
+            <span className="hidden sm:inline">Financeiro</span>
+          </button>
+        ) : null}
         {manualCompanyDriverExpense && (completed || canCompleteFreight) ? (
           <Link
             href="/dre/despesas-motorista"
@@ -611,6 +627,12 @@ export function ServiceOrderRowActions({
         )}
       </div>
 
+      <ServiceOrderReceivableModal
+        open={financeOpen}
+        serviceOrderId={row.id}
+        serviceOrderCode={row.code}
+        onClose={() => setFinanceOpen(false)}
+      />
       <AssignDriverModal
         open={assignOpen}
         order={row}

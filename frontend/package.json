@@ -14,6 +14,8 @@
     "test:freight-demo": "npx tsx --test scripts/test-freight-demo-dev.ts",
     "test:core-ar": "npx tsx --test scripts/test-core-ar-consumer.ts",
     "test:close-ar": "npx tsx --test scripts/test-service-order-close-ar.ts",
+    "test:os-receivable": "npx tsx --test scripts/test-service-order-receivable-ui.ts",
+    "qa:os-receivable:dev": "npx tsx scripts/service-order-receivable-dev-qa.mjs",
     "qa:close-ar:dev": "npx tsx scripts/close-core-ar-dev-qa.mjs",
     "test:driver-confirmed": "npx tsx --test scripts/test-driver-confirmed.ts",
     "test:service-order-client": "npx tsx --test scripts/test-service-order-client.ts",
