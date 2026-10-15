@@ -40,6 +40,7 @@ const fixtureReceivable = {
   posted_amount: "800.00",
   balance: "0.00",
   status: "paid",
+  due_on: null as string | null,
   reference_code: "PSCS_AR_LOGISTICS_FREIGHT_DEMO_001",
   source_system: "logistics_ai",
   source_entity_type: "service_order",
@@ -148,7 +149,8 @@ const session = {
   user_id: USER,
 };
 
-const dueAt = () => ({ ok: true as const, dueAt: "2026-11-08" });
+const dueAtExplicit = () => ({ ok: true as const, dueAt: "2026-11-08" });
+const dueAtInvalid = () => ({ ok: true as const, dueAt: "not-a-date" });
 
 async function run(
   order: CloseOrderRow,
@@ -157,7 +159,7 @@ async function run(
     directory?: ReturnType<typeof directoryFor>;
     fetch?: (url: string, init?: RequestInit) => Response | Promise<Response>;
     complete?: () => Promise<{ status: string; service_completed_at: string | null }> | { status: string; service_completed_at: string | null };
-    resolveDueAt?: typeof dueAt;
+    resolveDueAt?: typeof dueAtExplicit;
     member?: boolean;
   },
 ) {
@@ -221,19 +223,10 @@ describe("commercial amount", () => {
     );
   });
 
-  it("does not invent a due date", () => {
-    const due = resolveServiceOrderReceivableDueAt({ service_date: "2026-10-08" }, {});
-    assert.equal(due.ok, false);
-    assert.equal(due.code, "AR_DUE_DATE_RULE_REQUIRED");
-  });
-
-  it("derives due_at from PSCS_ONE_LOGISTICS_RECEIVABLE_DUE_DAYS", () => {
-    const due = resolveServiceOrderReceivableDueAt(
-      { service_date: "2026-10-08" },
-      { PSCS_ONE_LOGISTICS_RECEIVABLE_DUE_DAYS: "31" },
-    );
+  it("returns null due when OS has no canonical due date", () => {
+    const due = resolveServiceOrderReceivableDueAt({ service_date: "2026-10-08" });
     assert.equal(due.ok, true);
-    if (due.ok) assert.equal(due.dueAt, "2026-11-08");
+    if (due.ok) assert.equal(due.dueAt, null);
   });
 });
 
@@ -256,7 +249,7 @@ describe("close orchestrator gates", () => {
   it("returns CORE_PARTY_MAPPING_REQUIRED when the client has no Party", async () => {
     const directory = directoryFor({ missingParty: true });
     await assert.rejects(
-      () => run(openOrder(), { directory, resolveDueAt: dueAt }),
+      () => run(openOrder(), { directory }),
       (error: unknown) => error instanceof CoreArError && error.code === "CORE_PARTY_MAPPING_REQUIRED",
     );
     assert.deepEqual(directory.partyIds, [CLIENT]);
@@ -265,7 +258,7 @@ describe("close orchestrator gates", () => {
   it("denies a Logistics company without Core mapping", async () => {
     const directory = directoryFor({ coreCompanyId: null });
     await assert.rejects(
-      () => run(openOrder(), { directory, resolveDueAt: dueAt }),
+      () => run(openOrder(), { directory }),
       (error: unknown) => error instanceof CoreArError && error.code === "tenant_mapping_missing",
     );
   });
@@ -273,7 +266,7 @@ describe("close orchestrator gates", () => {
   it("denies a Core Party from another company", async () => {
     const directory = directoryFor({ partyCompanyId: OTHER_CORE });
     await assert.rejects(
-      () => run(openOrder(), { directory, resolveDueAt: dueAt }),
+      () => run(openOrder(), { directory }),
       (error: unknown) => error instanceof CoreArError && error.code === "PARTY_COMPANY_MISMATCH",
     );
   });
@@ -315,28 +308,43 @@ describe("close orchestrator gates", () => {
     assert.equal(seen.posts, 0);
   });
 
-  it("accepts canonical DRIVER_CONFIRMED and stops on the due date gap before AR", async () => {
+  it("accepts canonical DRIVER_CONFIRMED and posts due_at null when OS has no due date", async () => {
     const seen = { posts: 0 };
+    const { http, completeCalls } = await run(openOrder(), {
+      fetch: (_url, init) => {
+        seen.posts += 1;
+        const body = init?.body ? JSON.parse(String(init.body)) : null;
+        assert.ok(body && "due_at" in body);
+        assert.equal(body.due_at, null);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            created: true,
+            receivable: { ...fixtureReceivable, status: "open", posted_amount: "0.00", balance: "800.00" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    });
+    assert.equal(seen.posts, 1);
+    assert.equal(completeCalls, 1);
+    assert.equal((http[0]?.body as { due_at: null }).due_at, null);
+  });
+
+  it("rejects an explicit invalid due date string", async () => {
     await assert.rejects(
-      () =>
-        run(openOrder(), {
-          fetch: () => {
-            seen.posts += 1;
-            return new Response("{}", { status: 200 });
-          },
-        }),
+      () => run(openOrder(), { resolveDueAt: dueAtInvalid }),
       (error: unknown) => error instanceof CoreArError && error.code === "AR_DUE_DATE_RULE_REQUIRED",
     );
-    assert.equal(seen.posts, 0);
   });
 
   it("denies zero and invalid commercial amounts", async () => {
     await assert.rejects(
-      () => run(openOrder({ freight_agreed_amount: 0 }), { resolveDueAt: dueAt }),
+      () => run(openOrder({ freight_agreed_amount: 0 })),
       (error: unknown) => error instanceof CoreArError && error.code === "COMMERCIAL_AMOUNT_INVALID",
     );
     await assert.rejects(
-      () => run(openOrder({ freight_agreed_amount: -10 }), { resolveDueAt: dueAt }),
+      () => run(openOrder({ freight_agreed_amount: -10 })),
       (error: unknown) => error instanceof CoreArError && error.code === "COMMERCIAL_AMOUNT_INVALID",
     );
   });
@@ -346,7 +354,6 @@ describe("close saga", () => {
   it("creates the receivable before completing the OS", async () => {
     const sequence: string[] = [];
     const { result, http } = await run(openOrder(), {
-      resolveDueAt: dueAt,
       fetch: async (_url, init) => {
         sequence.push(init?.method ?? "GET");
         return new Response(
@@ -366,7 +373,17 @@ describe("close saga", () => {
     assert.deepEqual(sequence, ["POST", "complete"]);
     assert.equal(result.receivable_created, true);
     assert.equal(result.order.status, "Concluido");
-    const body = http[0]?.body as { amount: string; source_entity_id: string; party_id: string; company_id: string };
+    const body = http[0]?.body as {
+      amount: string;
+      due_at: string | null;
+      source_entity_id: string;
+      party_id: string;
+      company_id: string;
+      source_system: string;
+      source_entity_type: string;
+    };
+    assert.ok("due_at" in body);
+    assert.equal(body.due_at, null);
     assert.equal(body.amount, "800.00");
     assert.notEqual(body.amount, "150.00");
     assert.equal(body.source_entity_id, OS_ID);
@@ -379,7 +396,6 @@ describe("close saga", () => {
   it("retries with created=false and does not ask Core to insert again", async () => {
     let posts = 0;
     const { result, http } = await run(openOrder(), {
-      resolveDueAt: dueAt,
       fetch: async () => {
         posts += 1;
         return new Response(
@@ -400,7 +416,6 @@ describe("close saga", () => {
       await assert.rejects(
         () =>
           run(openOrder(), {
-            resolveDueAt: dueAt,
             fetch: async () =>
               new Response(JSON.stringify({ error: { code: "IDEMPOTENCY_CONFLICT", message: "conflict" } }), {
                 status: 409,
@@ -423,7 +438,6 @@ describe("close saga", () => {
     await assert.rejects(
       () =>
         run(openOrder(), {
-          resolveDueAt: dueAt,
           fetch: async () => new Response("{}", { status: 503 }),
           complete: async () => {
             complete += 1;
@@ -435,7 +449,6 @@ describe("close saga", () => {
     await assert.rejects(
       () =>
         run(openOrder(), {
-          resolveDueAt: dueAt,
           fetch: async () => {
             throw new Error("network down");
           },
@@ -452,7 +465,6 @@ describe("close saga", () => {
     const first = await assert.rejects(
       () =>
         run(order, {
-          resolveDueAt: dueAt,
           fetch: async () => {
             attempt += 1;
             createdFlags.push(true);
@@ -469,7 +481,6 @@ describe("close saga", () => {
     );
     assert.equal(first, undefined);
     const second = await run(order, {
-      resolveDueAt: dueAt,
       fetch: async () => {
         attempt += 1;
         createdFlags.push(false);
@@ -487,16 +498,16 @@ describe("close saga", () => {
 
   it("denies cross-tenant company and cross-tenant party", async () => {
     await assert.rejects(
-      () => run(openOrder(), { cookie: cookie(OTHER_LOGISTICS, CORE), resolveDueAt: dueAt }),
+      () => run(openOrder(), { cookie: cookie(OTHER_LOGISTICS, CORE) }),
       (error: unknown) => error instanceof CoreArError && error.code === "tenant_mapping_missing",
     );
     await assert.rejects(
-      () => run(openOrder(), { cookie: cookie(LOGISTICS, OTHER_CORE), resolveDueAt: dueAt }),
+      () => run(openOrder(), { cookie: cookie(LOGISTICS, OTHER_CORE) }),
       (error: unknown) => error instanceof CoreArError && error.code === "tenant_mapping_missing",
     );
     const directory = directoryFor();
     await assert.rejects(
-      () => run(openOrder({ company_id: OTHER_LOGISTICS }), { directory, resolveDueAt: dueAt }),
+      () => run(openOrder({ company_id: OTHER_LOGISTICS }), { directory }),
       (error: unknown) => error instanceof CoreArError && error.code === "tenant_mapping_missing",
     );
     assert.equal(directory.companyIds.includes(OTHER_LOGISTICS) || directory.companyIds.length === 0, true);
@@ -527,6 +538,7 @@ describe("official fixture and regressions", () => {
     assert.equal(result.receivable.balance, "0.00");
     assert.equal(result.receivable.status, "paid");
     assert.equal(result.receivable.receivable_id, RECEIVABLE_ID);
+    assert.equal((fixtureReceivable as { due_on: string | null }).due_on, null);
   });
 
   it("reports reconciliation when a completed OS has no receivable", async () => {

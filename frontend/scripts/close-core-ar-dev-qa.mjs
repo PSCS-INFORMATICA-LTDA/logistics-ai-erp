@@ -164,6 +164,8 @@ async function main() {
     throw new Error("fixture amounts changed");
   }
   if (after.status !== "paid") throw new Error("fixture status changed");
+  const dueOn = after.due_on ?? after.due_at ?? null;
+  if (dueOn !== null && dueOn !== undefined) throw new Error("fixture due_on must stay null");
 
   let partyMapping = "SKIPPED_NO_ANON_KEY";
   if (anon) {

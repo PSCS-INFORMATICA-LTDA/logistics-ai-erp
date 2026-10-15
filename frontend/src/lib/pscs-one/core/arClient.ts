@@ -12,7 +12,7 @@ export type CoreReceivableCreateRequest = {
   amount: string;
   currency: "BRL";
   issued_at: string;
-  due_at: string;
+  due_at: string | null;
   reference_code: string;
   source_system: typeof LOGISTICS_AR_SOURCE_SYSTEM;
   source_entity_type: typeof LOGISTICS_AR_SOURCE_ENTITY_TYPE;

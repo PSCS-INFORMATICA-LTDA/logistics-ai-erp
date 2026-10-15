@@ -63,7 +63,7 @@ export type CloseServiceOrderResult = {
   receivable_created: boolean;
 };
 
-export type CloseDueAtResolver = (order: CloseOrderRow) => DueAtResult | { ok: true; dueAt: string };
+export type CloseDueAtResolver = (order: CloseOrderRow) => DueAtResult;
 
 function readCookieValue(cookieHeader: string | null | undefined, name: string): string | null {
   if (!cookieHeader) return null;
@@ -292,7 +292,7 @@ export async function closeServiceOrderWithCoreReceivable(input: {
       409,
     );
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(due.dueAt)) {
+  if (due.dueAt !== null && !/^\d{4}-\d{2}-\d{2}$/.test(due.dueAt)) {
     fail("AR_DUE_DATE_RULE_REQUIRED", "Vencimento do recebível é inválido. A OS não foi concluída.", 409);
   }
 

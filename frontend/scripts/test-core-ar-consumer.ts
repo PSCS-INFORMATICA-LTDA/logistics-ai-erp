@@ -171,6 +171,40 @@ describe("Core AR client", () => {
     assert.equal((posts[0] as { source_entity_id: string }).source_entity_id, fixtureReceivable.source_entity_id);
   });
 
+  it("sends due_at null in create payload when provided", async () => {
+    const posts: unknown[] = [];
+    const fetchImpl = async (_url: string, init?: RequestInit) => {
+      posts.push(init?.body ? JSON.parse(String(init.body)) : null);
+      return new Response(
+        JSON.stringify({ ok: true, created: true, receivable: fixtureReceivable }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const client = new PscsOneCoreArClient(
+      { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
+      {
+        baseUrl: "https://core.test",
+        env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
+        fetchImpl: fetchImpl as typeof fetch,
+      },
+    );
+    await client.createReceivable({
+      company_id: fixtureReceivable.company_id,
+      party_id: fixtureReceivable.party_id,
+      amount: "800.00",
+      currency: "BRL",
+      issued_at: "2026-10-08T00:00:00.000Z",
+      due_at: null,
+      reference_code: "PSCS-FREIGHT-DEMO-001",
+      source_system: "logistics_ai",
+      source_entity_type: "service_order",
+      source_entity_id: fixtureReceivable.source_entity_id!,
+    });
+    const body = posts[0] as Record<string, unknown>;
+    assert.ok("due_at" in body);
+    assert.equal(body.due_at, null);
+  });
+
   it("maps Core 409 IDEMPOTENCY_CONFLICT", async () => {
     const fetchImpl = async () =>
       new Response(
