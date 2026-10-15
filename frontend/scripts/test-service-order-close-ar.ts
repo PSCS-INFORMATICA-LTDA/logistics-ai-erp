@@ -222,9 +222,18 @@ describe("commercial amount", () => {
   });
 
   it("does not invent a due date", () => {
-    const due = resolveServiceOrderReceivableDueAt({ service_date: "2026-10-08" });
+    const due = resolveServiceOrderReceivableDueAt({ service_date: "2026-10-08" }, {});
     assert.equal(due.ok, false);
     assert.equal(due.code, "AR_DUE_DATE_RULE_REQUIRED");
+  });
+
+  it("derives due_at from PSCS_ONE_LOGISTICS_RECEIVABLE_DUE_DAYS", () => {
+    const due = resolveServiceOrderReceivableDueAt(
+      { service_date: "2026-10-08" },
+      { PSCS_ONE_LOGISTICS_RECEIVABLE_DUE_DAYS: "31" },
+    );
+    assert.equal(due.ok, true);
+    if (due.ok) assert.equal(due.dueAt, "2026-11-08");
   });
 });
 
