@@ -1,22 +1,43 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/brand/AuthShell";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { classifyPasswordUpdate } from "@/lib/auth/recovery-redirect";
 import { createClient } from "@/lib/supabase/client";
 
 export default function RedefinirSenhaPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sessionOk, setSessionOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      const present = Boolean(data.user);
+      setSessionOk(present);
+      if (!present) {
+        setError("Link de recuperação inválido ou expirado. Solicite um novo.");
+      }
+    }).catch(() => {
+      if (!active) return;
+      setSessionOk(false);
+      setError("Link de recuperação inválido ou expirado. Solicite um novo.");
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,17 +54,27 @@ export default function RedefinirSenhaPage() {
     }
 
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const { error: updateError } = userData.user
+      ? await supabase.auth.updateUser({ password })
+      : { error: { message: "session" } };
+    const decision = classifyPasswordUpdate({
+      sessionPresent: Boolean(userData.user),
+      updateError: updateError ? { message: updateError.message } : null,
+    });
+    setPassword("");
+    setConfirmPassword("");
     setLoading(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!decision.ok) {
+      setError(decision.error);
       return;
     }
 
     setInfo("Senha atualizada com sucesso. Redirecionando…");
     setTimeout(() => {
-      router.push("/dashboard");
+      router.push(decision.next);
       router.refresh();
     }, 800);
   };
@@ -77,7 +108,7 @@ export default function RedefinirSenhaPage() {
               minLength={6}
               autoComplete="new-password"
             />
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || sessionOk !== true}>
               {loading ? "Salvando…" : "Salvar nova senha"}
             </Button>
           </form>
