@@ -19,10 +19,8 @@ import {
   resetDriverAssignment,
   respondToDriverAssignment,
 } from "@/lib/service-order-driver-assignment";
-import {
-  completeServiceOrder,
-  registerServiceOrderFollowUp,
-} from "@/lib/service-order-operational-api";
+import { registerServiceOrderFollowUp } from "@/lib/service-order-operational-api";
+import { closeIntegratedMessage } from "@/lib/pscs-one/core/closeMessages";
 import {
   registerProposalFollowUp,
   resetProposalClientResponse,
@@ -338,32 +336,61 @@ export function ServiceOrderRowActions({
   const handleCompleteFreight = async () => {
     if (
       !window.confirm(
-        `Registrar conclusão do frete OS ${row.code}?\n\nA OS ficará como «Concluído» e você poderá salvar o PDF em «PDF / Proposta».`
+        `Registrar conclusão do frete OS ${row.code}?\n\nA OS só fica «Concluído» se o recebível do cliente for registrado no PSCS One.`
       )
     ) {
       return;
     }
 
     setCompleting(true);
-    const supabase = createClient();
-    const { completedAt, error } = await completeServiceOrder(supabase, row.id);
-    setCompleting(false);
-
-    if (error) {
-      window.alert(error);
+    type ClosePayload = {
+      ok?: boolean;
+      receivable_created?: boolean;
+      order?: { service_completed_at?: string | null };
+      error?: { code?: string; message?: string };
+    };
+    let payload: ClosePayload | null = null;
+    try {
+      const response = await fetch(`/api/service-orders/${row.id}/close`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      payload = (await response.json()) as ClosePayload;
+      if (!response.ok || payload?.ok !== true) {
+        window.alert(
+          closeIntegratedMessage({
+            ok: false,
+            code: payload?.error?.code,
+            fallback: payload?.error?.message,
+          })
+        );
+        return;
+      }
+    } catch {
+      window.alert(
+        closeIntegratedMessage({
+          ok: false,
+          code: "core_unavailable",
+        })
+      );
       return;
+    } finally {
+      setCompleting(false);
     }
 
+    const completedAt = payload?.order?.service_completed_at ?? null;
     onServiceOrderCompleted?.(row.id, completedAt);
+    const headline = closeIntegratedMessage({
+      ok: true,
+      receivableCreated: payload?.receivable_created === true,
+    });
     if (manualCompanyDriverExpense) {
       window.alert(
-        `Frete concluído (OS ${row.code}).\n\nEsta OS é legado/importada e não tem valor de motorista/ajudante na designação.\n\nAutorizado: lançar em DRE → Lançamentos da empresa (conta Motorista/Ajudante).\nObrigatório informar o nº da OS — sem isso o rateio por sócios não aloca a despesa.\nNovas OS devem seguir o fluxo do sistema (valores na designação).`
+        `${headline}\n\nEsta OS é legado/importada e não tem valor de motorista/ajudante na designação.\n\nAutorizado: lançar em DRE → Lançamentos da empresa (conta Motorista/Ajudante).\nObrigatório informar o nº da OS — sem isso o rateio por sócios não aloca a despesa.`
       );
       return;
     }
-    window.alert(
-      `Frete concluído (OS ${row.code}).\n\nO pagamento ao motorista está disponível em DRE → Despesas motorista / ajudante, com Pix e dados bancários para o Rafael efetuar o pagamento.`
-    );
+    window.alert(headline);
   };
 
   const handleResetProposal = async () => {
