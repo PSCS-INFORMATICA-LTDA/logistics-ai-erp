@@ -33,6 +33,9 @@ export function isProposalAcceptedByClient(row: ServiceOrderStatusRow): boolean 
 /**
  * Motorista confirmado na OS.
  * Mesma regra de complete_service_order: driver_id + aceite canônico.
+ * Seleção, proposta, convite e resposta pending não confirmam.
+ * driver_id preenchido com proposed nulo, sem envio e sem aceite
+ * permanece sem confirmação.
  */
 export function isDriverConfirmedOnServiceOrder(row: ServiceOrderStatusRow): boolean {
   return isCanonicalDriverConfirmed(row);
@@ -40,6 +43,15 @@ export function isDriverConfirmedOnServiceOrder(row: ServiceOrderStatusRow): boo
 
 export function isServiceOrderCompleted(row: ServiceOrderStatusRow): boolean {
   return row.status === "Concluido";
+}
+
+/**
+ * Campo Status do formulário da OS.
+ * É o status operacional gravado (`Aberto`, `Concluido`…), nunca o rótulo
+ * «Motorista confirmado», que só existe na listagem após aceite efetivo.
+ */
+export function serviceOrderFormStatus(status: string | null | undefined): string {
+  return status && status.trim().length > 0 ? status : "Aberto";
 }
 
 /** Cliente aceitou e a OS ainda precisa de motorista confirmado. */
