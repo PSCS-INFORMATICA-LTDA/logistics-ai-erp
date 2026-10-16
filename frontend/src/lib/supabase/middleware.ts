@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveAuthEntryRedirect } from "@/lib/auth/recovery-redirect";
 import {
   resolveForbiddenRedirect,
   resolvePostLoginPath,
@@ -30,6 +31,14 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const authEntry = resolveAuthEntryRedirect({
+    requestUrl: request.url,
+    existingSession: Boolean(user),
+  });
+  if (authEntry) {
+    return NextResponse.redirect(authEntry.location);
+  }
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/login");
   const isPasswordLoginApi = request.nextUrl.pathname === "/api/auth/password";
@@ -63,7 +72,9 @@ export async function updateSession(request: NextRequest) {
 
   const mappedCompanyId = request.cookies.get("pscs_one_mapped_company_id")?.value ?? null;
 
-  if (user && isAuthPage) {
+  const keepRecoveryLogin = request.nextUrl.searchParams.get("recovery") === "1";
+
+  if (user && isAuthPage && !keepRecoveryLogin) {
     const next = request.nextUrl.searchParams.get("next");
     if (next?.startsWith("/")) {
       const forbidden = await resolveForbiddenRedirect(supabase, user.id, next, mappedCompanyId);

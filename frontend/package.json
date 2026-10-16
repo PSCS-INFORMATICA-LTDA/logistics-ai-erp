@@ -18,6 +18,7 @@
     "qa:os-receivable:dev": "npx tsx scripts/service-order-receivable-dev-qa.mjs",
     "qa:close-ar:dev": "npx tsx scripts/close-core-ar-dev-qa.mjs",
     "test:driver-confirmed": "npx tsx --test scripts/test-driver-confirmed.ts",
+    "test:password-recovery": "npx tsx --test scripts/test-password-recovery-redirect.ts",
     "test:service-order-client": "npx tsx --test scripts/test-service-order-client.ts",
     "qa:core-ar:dev": "npx tsx scripts/core-ar-dev-live.mjs",
     "demo:freight:seed": "node scripts/freight-demo-dev.mjs seed",

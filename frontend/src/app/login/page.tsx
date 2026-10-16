@@ -7,12 +7,15 @@ import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { getAuthCallbackUrl } from "@/lib/auth-urls";
 import {
   mapPasswordAuthError,
   sanitizeAuthNextPath,
   submitPasswordLogin,
 } from "@/lib/auth/password-login";
+import {
+  buildPasswordRecoveryRedirect,
+  RECOVERY_ORIGIN_REJECTED_MESSAGE,
+} from "@/lib/auth/recovery-redirect";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup" | "forgot";
@@ -27,12 +30,16 @@ function LoginForm() {
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
+  const recoveryRequest = searchParams.get("recovery") === "1";
   const supabase = createClient();
 
   useEffect(() => {
     const urlError = searchParams.get("error");
     const confirmed = searchParams.get("confirmed");
     const ssoReason = searchParams.get("reason");
+    if (searchParams.get("recovery") === "1") {
+      setMode("forgot");
+    }
     if (urlError) {
       setError(ssoReason ? `${urlError} (${ssoReason})` : urlError);
     }
@@ -76,11 +83,21 @@ function LoginForm() {
         return;
       }
 
+      const emailRedirectTo = buildPasswordRecoveryRedirect(
+        window.location.origin,
+        "/login?confirmed=1",
+      );
+      if (!emailRedirectTo) {
+        setError(RECOVERY_ORIGIN_REJECTED_MESSAGE);
+        setLoading(false);
+        return;
+      }
+
       const { data, error: err } = await supabase.auth.signUp({
         email: normalizedEmail,
         password,
         options: {
-          emailRedirectTo: getAuthCallbackUrl("/login?confirmed=1"),
+          emailRedirectTo,
         },
       });
 
@@ -109,11 +126,23 @@ function LoginForm() {
         return;
       }
 
+      const redirectTo = buildPasswordRecoveryRedirect(
+        window.location.origin,
+        "/auth/redefinir-senha",
+      );
+      if (!redirectTo) {
+        setError(RECOVERY_ORIGIN_REJECTED_MESSAGE);
+        setLoading(false);
+        return;
+      }
+
       const { error: err } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: getAuthCallbackUrl("/auth/redefinir-senha"),
+        redirectTo,
       });
 
-      if (err) setError(err.message);
+      if (err) {
+        setError("Não foi possível enviar o link de recuperação. Tente novamente.");
+      }
       else {
         setInfo(
           "Se este e-mail estiver cadastrado, enviamos um link para redefinir a senha. Verifique a caixa de entrada e o spam."
@@ -214,7 +243,9 @@ function LoginForm() {
               : mode === "signup"
                 ? "Criar conta"
                 : mode === "forgot"
-                  ? "Enviar link de recuperação"
+                  ? recoveryRequest
+                    ? "Solicitar um novo e-mail"
+                    : "Enviar link de recuperação"
                   : "Entrar"}
           </Button>
 
