@@ -20,6 +20,7 @@ import {
 const PREVIEW_ORIGIN =
   "https://logistics-ai-erp-3io79a3ng-pscs-informatica-ltda-s-projects.vercel.app";
 const DEV_ORIGIN = "https://logistics-ai-erp-dev.vercel.app";
+const PR19_PREVIEW_ORIGIN = "https://logistics-release-main-ll6013z3f.vercel.app";
 const RESET_NEXT = "/auth/redefinir-senha";
 const SAMPLE_CODE = "pkce-code-nao-logar";
 const SAMPLE_PASSWORD = "senha-nova-nao-usar";
@@ -257,6 +258,27 @@ describe("recuperação de senha — redirect autorizado", () => {
       recoveryAuthErrorKindFromHref(`${PREVIEW_ORIGIN}/dashboard#error=access_denied&error_code=otp_expired`),
       "expired",
     );
+  });
+
+  it("o Preview da PR #19 entra na allowlist sem abrir os demais hosts da Vercel", () => {
+    assert.equal(isAuthorizedRecoveryOrigin(PR19_PREVIEW_ORIGIN), true);
+    assert.equal(
+      buildPasswordRecoveryRedirect(PR19_PREVIEW_ORIGIN, RESET_NEXT),
+      `${PR19_PREVIEW_ORIGIN}/auth/callback?next=${encodeURIComponent(RESET_NEXT)}`,
+    );
+    const stillRejected = [
+      "https://logistics-release-main-outro.vercel.app",
+      "https://logistics-release-m-git-fa6d84-pscs-informatica-ltda-s-projects.vercel.app",
+      "https://outro-app.vercel.app",
+      "https://evil.example",
+    ];
+    for (const origin of stillRejected) {
+      assert.equal(isAuthorizedRecoveryOrigin(origin), false, origin);
+      assert.equal(buildPasswordRecoveryRedirect(origin, RESET_NEXT), null, origin);
+    }
+    assert.equal(isAuthorizedRecoveryOrigin("https://grx-management.vercel.app"), true);
+    assert.equal(isAuthorizedRecoveryOrigin(DEV_ORIGIN), true);
+    assert.equal(isAuthorizedRecoveryOrigin(PREVIEW_ORIGIN), true);
   });
 
   it("URL externa não autorizada não gera redirect", () => {
