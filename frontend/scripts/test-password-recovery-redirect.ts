@@ -21,6 +21,8 @@ const PREVIEW_ORIGIN =
   "https://logistics-ai-erp-3io79a3ng-pscs-informatica-ltda-s-projects.vercel.app";
 const DEV_ORIGIN = "https://logistics-ai-erp-dev.vercel.app";
 const PR19_PREVIEW_ORIGIN = "https://logistics-release-main-ll6013z3f.vercel.app";
+const PR19_STABLE_ORIGIN =
+  "https://logistics-release-m-git-fa6d84-pscs-informatica-ltda-s-projects.vercel.app";
 const RESET_NEXT = "/auth/redefinir-senha";
 const SAMPLE_CODE = "pkce-code-nao-logar";
 const SAMPLE_PASSWORD = "senha-nova-nao-usar";
@@ -266,9 +268,14 @@ describe("recuperação de senha — redirect autorizado", () => {
       buildPasswordRecoveryRedirect(PR19_PREVIEW_ORIGIN, RESET_NEXT),
       `${PR19_PREVIEW_ORIGIN}/auth/callback?next=${encodeURIComponent(RESET_NEXT)}`,
     );
+    assert.equal(isAuthorizedRecoveryOrigin(PR19_STABLE_ORIGIN), true);
+    assert.equal(
+      buildPasswordRecoveryRedirect(PR19_STABLE_ORIGIN, RESET_NEXT),
+      `${PR19_STABLE_ORIGIN}/auth/callback?next=${encodeURIComponent(RESET_NEXT)}`,
+    );
     const stillRejected = [
       "https://logistics-release-main-outro.vercel.app",
-      "https://logistics-release-m-git-fa6d84-pscs-informatica-ltda-s-projects.vercel.app",
+      "https://logistics-release-m-git-outro-pscs-informatica-ltda-s-projects.vercel.app",
       "https://outro-app.vercel.app",
       "https://evil.example",
     ];

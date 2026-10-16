@@ -15,6 +15,7 @@ const EXACT_HTTPS_ORIGINS = new Set([
   "https://logistics-ai-erp-dev.vercel.app",
   "https://grx-management.vercel.app",
   "https://logistics-release-main-ll6013z3f.vercel.app",
+  "https://logistics-release-m-git-fa6d84-pscs-informatica-ltda-s-projects.vercel.app",
 ]);
 
 const PREVIEW_HOST_PREFIX = "logistics-ai-erp-";
