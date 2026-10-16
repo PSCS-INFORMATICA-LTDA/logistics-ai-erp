@@ -20,14 +20,23 @@ const PREVIEW_HOST_PREFIX = "logistics-ai-erp-";
 
 export const PASSWORD_RECOVERY_NEXT_PATH = "/auth/redefinir-senha";
 
+export const RECOVERY_GRANT_COOKIE = "pscs_recovery_grant";
+
 export const RECOVERY_ORIGIN_REJECTED_MESSAGE =
   "Este endereço não pode receber o link de recuperação.";
+
+export const RECOVERY_LINK_EXPIRED_MESSAGE =
+  "Link de recuperação inválido ou expirado. Solicite um novo e-mail.";
+
+export const RECOVERY_LINK_REUSED_MESSAGE =
+  "Este link de recuperação já foi utilizado. Solicite um novo.";
 
 export type RecoveryLinkKind = "valid" | "expired" | "reused" | "invalid" | "missing";
 
 export type RecoveryCallbackDecision = {
   location: string;
   kind: RecoveryLinkKind;
+  setRecoveryGrant: boolean;
 };
 
 export type PasswordUpdateDecision =
@@ -99,16 +108,118 @@ export function buildPasswordRecoveryRedirect(
 export function recoveryLinkErrorMessage(kind: RecoveryLinkKind): string {
   switch (kind) {
     case "expired":
-      return "Este link de recuperação expirou. Solicite um novo.";
-    case "reused":
-      return "Este link de recuperação já foi utilizado. Solicite um novo.";
     case "missing":
-      return "Link de recuperação inválido. Solicite um novo.";
     case "invalid":
-      return "Não foi possível validar o link de recuperação. Solicite um novo.";
+      return RECOVERY_LINK_EXPIRED_MESSAGE;
+    case "reused":
+      return RECOVERY_LINK_REUSED_MESSAGE;
     case "valid":
       return "";
   }
+}
+
+const SUPABASE_ERROR_CODES = new Set([
+  "otp_expired",
+  "flow_state_expired",
+  "flow_state_not_found",
+  "bad_code_verifier",
+  "bad_oauth_callback",
+  "bad_oauth_state",
+  "validation_failed",
+]);
+
+const SUPABASE_ERROR_NAMES = new Set(["access_denied", "server_error", "unauthorized_client"]);
+
+/** Erro cru do Supabase Auth na query ou no fragmento. Mensagens da própria tela não entram. */
+export function recoveryAuthErrorKind(
+  params: URLSearchParams,
+): Exclude<RecoveryLinkKind, "valid" | "missing"> | null {
+  const code = (params.get("error_code") ?? "").toLowerCase();
+  const error = (params.get("error") ?? "").toLowerCase();
+  const description = (params.get("error_description") ?? "").toLowerCase();
+  const knownCode = SUPABASE_ERROR_CODES.has(code);
+  const knownError = SUPABASE_ERROR_NAMES.has(error);
+  const described =
+    description.includes("expired") ||
+    description.includes("expirou") ||
+    description.includes("already used") ||
+    description.includes("already been used") ||
+    description.includes("reutiliz");
+  if (!knownCode && !knownError && !described) return null;
+
+  if (
+    code === "otp_expired" ||
+    code === "flow_state_expired" ||
+    description.includes("expired") ||
+    description.includes("expirou")
+  ) {
+    return "expired";
+  }
+
+  if (
+    code === "flow_state_not_found" ||
+    description.includes("already used") ||
+    description.includes("already been used") ||
+    description.includes("reutiliz")
+  ) {
+    return "reused";
+  }
+
+  return "invalid";
+}
+
+export function recoveryAuthErrorKindFromHref(
+  href: string,
+): Exclude<RecoveryLinkKind, "valid" | "missing"> | null {
+  const url = new URL(href);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  return recoveryAuthErrorKind(url.searchParams) ?? recoveryAuthErrorKind(hash);
+}
+
+function loginFailure(
+  origin: string,
+  kind: Exclude<RecoveryLinkKind, "valid">,
+): RecoveryCallbackDecision {
+  const login = new URL("/login", origin);
+  login.searchParams.set("recovery", "1");
+  login.searchParams.set("error", recoveryLinkErrorMessage(kind));
+  return { location: login.toString(), kind, setRecoveryGrant: false };
+}
+
+function nestedAuthError(
+  next: string | null,
+  origin: string,
+): Exclude<RecoveryLinkKind, "valid" | "missing"> | null {
+  if (!next) return null;
+  try {
+    return recoveryAuthErrorKind(new URL(next, origin).searchParams);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Destino quando a URL traz erro do link de recuperação.
+ * Sessão já autenticada não desvia para o dashboard.
+ */
+export function resolveAuthEntryRedirect(input: {
+  requestUrl: string;
+  existingSession: boolean;
+}): RecoveryCallbackDecision | null {
+  const url = new URL(input.requestUrl);
+  if (url.pathname === "/login" && url.searchParams.get("recovery") === "1") {
+    return null;
+  }
+
+  const direct = recoveryAuthErrorKind(url.searchParams);
+  const nested = nestedAuthError(url.searchParams.get("next"), url.origin);
+  const kind = direct ?? nested;
+  if (!kind) return null;
+
+  if (input.existingSession) {
+    return loginFailure(url.origin, kind);
+  }
+  return loginFailure(url.origin, kind);
 }
 
 export function classifyRecoveryLinkError(
@@ -142,35 +253,62 @@ export function classifyRecoveryLinkError(
 export function resolveRecoveryCallback(input: {
   requestUrl: string;
   exchangeError: { message?: string; code?: string } | null;
+  existingSession?: boolean;
 }): RecoveryCallbackDecision {
   const url = new URL(input.requestUrl);
-  const code = url.searchParams.get("code");
+  const entry = resolveAuthEntryRedirect({
+    requestUrl: input.requestUrl,
+    existingSession: input.existingSession === true,
+  });
+  if (entry) return entry;
 
+  const code = url.searchParams.get("code");
   if (!code) {
-    const login = new URL("/login", url.origin);
-    login.searchParams.set("error", recoveryLinkErrorMessage("missing"));
-    return { location: login.toString(), kind: "missing" };
+    return loginFailure(url.origin, "missing");
   }
 
   if (input.exchangeError) {
-    const kind = classifyRecoveryLinkError(input.exchangeError);
-    const login = new URL("/login", url.origin);
-    login.searchParams.set("error", recoveryLinkErrorMessage(kind));
-    return { location: login.toString(), kind };
+    return loginFailure(url.origin, classifyRecoveryLinkError(input.exchangeError));
   }
 
-  const next = safeNextPath(url.searchParams.get("next") ?? "") ?? "/dashboard";
-  return { location: new URL(next, url.origin).toString(), kind: "valid" };
+  const requested = safeNextPath(url.searchParams.get("next") ?? "");
+  const next =
+    !requested || requested === "/dashboard" ? PASSWORD_RECOVERY_NEXT_PATH : requested;
+  const location = new URL(next, url.origin).toString();
+  return {
+    location,
+    kind: "valid",
+    setRecoveryGrant: new URL(location).pathname === PASSWORD_RECOVERY_NEXT_PATH,
+  };
+}
+
+export function canShowPasswordResetForm(recoveryGrant: boolean): boolean {
+  return recoveryGrant === true;
+}
+
+export function classifyPasswordConfirmation(
+  password: string,
+  confirmPassword: string,
+): { ok: true } | { ok: false; error: string } {
+  if (password.length < 6) {
+    return { ok: false, error: "A senha deve ter pelo menos 6 caracteres." };
+  }
+  if (password !== confirmPassword) {
+    return { ok: false, error: "A confirmação da senha não confere." };
+  }
+  return { ok: true };
 }
 
 export function classifyPasswordUpdate(input: {
   sessionPresent: boolean;
+  recoveryGrant: boolean;
   updateError: { message?: string; code?: string } | null;
+  updateAccepted: boolean;
 }): PasswordUpdateDecision {
-  if (!input.sessionPresent) {
-    return { ok: false, error: recoveryLinkErrorMessage("invalid") };
+  if (!input.recoveryGrant || !input.sessionPresent) {
+    return { ok: false, error: RECOVERY_LINK_EXPIRED_MESSAGE };
   }
-  if (input.updateError) {
+  if (!input.updateAccepted || input.updateError) {
     return {
       ok: false,
       error: "Não foi possível atualizar a senha. Solicite um novo link e tente novamente.",

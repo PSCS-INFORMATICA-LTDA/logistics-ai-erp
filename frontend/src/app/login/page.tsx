@@ -30,12 +30,16 @@ function LoginForm() {
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
+  const recoveryRequest = searchParams.get("recovery") === "1";
   const supabase = createClient();
 
   useEffect(() => {
     const urlError = searchParams.get("error");
     const confirmed = searchParams.get("confirmed");
     const ssoReason = searchParams.get("reason");
+    if (searchParams.get("recovery") === "1") {
+      setMode("forgot");
+    }
     if (urlError) {
       setError(ssoReason ? `${urlError} (${ssoReason})` : urlError);
     }
@@ -239,7 +243,9 @@ function LoginForm() {
               : mode === "signup"
                 ? "Criar conta"
                 : mode === "forgot"
-                  ? "Enviar link de recuperação"
+                  ? recoveryRequest
+                    ? "Solicitar um novo e-mail"
+                    : "Enviar link de recuperação"
                   : "Entrar"}
           </Button>
 

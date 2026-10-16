@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { resolveRecoveryCallback } from "@/lib/auth/recovery-redirect";
+import {
+  PASSWORD_RECOVERY_NEXT_PATH,
+  RECOVERY_GRANT_COOKIE,
+  resolveRecoveryCallback,
+} from "@/lib/auth/recovery-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -23,5 +27,15 @@ export async function GET(request: Request) {
     requestUrl: request.url,
     exchangeError,
   });
-  return NextResponse.redirect(decision.location);
+  const response = NextResponse.redirect(decision.location);
+  if (decision.setRecoveryGrant) {
+    response.cookies.set(RECOVERY_GRANT_COOKIE, "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: new URL(request.url).protocol === "https:",
+      path: PASSWORD_RECOVERY_NEXT_PATH,
+      maxAge: 60 * 10,
+    });
+  }
+  return response;
 }

@@ -5,9 +5,15 @@ import { describe, it } from "node:test";
 import { submitPasswordLogin } from "../src/lib/auth/password-login.ts";
 import {
   buildPasswordRecoveryRedirect,
+  canShowPasswordResetForm,
+  classifyPasswordConfirmation,
   classifyPasswordUpdate,
   classifyRecoveryLinkError,
   isAuthorizedRecoveryOrigin,
+  RECOVERY_LINK_EXPIRED_MESSAGE,
+  RECOVERY_LINK_REUSED_MESSAGE,
+  recoveryAuthErrorKindFromHref,
+  resolveAuthEntryRedirect,
   resolveRecoveryCallback,
 } from "../src/lib/auth/recovery-redirect.ts";
 
@@ -26,7 +32,7 @@ function assertNoSecrets(value: string, extras: string[] = []) {
 }
 
 describe("recuperação de senha — redirect autorizado", () => {
-  it("T01 recuperação iniciada no Preview aponta para o callback HTTPS do Preview", () => {
+  it("recuperação iniciada no Preview aponta para o callback HTTPS do Preview", () => {
     const redirect = buildPasswordRecoveryRedirect(PREVIEW_ORIGIN, RESET_NEXT);
     assert.equal(
       redirect,
@@ -37,7 +43,7 @@ describe("recuperação de senha — redirect autorizado", () => {
     assert.equal(redirect?.includes("grx-management.vercel.app"), false);
   });
 
-  it("T02 recuperação iniciada no DEV operacional permanece no host operacional", () => {
+  it("recuperação iniciada no DEV operacional permanece no host operacional", () => {
     const redirect = buildPasswordRecoveryRedirect(DEV_ORIGIN, RESET_NEXT);
     assert.equal(
       redirect,
@@ -45,42 +51,46 @@ describe("recuperação de senha — redirect autorizado", () => {
     );
   });
 
-  it("T03 recuperação em localhost durante DEV local aceita as portas locais", () => {
+  it("recuperação em localhost durante DEV local aceita as portas locais", () => {
     for (const origin of ["http://localhost:3000", "http://localhost:3002", "http://127.0.0.1:3002"]) {
       const redirect = buildPasswordRecoveryRedirect(origin, RESET_NEXT);
       assert.equal(redirect, `${origin}/auth/callback?next=${encodeURIComponent(RESET_NEXT)}`);
     }
   });
 
-  it("T04 código válido segue para a rota de redefinição sem o código na URL", () => {
+  it("T01 link válido abre a redefinição sem o código na URL", () => {
     const decision = resolveRecoveryCallback({
       requestUrl: `${PREVIEW_ORIGIN}/auth/callback?code=${SAMPLE_CODE}&next=${encodeURIComponent(RESET_NEXT)}`,
       exchangeError: null,
     });
     assert.equal(decision.kind, "valid");
+    assert.equal(decision.setRecoveryGrant, true);
     assert.equal(decision.location, `${PREVIEW_ORIGIN}${RESET_NEXT}`);
+    assert.equal(decision.location.includes("/dashboard"), false);
     assertNoSecrets(decision.location);
   });
 
-  it("T05 código expirado volta ao login com mensagem fixa", () => {
+  it("T02 link expirado não abre o dashboard", () => {
     assert.equal(classifyRecoveryLinkError({ code: "otp_expired", message: "Token has expired" }), "expired");
     const decision = resolveRecoveryCallback({
-      requestUrl: `${DEV_ORIGIN}/auth/callback?code=${SAMPLE_CODE}&next=${encodeURIComponent(RESET_NEXT)}`,
-      exchangeError: { code: "otp_expired", message: `expired ${SAMPLE_CODE}` },
+      requestUrl: `${DEV_ORIGIN}/auth/callback?error=access_denied&error_code=otp_expired&next=${encodeURIComponent(RESET_NEXT)}`,
+      exchangeError: null,
+      existingSession: true,
     });
     assert.equal(decision.kind, "expired");
+    assert.equal(decision.setRecoveryGrant, false);
     const expiredLogin = new URL(decision.location);
     assert.equal(expiredLogin.origin, DEV_ORIGIN);
     assert.equal(expiredLogin.pathname, "/login");
     assert.equal(expiredLogin.searchParams.get("code"), null);
-    assert.equal(
-      expiredLogin.searchParams.get("error"),
-      "Este link de recuperação expirou. Solicite um novo.",
-    );
+    assert.equal(expiredLogin.searchParams.get("error_code"), null);
+    assert.equal(expiredLogin.searchParams.get("recovery"), "1");
+    assert.equal(expiredLogin.searchParams.get("error"), RECOVERY_LINK_EXPIRED_MESSAGE);
+    assert.equal(decision.location.includes("/dashboard"), false);
     assertNoSecrets(decision.location);
   });
 
-  it("T06 código reutilizado volta ao login com mensagem fixa", () => {
+  it("T03 link reutilizado volta ao login com mensagem própria", () => {
     assert.equal(
       classifyRecoveryLinkError({ code: "flow_state_not_found", message: "Flow state not found" }),
       "reused",
@@ -90,24 +100,121 @@ describe("recuperação de senha — redirect autorizado", () => {
       exchangeError: { message: "Email link is invalid or has already been used" },
     });
     assert.equal(decision.kind, "reused");
+    assert.equal(decision.setRecoveryGrant, false);
     const reusedLogin = new URL(decision.location);
     assert.equal(reusedLogin.pathname, "/login");
     assert.equal(reusedLogin.searchParams.get("code"), null);
-    assert.equal(
-      reusedLogin.searchParams.get("error"),
-      "Este link de recuperação já foi utilizado. Solicite um novo.",
-    );
+    assert.equal(reusedLogin.searchParams.get("error"), RECOVERY_LINK_REUSED_MESSAGE);
+    assert.equal(decision.location.includes("/dashboard"), false);
     assertNoSecrets(decision.location);
   });
 
-  it("T07 senha atualizada com sucesso aponta para o dashboard e não devolve a senha", () => {
-    const decision = classifyPasswordUpdate({ sessionPresent: true, updateError: null });
-    assert.deepEqual(decision, { ok: true, next: "/dashboard" });
-    assertNoSecrets(JSON.stringify(decision), [SAMPLE_PASSWORD]);
+  it("T04 callback com erro permanece no login", () => {
+    const decision = resolveRecoveryCallback({
+      requestUrl: `${PREVIEW_ORIGIN}/auth/callback?error=server_error&error_code=unexpected_failure&next=/dashboard`,
+      exchangeError: null,
+    });
+    assert.equal(decision.kind, "invalid");
+    const failed = new URL(decision.location);
+    assert.equal(failed.pathname, "/login");
+    assert.equal(failed.searchParams.get("error"), RECOVERY_LINK_EXPIRED_MESSAGE);
+    assert.equal(decision.location.includes("/dashboard"), false);
+    assertNoSecrets(decision.location);
   });
 
-  it("T08 login com a nova senha usa o endpoint de senha e o resultado não ecoa a senha", async () => {
-    const update = classifyPasswordUpdate({ sessionPresent: true, updateError: null });
+  it("T05 sessão previamente autenticada não mascara otp_expired", () => {
+    const decision = resolveAuthEntryRedirect({
+      requestUrl: `${DEV_ORIGIN}/login?next=${encodeURIComponent("/dashboard?error=access_denied&error_code=otp_expired")}`,
+      existingSession: true,
+    });
+    assert.ok(decision);
+    assert.equal(decision?.kind, "expired");
+    const landed = new URL(decision!.location);
+    assert.equal(landed.pathname, "/login");
+    assert.equal(landed.searchParams.get("error"), RECOVERY_LINK_EXPIRED_MESSAGE);
+    assert.equal(landed.searchParams.get("error_code"), null);
+    assert.equal(decision?.location.includes("/dashboard"), false);
+    assertNoSecrets(decision!.location);
+  });
+
+  it("T06 código PKCE inválido não abre o dashboard", () => {
+    assert.equal(
+      classifyRecoveryLinkError({ code: "bad_code_verifier", message: "code verifier mismatch" }),
+      "invalid",
+    );
+    const decision = resolveRecoveryCallback({
+      requestUrl: `${PREVIEW_ORIGIN}/auth/callback?code=${SAMPLE_CODE}&next=/dashboard`,
+      exchangeError: { code: "bad_code_verifier", message: `pkce ${SAMPLE_CODE}` },
+      existingSession: true,
+    });
+    assert.equal(decision.kind, "invalid");
+    assert.equal(decision.setRecoveryGrant, false);
+    const landed = new URL(decision.location);
+    assert.equal(landed.pathname, "/login");
+    assert.equal(landed.searchParams.get("error"), RECOVERY_LINK_EXPIRED_MESSAGE);
+    assert.equal(decision.location.includes("/dashboard"), false);
+    assertNoSecrets(decision.location);
+  });
+
+  it("T07 tela de redefinição só abre com o grant do callback", () => {
+    assert.equal(canShowPasswordResetForm(false), false);
+    assert.equal(canShowPasswordResetForm(true), true);
+    const form = fs.readFileSync(
+      path.join(process.cwd(), "src/app/auth/redefinir-senha/redefinir-senha-form.tsx"),
+      "utf8",
+    );
+    assert.equal(form.includes("Nova senha"), true);
+    assert.equal(form.includes("Confirmar nova senha"), true);
+    assert.equal(form.includes("Solicitar um novo e-mail"), true);
+    assert.equal(form.includes("RECOVERY_LINK_EXPIRED_MESSAGE"), true);
+    assert.equal(form.includes("updateUser"), true);
+  });
+
+  it("T08 confirmação de senha divergente não segue para a atualização", () => {
+    const mismatch = classifyPasswordConfirmation(SAMPLE_PASSWORD, `${SAMPLE_PASSWORD}-outra`);
+    assert.equal(mismatch.ok, false);
+    if (!mismatch.ok) {
+      assert.equal(mismatch.error, "A confirmação da senha não confere.");
+      assertNoSecrets(mismatch.error, [SAMPLE_PASSWORD]);
+    }
+    const match = classifyPasswordConfirmation(SAMPLE_PASSWORD, SAMPLE_PASSWORD);
+    assert.equal(match.ok, true);
+  });
+
+  it("T09 atualização efetiva exige grant e resposta positiva", () => {
+    const sessionOnly = classifyPasswordUpdate({
+      sessionPresent: true,
+      recoveryGrant: false,
+      updateError: null,
+      updateAccepted: false,
+    });
+    assert.equal(sessionOnly.ok, false);
+
+    const rejected = classifyPasswordUpdate({
+      sessionPresent: true,
+      recoveryGrant: true,
+      updateError: { message: "Auth update failed" },
+      updateAccepted: false,
+    });
+    assert.equal(rejected.ok, false);
+
+    const accepted = classifyPasswordUpdate({
+      sessionPresent: true,
+      recoveryGrant: true,
+      updateError: null,
+      updateAccepted: true,
+    });
+    assert.deepEqual(accepted, { ok: true, next: "/dashboard" });
+    assertNoSecrets(JSON.stringify(accepted), [SAMPLE_PASSWORD]);
+  });
+
+  it("T10 login com a nova senha usa o endpoint de senha e o resultado não ecoa a senha", async () => {
+    const update = classifyPasswordUpdate({
+      sessionPresent: true,
+      recoveryGrant: true,
+      updateError: null,
+      updateAccepted: true,
+    });
     assert.equal(update.ok, true);
 
     const originalFetch = globalThis.fetch;
@@ -129,7 +236,30 @@ describe("recuperação de senha — redirect autorizado", () => {
     }
   });
 
-  it("T09 URL externa não autorizada não gera redirect", () => {
+  it("T11 redirecionamento seguro permanece na origem e fora do dashboard quando o link falha", () => {
+    const cases = [
+      `${PREVIEW_ORIGIN}/dashboard?error=access_denied&error_code=otp_expired`,
+      `${PREVIEW_ORIGIN}/?error=access_denied&error_code=otp_expired`,
+      `${PREVIEW_ORIGIN}/auth/callback?next=${encodeURIComponent("/dashboard")}&error=access_denied&error_code=otp_expired`,
+    ];
+    for (const requestUrl of cases) {
+      const decision = resolveAuthEntryRedirect({ requestUrl, existingSession: true });
+      assert.ok(decision);
+      const landed = new URL(decision!.location);
+      assert.equal(landed.origin, PREVIEW_ORIGIN);
+      assert.equal(landed.pathname, "/login");
+      assert.equal(landed.protocol, "https:");
+      assert.equal(decision!.location.includes("/dashboard"), false);
+      assert.equal(landed.searchParams.get("error_code"), null);
+      assertNoSecrets(decision!.location);
+    }
+    assert.equal(
+      recoveryAuthErrorKindFromHref(`${PREVIEW_ORIGIN}/dashboard#error=access_denied&error_code=otp_expired`),
+      "expired",
+    );
+  });
+
+  it("URL externa não autorizada não gera redirect", () => {
     const rejected = [
       null,
       "",
@@ -157,7 +287,7 @@ describe("recuperação de senha — redirect autorizado", () => {
     );
   });
 
-  it("T10 ausência de exposição de tokens no redirect, nos erros e no código", () => {
+  it("T12 ausência de exposição de tokens no redirect, nos erros e no código", () => {
     const missing = resolveRecoveryCallback({
       requestUrl: `${PREVIEW_ORIGIN}/auth/callback?next=${encodeURIComponent(RESET_NEXT)}`,
       exchangeError: null,
@@ -178,7 +308,9 @@ describe("recuperação de senha — redirect autorizado", () => {
       "lib/auth/recovery-redirect.ts",
       "app/auth/callback/route.ts",
       "app/auth/redefinir-senha/page.tsx",
+      "app/auth/redefinir-senha/redefinir-senha-form.tsx",
       "app/login/page.tsx",
+      "components/auth/RecoveryErrorGuard.tsx",
     ];
     for (const file of files) {
       const source = fs.readFileSync(path.join(root, file), "utf8");
