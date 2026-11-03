@@ -22,7 +22,10 @@ import {
   respondToDriverAssignment,
 } from "@/lib/service-order-driver-assignment";
 import { registerServiceOrderFollowUp } from "@/lib/service-order-operational-api";
-import { closeIntegratedMessage } from "@/lib/pscs-one/core/closeMessages";
+import {
+  OPERATIONAL_CLOSE_REPLAY,
+  OPERATIONAL_CLOSE_SUCCESS,
+} from "@/lib/service-order-operational-close";
 import {
   registerProposalFollowUp,
   resetProposalClientResponse,
@@ -340,7 +343,7 @@ export function ServiceOrderRowActions({
   const handleCompleteFreight = async () => {
     if (
       !window.confirm(
-        `Registrar conclusão do frete OS ${row.code}?\n\nA OS só fica «Concluído» se o recebível do cliente for registrado no PSCS One.`
+        `Registrar conclusão do frete OS ${row.code}?\n\nA conclusão fica no Logistics e exige motorista confirmado.`
       )
     ) {
       return;
@@ -349,7 +352,9 @@ export function ServiceOrderRowActions({
     setCompleting(true);
     type ClosePayload = {
       ok?: boolean;
+      already_completed?: boolean;
       receivable_created?: boolean;
+      message?: string;
       order?: { service_completed_at?: string | null };
       error?: { code?: string; message?: string };
     };
@@ -360,23 +365,12 @@ export function ServiceOrderRowActions({
         headers: { Accept: "application/json" },
       });
       payload = (await response.json()) as ClosePayload;
-      if (!response.ok || payload?.ok !== true) {
-        window.alert(
-          closeIntegratedMessage({
-            ok: false,
-            code: payload?.error?.code,
-            fallback: payload?.error?.message,
-          })
-        );
+      if (!response.ok || payload?.ok !== true || payload.receivable_created === true) {
+        window.alert(payload?.error?.message ?? "Não foi possível concluir a OS. Tente novamente.");
         return;
       }
     } catch {
-      window.alert(
-        closeIntegratedMessage({
-          ok: false,
-          code: "core_unavailable",
-        })
-      );
+      window.alert("Não foi possível concluir a OS. Tente novamente.");
       return;
     } finally {
       setCompleting(false);
@@ -384,10 +378,9 @@ export function ServiceOrderRowActions({
 
     const completedAt = payload?.order?.service_completed_at ?? null;
     onServiceOrderCompleted?.(row.id, completedAt);
-    const headline = closeIntegratedMessage({
-      ok: true,
-      receivableCreated: payload?.receivable_created === true,
-    });
+    const headline =
+      payload?.message ??
+      (payload?.already_completed ? OPERATIONAL_CLOSE_REPLAY : OPERATIONAL_CLOSE_SUCCESS);
     if (manualCompanyDriverExpense) {
       window.alert(
         `${headline}\n\nEsta OS é legado/importada e não tem valor de motorista/ajudante na designação.\n\nAutorizado: lançar em DRE → Lançamentos da empresa (conta Motorista/Ajudante).\nObrigatório informar o nº da OS — sem isso o rateio por sócios não aloca a despesa.`

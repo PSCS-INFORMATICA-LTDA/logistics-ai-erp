@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { CoreArError } from "@/lib/pscs-one/core/errors";
-import { requireCoreArSession } from "@/lib/pscs-one/core/requestAuth";
 import {
-  closeServiceOrderWithCoreReceivable,
-  createSupabaseLogisticsCloseStore,
-} from "@/lib/pscs-one/core/closeServiceOrder";
+  closeServiceOrderOperationally,
+  createSupabaseOperationalCloseStore,
+  OperationalCloseError,
+} from "@/lib/service-order-operational-close";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function errorResponse(error: unknown) {
-  if (error instanceof CoreArError) {
+  if (error instanceof OperationalCloseError) {
     return NextResponse.json(
       { ok: false, error: { code: error.code, message: error.message } },
       { status: error.status },
@@ -21,16 +20,16 @@ function errorResponse(error: unknown) {
     {
       ok: false,
       error: {
-        code: "core_unavailable",
-        message: "Não foi possível registrar o recebível. A OS não foi concluída.",
+        code: "LOCAL_CLOSE_FAILED",
+        message: "Não foi possível concluir a OS. Tente novamente.",
       },
     },
-    { status: 502 },
+    { status: 503 },
   );
 }
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id: serviceOrderId } = await context.params;
@@ -41,19 +40,16 @@ export async function POST(
 
   if (!user) {
     return NextResponse.json(
-      { ok: false, error: { code: "core_unauthenticated", message: "Authentication required." } },
+      { ok: false, error: { code: "unauthenticated", message: "Authentication required." } },
       { status: 401 },
     );
   }
 
   try {
-    const coreSession = requireCoreArSession(request.headers.get("cookie"));
-    const result = await closeServiceOrderWithCoreReceivable({
+    const result = await closeServiceOrderOperationally({
       authUserId: user.id,
       serviceOrderId,
-      cookieHeader: request.headers.get("cookie"),
-      coreSession,
-      store: createSupabaseLogisticsCloseStore(supabase),
+      store: createSupabaseOperationalCloseStore(supabase),
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

@@ -569,8 +569,11 @@ describe("official fixture and regressions", () => {
     for (const src of [closeSrc, routeSrc, amountSrc]) {
       assert.doesNotMatch(src, /service_role|SERVICE_ROLE|createServiceClient|accounts_receivable/i);
     }
-    assert.match(routeSrc, /requireCoreArSession/);
+    assert.match(routeSrc, /closeServiceOrderOperationally/);
+    assert.doesNotMatch(routeSrc, /requireCoreArSession|createReceivable/);
+    assert.match(closeSrc, /createReceivable/);
     assert.match(closeSrc, /complete_service_order/);
+    assert.doesNotMatch(uiSrc, /recebível do cliente/);
     assert.doesNotMatch(closeSrc, /service-order-proposal|agenda|service-order-driver-assignment/);
     assert.doesNotMatch(uiSrc, /completeServiceOrder\(/);
     assert.match(uiSrc, /\/api\/service-orders\/\$\{row\.id\}\/close/);

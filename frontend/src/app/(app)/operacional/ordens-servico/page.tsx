@@ -39,6 +39,7 @@ import {
   matchesServiceOrderStatusFilter,
   resolveServiceOrderDisplayStatus,
   resolveServiceOrderDriverColumnLabel,
+  serviceOrderFormStatus,
   serviceOrderStatusVariant,
 } from "@/lib/service-order-display-status";
 import {
@@ -741,7 +742,7 @@ function OrdensServicoPageContent() {
                 : categoriesForServiceType(item?.service_type ?? "Transporte"),
             chart_of_account_id: item?.chart_of_account_id ?? "",
             service_amount: item?.service_amount ?? "",
-            status: item?.status ?? "Aberto",
+            status: serviceOrderFormStatus(item?.status),
             entry_date: item?.entry_date ?? "",
             entry_time: item?.entry_time ?? "",
             exit_date: item?.exit_date ?? "",
