@@ -40,6 +40,8 @@ export type Column<T> = {
   render?: (row: T) => ReactNode;
   /** Classes no <th>/<td> (ex.: hidden xl:table-cell para caber em 100%). */
   className?: string;
+  /** Mostra o texto inteiro, com quebra de linha, em vez de reticências. */
+  wrapContent?: boolean;
 };
 
 type CrudPageProps<T extends { id: string }> = {
@@ -741,7 +743,7 @@ export function CrudPage<T extends { id: string }>({
                         key={String(col.key)}
                         className={
                           compactTable
-                            ? `truncate px-1.5 py-1.5 text-slate-700 sm:px-2 ${col.className ?? ""}`
+                            ? `${col.wrapContent ? "whitespace-normal break-words align-top" : "truncate"} px-1.5 py-1.5 text-slate-700 sm:px-2 ${col.className ?? ""}`
                             : `px-3 py-3 text-slate-700 sm:px-4 ${col.className ?? ""}`
                         }
                       >

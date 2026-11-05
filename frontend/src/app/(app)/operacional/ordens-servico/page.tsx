@@ -623,23 +623,20 @@ function OrdensServicoPageContent() {
         {
           key: "driver_name",
           label: "Motorista",
+          wrapContent: true,
+          className: "min-w-[9rem] max-w-[18rem]",
           render: (r) => {
             const label = resolveServiceOrderDriverColumnLabel(r);
-            if (isDriverAssignmentRejected(r)) {
-              return (
-                <span className="font-medium text-red-700" title={label}>
-                  {label}
-                </span>
-              );
-            }
-            if (needsDriverAssignment(r) && !isPendingDriverAssignment(r)) {
-              return (
-                <span className="font-medium text-amber-700" title={label}>
-                  {label}
-                </span>
-              );
-            }
-            return <span title={label}>{label}</span>;
+            const tone = isDriverAssignmentRejected(r)
+              ? "font-medium text-red-700"
+              : needsDriverAssignment(r) && !isPendingDriverAssignment(r)
+                ? "font-medium text-amber-700"
+                : undefined;
+            return (
+              <span className={tone} title={label} aria-label={label}>
+                {label}
+              </span>
+            );
           },
         },
         {
