@@ -28,7 +28,8 @@ CREATE POLICY service_order_driver_acceptance_history_select
 
 REVOKE ALL ON TABLE public.service_order_driver_acceptance_history FROM PUBLIC;
 REVOKE ALL ON TABLE public.service_order_driver_acceptance_history FROM anon;
-REVOKE INSERT, UPDATE, DELETE ON TABLE public.service_order_driver_acceptance_history FROM authenticated;
+REVOKE ALL ON TABLE public.service_order_driver_acceptance_history FROM authenticated;
+REVOKE ALL ON TABLE public.service_order_driver_acceptance_history FROM service_role;
 GRANT SELECT ON TABLE public.service_order_driver_acceptance_history TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.guard_service_order_direct_confirmation()
