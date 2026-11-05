@@ -1,13 +1,21 @@
 -- Segurança da OS, sem mudar assinatura das funções públicas.
 -- Não aplicar até a revisão. Não executar em PROD.
 --
--- Rollback: remover o trigger e a função de guarda, devolver TRUNCATE
--- ao papel authenticated e o EXECUTE de seed_drivers a esse papel.
--- Restaurar as três funções a partir da migration 080 e do corpo anterior.
+-- Rollback seguro: remover só o gatilho e a função de guarda, e restaurar
+-- complete_service_order, respond_to_driver_assignment e
+-- confirm_service_order_driver_without_link a partir da migration 080
+-- e do corpo anterior à 084.
+-- Não devolver TRUNCATE a authenticated ou service_role.
+-- Não devolver EXECUTE de seed_drivers a anon, PUBLIC ou authenticated.
+--
+-- Se o formulário não conseguir marcar Concluido ou reabrir uma ordem
+-- Cancelado, a alternativa é o fluxo oficial: complete_service_order para
+-- concluir, e uma RPC futura para reabrir. Não desfazer o gatilho para isso.
 
 REVOKE TRUNCATE ON TABLE public.service_orders FROM PUBLIC;
 REVOKE TRUNCATE ON TABLE public.service_orders FROM anon;
 REVOKE TRUNCATE ON TABLE public.service_orders FROM authenticated;
+REVOKE TRUNCATE ON TABLE public.service_orders FROM service_role;
 
 REVOKE ALL ON FUNCTION public._assert_service_order_member(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public._assert_service_order_member(uuid) FROM anon;
@@ -54,9 +62,13 @@ LANGUAGE plpgsql
 SET search_path = public
 AS $$
 BEGIN
-  IF current_user IN ('authenticated', 'anon') THEN
-    IF OLD.status = 'Cancelado' AND NEW.status = 'Concluido' THEN
-      RAISE EXCEPTION 'Ordem cancelada não pode ser concluída por alteração direta';
+  IF current_user IN ('anon', 'authenticated', 'service_role') THEN
+    IF NEW.status = 'Concluido' AND OLD.status IS DISTINCT FROM 'Concluido' THEN
+      RAISE EXCEPTION 'A conclusão da ordem só pode ser feita pelo fluxo oficial';
+    END IF;
+
+    IF OLD.status = 'Cancelado' AND NEW.status IS DISTINCT FROM 'Cancelado' THEN
+      RAISE EXCEPTION 'Ordem cancelada não pode ser alterada por atualização direta';
     END IF;
 
     IF NEW.driver_assignment_response IS DISTINCT FROM OLD.driver_assignment_response

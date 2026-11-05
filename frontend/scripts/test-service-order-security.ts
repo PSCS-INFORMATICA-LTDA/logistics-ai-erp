@@ -56,18 +56,22 @@ describe("OS003 confirmada", () => {
 describe("migration 084 — testes negativos do contrato", () => {
   it("retira TRUNCATE e não devolve essa permissão", () => {
     assert.match(migration, /REVOKE TRUNCATE ON TABLE public\.service_orders FROM authenticated/);
+    assert.match(migration, /REVOKE TRUNCATE ON TABLE public\.service_orders FROM service_role/);
+    assert.match(migration, /REVOKE TRUNCATE ON TABLE public\.service_orders FROM PUBLIC/);
     assert.doesNotMatch(migration, /GRANT TRUNCATE/i);
+    assert.match(migration, /Não devolver TRUNCATE/);
   });
 
   it("impede conclusão direta de ordem cancelada e confirmação duplicada", () => {
-    assert.match(migration, /OLD\.status = 'Cancelado' AND NEW\.status = 'Concluido'/);
+    assert.match(migration, /NEW\.status = 'Concluido' AND OLD\.status IS DISTINCT FROM 'Concluido'/);
+    assert.match(migration, /OLD\.status = 'Cancelado' AND NEW\.status IS DISTINCT FROM 'Cancelado'/);
     assert.match(migration, /IF v_row\.status = 'Cancelado' THEN/);
     assert.match(migration, /Designação já respondida/);
     assert.match(migration, /Motorista já confirmado nesta ordem/);
   });
 
   it("bloqueia alteração direta da designação e preserva o fluxo oficial", () => {
-    assert.match(migration, /current_user IN \('authenticated', 'anon'\)/);
+    assert.match(migration, /current_user IN \('anon', 'authenticated', 'service_role'\)/);
     assert.match(migration, /driver_assignment_response IS DISTINCT FROM OLD\.driver_assignment_response/);
     assert.match(migration, /A designação do motorista só pode ser alterada pelo fluxo oficial/);
   });
