@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import {
   DRIVER_ASSIGNMENT_RESPONSE_LABELS,
   fetchPublicDriverAssignment,
+  formatDriverScheduleMoment,
+  resolveDriverAssignmentSchedule,
   respondToDriverAssignment,
   type DriverAssignmentResponse,
 } from "@/lib/service-order-driver-assignment";
@@ -125,13 +127,49 @@ export function PublicDriverAssignmentClient({ token }: Props) {
             </p>
           ) : null}
 
-          <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+          <div className="mt-4 space-y-3 text-sm text-slate-700">
+            {(() => {
+              const schedule = resolveDriverAssignmentSchedule({
+                serviceDate: order.service_date,
+                entryDate: order.entry_date,
+                entryTime: order.entry_time,
+                exitDate: order.exit_date,
+                exitTime: order.exit_time,
+              });
+              return (
+                <div className="space-y-3">
+                  <div className="rounded-lg border-2 border-amber-400 bg-amber-50 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                      Apresentação do motorista
+                    </p>
+                    <p className="mt-1 text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
+                      {formatDriverScheduleMoment(
+                        schedule.presentationDate,
+                        schedule.presentationTime,
+                      )}
+                    </p>
+                  </div>
+                  <div className="space-y-2 rounded-lg bg-slate-50 p-4">
+                    <p>
+                      <span className="text-slate-500">Data do serviço:</span>{" "}
+                      {formatServiceDate(schedule.serviceDate)}
+                    </p>
+                    <p>
+                      <span className="text-slate-500">Saída prevista:</span>{" "}
+                      <strong>
+                        {formatDriverScheduleMoment(
+                          schedule.departureDate,
+                          schedule.departureTime,
+                        )}
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+            <div className="space-y-2 rounded-lg bg-slate-50 p-4">
             <p>
               <span className="text-slate-500">Cliente:</span> {order.client_name ?? "—"}
-            </p>
-            <p>
-              <span className="text-slate-500">Data:</span>{" "}
-              {order.service_date ? formatServiceDate(order.service_date) : "—"}
             </p>
             <p>
               <span className="text-slate-500">Placa:</span> {order.plate ?? "—"}
@@ -185,6 +223,7 @@ export function PublicDriverAssignmentClient({ token }: Props) {
                 {formatCurrency(order.freight_toll_amount)}
               </p>
             )}
+            </div>
           </div>
 
           {canRespond && (
