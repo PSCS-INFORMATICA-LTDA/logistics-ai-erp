@@ -1,10 +1,24 @@
 -- Rollback da migration 085.
 -- Restaura o gatilho da 084 e o JSON público da 083.
--- Remove a função de nova designação e o histórico.
+-- Remove a função de nova designação.
+-- Preserva a tabela de histórico quando ela já tem registros.
 -- Não devolve TRUNCATE nem EXECUTE de seed_drivers.
 
 DROP FUNCTION IF EXISTS public.reassign_accepted_service_order_driver(uuid, uuid, numeric, numeric);
-DROP TABLE IF EXISTS public.service_order_driver_acceptance_history;
+
+DO $$
+BEGIN
+  IF to_regclass('public.service_order_driver_acceptance_history') IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.service_order_driver_acceptance_history) THEN
+    RAISE NOTICE 'Histórico preservado; a tabela não foi removida.';
+    RETURN;
+  END IF;
+
+  DROP TABLE public.service_order_driver_acceptance_history;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.guard_service_order_direct_confirmation()
 RETURNS trigger
