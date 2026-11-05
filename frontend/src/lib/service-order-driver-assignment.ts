@@ -36,9 +36,7 @@ export type PublicDriverAssignmentPayload = {
     | "freight_origin_address"
     | "freight_destination_address"
     | "freight_distance_km"
-    | "freight_agreed_amount"
     | "freight_toll_amount"
-    | "service_amount"
   >;
 };
 
@@ -533,6 +531,47 @@ export async function sendDriverAssignment(
   return {
     token: payload?.token ?? null,
     sentAt: payload?.driver_assignment_sent_at ?? null,
+    proposedDriverId: payload?.proposed_driver_id ?? driverId,
+    error: null,
+  };
+}
+
+export async function reassignAcceptedServiceOrderDriver(
+  supabase: SupabaseClient,
+  orderId: string,
+  driverId: string,
+  payDetails: DriverAssignmentPayDetails
+): Promise<{
+  token: string | null;
+  proposedDriverId: string | null;
+  error: string | null;
+}> {
+  const { data, error } = await supabase.rpc("reassign_accepted_service_order_driver", {
+    p_order_id: orderId,
+    p_driver_id: driverId,
+    p_driver_pay_amount: payDetails.driverPayAmount,
+    p_assistant_pay_amount: payDetails.assistantPayAmount ?? null,
+  });
+
+  if (error) {
+    const message = error.message.includes("reassign_accepted_service_order_driver")
+      ? "Função de nova designação indisponível. Aplique a migration 085 no DEV."
+      : error.message;
+    return { token: null, proposedDriverId: null, error: message };
+  }
+
+  const payload = data as {
+    token?: string;
+    proposed_driver_id?: string;
+    driver_assignment_response?: string;
+  } | null;
+
+  if (payload?.driver_assignment_response && payload.driver_assignment_response !== "pending") {
+    return { token: null, proposedDriverId: null, error: "A nova designação precisa aguardar outro aceite." };
+  }
+
+  return {
+    token: payload?.token ?? null,
     proposedDriverId: payload?.proposed_driver_id ?? driverId,
     error: null,
   };

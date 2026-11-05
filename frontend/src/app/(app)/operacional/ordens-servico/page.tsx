@@ -25,6 +25,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchActiveFleetVehicles, fleetVehicleLabel } from "@/lib/fleet-vehicles";
 import { requiresPerDiem } from "@/lib/freight-per-diem";
 import { isTruckCategory } from "@/lib/transport-van-estimate";
+import { isCanonicalDriverConfirmed } from "@/lib/driver-confirmed";
 import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
 import { serviceOrderClientLinkStatus } from "@/lib/service-order-client";
 import {
@@ -791,6 +792,16 @@ function OrdensServicoPageContent() {
             }
             if (!data.driver_id) {
               window.alert("Selecione o motorista.");
+              return;
+            }
+            if (
+              item?.id &&
+              isCanonicalDriverConfirmed(item) &&
+              String(data.driver_id) !== String(item.driver_id)
+            ) {
+              window.alert(
+                "Motorista confirmado só pode ser substituído por uma nova designação. O aceite anterior permanece no histórico e o novo motorista precisa aceitar."
+              );
               return;
             }
             if (data.service_amount === "" || data.service_amount == null) {

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
 import {
   canAssignDriverToServiceOrder,
+  canReplaceConfirmedDriver,
   canViewDriverVoucher,
   isDriverAssignmentRejected,
   isFreightInExecution,
@@ -159,6 +160,8 @@ export function ServiceOrderRowActions({
   const canPhoneResponse = isPendingClientProposal(row);
   const canDriverPhoneResponse = isPendingDriverAssignment(row);
   const canAssignDriver = canAssignDriverToServiceOrder(row);
+  const canReplaceDriver = canReplaceConfirmedDriver(row);
+  const [assignReplacement, setAssignReplacement] = useState(false);
   const driverRejected = isDriverAssignmentRejected(row);
   const canResetProposal =
     Boolean(row.proposal_sent_at) && (row.proposal_response ?? "pending") !== "pending";
@@ -476,6 +479,20 @@ export function ServiceOrderRowActions({
             <span className="hidden sm:inline">DRE legado</span>
           </Link>
         ) : null}
+        {canReplaceDriver && (
+          <button
+            type="button"
+            title="Substituir o motorista confirmado. O aceite anterior fica no histórico e o novo motorista precisa aceitar."
+            onClick={() => {
+              setAssignReplacement(true);
+              setAssignOpen(true);
+            }}
+            className={`${glassAction("amber", true)} action-icon-btn`}
+          >
+            <span className="sm:hidden">Troca</span>
+            <span className="hidden sm:inline">Nova designação</span>
+          </button>
+        )}
         {canAssignDriver && (
           <button
             type="button"
@@ -484,7 +501,10 @@ export function ServiceOrderRowActions({
                 ? "Designar outro motorista (anterior recusou)"
                 : "Designar motorista disponível"
             }
-            onClick={() => setAssignOpen(true)}
+            onClick={() => {
+              setAssignReplacement(false);
+              setAssignOpen(true);
+            }}
             className={`${glassAction(driverRejected ? "red" : "brand", true)} action-icon-btn`}
           >
             {driverRejected ? (
@@ -629,6 +649,7 @@ export function ServiceOrderRowActions({
       <AssignDriverModal
         open={assignOpen}
         order={row}
+        replacement={assignReplacement}
         onClose={() => setAssignOpen(false)}
         onAssigned={(driverId, driverName) => {
           onDriverAssigned?.(row.id, driverId, driverName);

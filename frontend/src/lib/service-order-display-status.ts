@@ -102,6 +102,15 @@ export function canAssignDriverToServiceOrder(
   return true;
 }
 
+/** Motorista já aceito: a troca só entra pela nova designação, que pede outro aceite. */
+export function canReplaceConfirmedDriver(row: ServiceOrderStatusRow): boolean {
+  return (
+    isDriverConfirmedOnServiceOrder(row) &&
+    row.status !== "Concluido" &&
+    row.status !== "Cancelado"
+  );
+}
+
 /** Status operacional único — evita conflito entre colunas Proposta e Status. */
 export function resolveServiceOrderDisplayStatus(row: ServiceOrderStatusRow): string {
   const response = row.proposal_response ?? "pending";
