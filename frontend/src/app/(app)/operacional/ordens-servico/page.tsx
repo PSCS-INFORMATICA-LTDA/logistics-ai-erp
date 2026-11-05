@@ -659,9 +659,15 @@ function OrdensServicoPageContent() {
         {
           key: "status",
           label: "Status",
+          wrapContent: true,
+          className: "min-w-0 w-[9.5rem]",
           render: (r) => {
             const label = resolveServiceOrderDisplayStatus(r);
-            return <Badge variant={serviceOrderStatusVariant(r)}>{label}</Badge>;
+            return (
+              <Badge variant={serviceOrderStatusVariant(r)}>
+                <span title={label}>{label}</span>
+              </Badge>
+            );
           },
         },
         {

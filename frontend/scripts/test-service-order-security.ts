@@ -47,6 +47,7 @@ describe("OS003 confirmada", () => {
 
   it("o nome longo deixa de usar reticências e expõe o texto completo", () => {
     assert.match(listPage, /wrapContent: true/);
+    assert.match(listPage, /key: "status"[\s\S]{0,240}wrapContent: true/);
     assert.match(listPage, /aria-label=\{label\}/);
     assert.match(listPage, /title=\{label\}/);
     assert.match(crudPage, /wrapContent \? "whitespace-normal break-words align-top" : "truncate"/);
