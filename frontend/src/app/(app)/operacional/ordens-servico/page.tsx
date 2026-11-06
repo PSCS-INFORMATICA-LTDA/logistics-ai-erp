@@ -25,6 +25,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchActiveFleetVehicles, fleetVehicleLabel } from "@/lib/fleet-vehicles";
 import { requiresPerDiem } from "@/lib/freight-per-diem";
 import { isTruckCategory } from "@/lib/transport-van-estimate";
+import { isCanonicalDriverConfirmed } from "@/lib/driver-confirmed";
 import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
 import { serviceOrderClientLinkStatus } from "@/lib/service-order-client";
 import {
@@ -39,6 +40,7 @@ import {
   matchesServiceOrderStatusFilter,
   resolveServiceOrderDisplayStatus,
   resolveServiceOrderDriverColumnLabel,
+  serviceOrderFormStatus,
   serviceOrderStatusVariant,
 } from "@/lib/service-order-display-status";
 import {
@@ -520,6 +522,7 @@ function OrdensServicoPageContent() {
       table="service_orders"
       auditScreenKey="operacional.ordens-servico"
       compactTable
+      cardsUntil="xl"
       orderBy="service_date"
       softDelete={false}
       transformItems={transformItems}
@@ -622,23 +625,20 @@ function OrdensServicoPageContent() {
         {
           key: "driver_name",
           label: "Motorista",
+          wrapContent: true,
+          className: "os-driver-col w-[13rem] min-w-[13rem] max-w-[18rem]",
           render: (r) => {
             const label = resolveServiceOrderDriverColumnLabel(r);
-            if (isDriverAssignmentRejected(r)) {
-              return (
-                <span className="font-medium text-red-700" title={label}>
-                  {label}
-                </span>
-              );
-            }
-            if (needsDriverAssignment(r) && !isPendingDriverAssignment(r)) {
-              return (
-                <span className="font-medium text-amber-700" title={label}>
-                  {label}
-                </span>
-              );
-            }
-            return <span title={label}>{label}</span>;
+            const tone = isDriverAssignmentRejected(r)
+              ? "font-medium text-red-700"
+              : needsDriverAssignment(r) && !isPendingDriverAssignment(r)
+                ? "font-medium text-amber-700"
+                : undefined;
+            return (
+              <span className={tone} title={label} aria-label={label}>
+                {label}
+              </span>
+            );
           },
         },
         {
@@ -660,9 +660,15 @@ function OrdensServicoPageContent() {
         {
           key: "status",
           label: "Status",
+          wrapContent: true,
+          className: "min-w-0 w-[9.5rem]",
           render: (r) => {
             const label = resolveServiceOrderDisplayStatus(r);
-            return <Badge variant={serviceOrderStatusVariant(r)}>{label}</Badge>;
+            return (
+              <Badge variant={serviceOrderStatusVariant(r)}>
+                <span title={label}>{label}</span>
+              </Badge>
+            );
           },
         },
         {
@@ -741,7 +747,7 @@ function OrdensServicoPageContent() {
                 : categoriesForServiceType(item?.service_type ?? "Transporte"),
             chart_of_account_id: item?.chart_of_account_id ?? "",
             service_amount: item?.service_amount ?? "",
-            status: item?.status ?? "Aberto",
+            status: serviceOrderFormStatus(item?.status),
             entry_date: item?.entry_date ?? "",
             entry_time: item?.entry_time ?? "",
             exit_date: item?.exit_date ?? "",
@@ -793,6 +799,16 @@ function OrdensServicoPageContent() {
             }
             if (!data.driver_id) {
               window.alert("Selecione o motorista.");
+              return;
+            }
+            if (
+              item?.id &&
+              isCanonicalDriverConfirmed(item) &&
+              String(data.driver_id) !== String(item.driver_id)
+            ) {
+              window.alert(
+                "Motorista confirmado só pode ser substituído por uma nova designação. O aceite anterior permanece no histórico e o novo motorista precisa aceitar."
+              );
               return;
             }
             if (data.service_amount === "" || data.service_amount == null) {

@@ -21,6 +21,7 @@ import {
   formatMoneyInputValue,
   parseBrazilianMoneyInput,
   prepareDriverAssignmentSharePayload,
+  reassignAcceptedServiceOrderDriver,
   sendDriverAssignment,
   type DriverAssignmentPayDetails,
   type DriverAssignmentSharePayload,
@@ -44,7 +45,10 @@ type OrderSummary = Pick<
   | "client_name"
   | "service_type"
   | "service_date"
+  | "entry_date"
   | "entry_time"
+  | "exit_date"
+  | "exit_time"
   | "freight_origin_address"
   | "freight_destination_address"
   | "freight_distance_km"
@@ -63,7 +67,7 @@ type OrderSummary = Pick<
 };
 
 const ORDER_ASSIGNMENT_FIELDS =
-  "id, code, plate, client_name, service_type, service_date, entry_time, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at, driver_assignment_rejected_driver_ids, driver_assignment_pay_amount, driver_assignment_assistant_pay_amount";
+  "id, code, plate, client_name, service_type, service_date, entry_date, entry_time, exit_date, exit_time, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at, driver_assignment_rejected_driver_ids, driver_assignment_pay_amount, driver_assignment_assistant_pay_amount";
 
 const ORDER_ASSIGNMENT_FIELDS_LEGACY =
   "id, code, plate, client_name, service_type, service_date, entry_time, freight_origin_address, freight_destination_address, freight_distance_km, freight_agreed_amount, freight_toll_amount, service_amount, driver_assignment_response, proposed_driver_id, driver_assignment_rejected_at";
@@ -74,6 +78,7 @@ type Props = {
   onClose: () => void;
   onAssigned: (driverId: string, driverName: string) => void;
   onAssignmentSent?: (driverId: string, driverName: string) => void;
+  replacement?: boolean;
 };
 
 function driverAvailabilityLabel(driver: DriverListRow): string {
@@ -109,7 +114,14 @@ function DriverRefusedMark({ orderCode }: { orderCode: string }) {
   );
 }
 
-export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignmentSent }: Props) {
+export function AssignDriverModal({
+  open,
+  order,
+  onClose,
+  onAssigned,
+  onAssignmentSent,
+  replacement = false,
+}: Props) {
   const { companyId, company } = useCompany();
   const supabase = useMemo(() => createClient(), []);
   const [drivers, setDrivers] = useState<DriverListRow[]>([]);
@@ -363,12 +375,9 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
     setSelectedId(driver.id);
     setSaving(true);
 
-    const { token, error: sendError } = await sendDriverAssignment(
-      supabase,
-      order.id,
-      driver.id,
-      resolvedPay
-    );
+    const { token, error: sendError } = replacement
+      ? await reassignAcceptedServiceOrderDriver(supabase, order.id, driver.id, resolvedPay)
+      : await sendDriverAssignment(supabase, order.id, driver.id, resolvedPay);
     if (sendError || !token) {
       setSaving(false);
       window.alert(sendError ?? "Não foi possível registrar a designação.");
@@ -607,8 +616,13 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
       >
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 id="assign-driver-title" className="text-lg font-semibold text-slate-900">
-            Designar motorista
+            {replacement ? "Nova designação" : "Designar motorista"}
           </h2>
+          {replacement ? (
+            <p className="mt-1 text-sm text-slate-600">
+              O aceite anterior permanece no histórico. O novo motorista precisa aceitar.
+            </p>
+          ) : null}
           <p className="mt-1 text-sm text-slate-600">
             OS <strong>{orderDetails.code}</strong>
             {orderDetails.plate ? ` · ${orderDetails.plate}` : ""}
@@ -971,7 +985,7 @@ export function AssignDriverModal({ open, order, onClose, onAssigned, onAssignme
             <Button type="button" variant="secondary" disabled={saving} onClick={handleClose}>
               {sharePayload ? "Fechar" : "Cancelar"}
             </Button>
-            {!sharePayload ? (
+            {!sharePayload && !replacement ? (
               <Button
                 type="button"
                 variant="secondary"

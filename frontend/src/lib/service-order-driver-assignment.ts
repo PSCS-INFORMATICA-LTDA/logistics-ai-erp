@@ -27,14 +27,16 @@ export type PublicDriverAssignmentPayload = {
     | "code"
     | "service_type"
     | "service_date"
+    | "entry_date"
+    | "entry_time"
+    | "exit_date"
+    | "exit_time"
     | "plate"
     | "client_name"
     | "freight_origin_address"
     | "freight_destination_address"
     | "freight_distance_km"
-    | "freight_agreed_amount"
     | "freight_toll_amount"
-    | "service_amount"
   >;
 };
 
@@ -66,7 +68,10 @@ export type DriverAssignmentOrderSummary = Pick<
   | "code"
   | "service_type"
   | "service_date"
+  | "entry_date"
   | "entry_time"
+  | "exit_date"
+  | "exit_time"
   | "plate"
   | "client_name"
   | "freight_origin_address"
@@ -75,9 +80,111 @@ export type DriverAssignmentOrderSummary = Pick<
   | "freight_toll_amount"
 >;
 
-function formatPresentationTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  return String(value).slice(0, 5);
+export type DriverScheduleSource = "recorded" | "fallback" | "missing";
+
+export type DriverAssignmentSchedule = {
+  serviceDate: string | null;
+  departureDate: string | null;
+  departureTime: string | null;
+  presentationDate: string | null;
+  presentationTime: string | null;
+  presentationSource: DriverScheduleSource;
+};
+
+const PRESENTATION_LEAD_MINUTES = 30;
+
+function civilDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+}
+
+function clockMinutes(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = String(value).trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function formatClock(totalMinutes: number): string {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function shiftCivilDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return utc.toISOString().slice(0, 10);
+}
+
+/** Data e hora exibidas no card público e no WhatsApp. Não grava nada. */
+export function formatDriverScheduleMoment(
+  date: string | null,
+  time: string | null,
+): string {
+  const day = date ? formatServiceDate(date) : null;
+  if (day && day !== "—" && time) return `${day} ${time}`;
+  if (time) return time;
+  if (day && day !== "—") return day;
+  return "—";
+}
+
+/**
+ * Apresentação oficial: entry_date/entry_time.
+ * Sem apresentação cadastrada, a tela calcula 30 minutos antes da saída.
+ */
+export function resolveDriverAssignmentSchedule(input: {
+  serviceDate?: string | null;
+  entryDate?: string | null;
+  entryTime?: string | null;
+  exitDate?: string | null;
+  exitTime?: string | null;
+}): DriverAssignmentSchedule {
+  const serviceDate = civilDate(input.serviceDate);
+  const entryDate = civilDate(input.entryDate);
+  const exitDate = civilDate(input.exitDate);
+  const entryTime = clockMinutes(input.entryTime);
+  const exitTime = clockMinutes(input.exitTime);
+  const departureDate = exitTime == null ? null : exitDate ?? serviceDate;
+
+  if (entryTime != null) {
+    return {
+      serviceDate,
+      departureDate,
+      departureTime: exitTime == null ? null : formatClock(exitTime),
+      presentationDate: entryDate ?? serviceDate ?? exitDate,
+      presentationTime: formatClock(entryTime),
+      presentationSource: "recorded",
+    };
+  }
+
+  if (exitTime != null) {
+    const raw = exitTime - PRESENTATION_LEAD_MINUTES;
+    const baseDate = exitDate ?? serviceDate;
+    return {
+      serviceDate,
+      departureDate,
+      departureTime: formatClock(exitTime),
+      presentationDate: baseDate && raw < 0 ? shiftCivilDate(baseDate, -1) : baseDate,
+      presentationTime: formatClock(raw),
+      presentationSource: "fallback",
+    };
+  }
+
+  return {
+    serviceDate,
+    departureDate: null,
+    departureTime: null,
+    presentationDate: null,
+    presentationTime: null,
+    presentationSource: "missing",
+  };
 }
 
 const DRIVER_ASSIGNMENT_INTRO =
@@ -131,6 +238,13 @@ function appendDriverAssignmentOrderDetails(
   options?: { boldRoute?: boolean }
 ): void {
   const routeLabel = options?.boldRoute ? "*Rota*" : "Rota";
+  const schedule = resolveDriverAssignmentSchedule({
+    serviceDate: order.service_date,
+    entryDate: order.entry_date,
+    entryTime: order.entry_time,
+    exitDate: order.exit_date,
+    exitTime: order.exit_time,
+  });
 
   lines.push(
     "",
@@ -138,7 +252,8 @@ function appendDriverAssignmentOrderDetails(
     `Cliente: ${order.client_name ?? "—"}`,
     `Tipo: ${SERVICE_ORDER_TYPE_LABELS[order.service_type] ?? order.service_type}`,
     `Data: ${formatServiceDate(order.service_date)}`,
-    `Horário de apresentação: ${formatPresentationTime(order.entry_time)}`,
+    `Saída prevista: ${formatDriverScheduleMoment(schedule.departureDate, schedule.departureTime)}`,
+    `Horário de apresentação: ${formatDriverScheduleMoment(schedule.presentationDate, schedule.presentationTime)}`,
     `Placa: ${order.plate ?? "—"}`
   );
 
@@ -416,6 +531,47 @@ export async function sendDriverAssignment(
   return {
     token: payload?.token ?? null,
     sentAt: payload?.driver_assignment_sent_at ?? null,
+    proposedDriverId: payload?.proposed_driver_id ?? driverId,
+    error: null,
+  };
+}
+
+export async function reassignAcceptedServiceOrderDriver(
+  supabase: SupabaseClient,
+  orderId: string,
+  driverId: string,
+  payDetails: DriverAssignmentPayDetails
+): Promise<{
+  token: string | null;
+  proposedDriverId: string | null;
+  error: string | null;
+}> {
+  const { data, error } = await supabase.rpc("reassign_accepted_service_order_driver", {
+    p_order_id: orderId,
+    p_driver_id: driverId,
+    p_driver_pay_amount: payDetails.driverPayAmount,
+    p_assistant_pay_amount: payDetails.assistantPayAmount ?? null,
+  });
+
+  if (error) {
+    const message = error.message.includes("reassign_accepted_service_order_driver")
+      ? "Função de nova designação indisponível. Aplique a migration 085 no DEV."
+      : error.message;
+    return { token: null, proposedDriverId: null, error: message };
+  }
+
+  const payload = data as {
+    token?: string;
+    proposed_driver_id?: string;
+    driver_assignment_response?: string;
+  } | null;
+
+  if (payload?.driver_assignment_response && payload.driver_assignment_response !== "pending") {
+    return { token: null, proposedDriverId: null, error: "A nova designação precisa aguardar outro aceite." };
+  }
+
+  return {
+    token: payload?.token ?? null,
     proposedDriverId: payload?.proposed_driver_id ?? driverId,
     error: null,
   };

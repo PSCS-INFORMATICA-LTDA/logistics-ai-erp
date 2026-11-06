@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { needsManualCompanyDriverExpense } from "@/lib/legacy-driver-expense";
 import {
   canAssignDriverToServiceOrder,
+  canReplaceConfirmedDriver,
   canViewDriverVoucher,
   isDriverAssignmentRejected,
   isFreightInExecution,
@@ -22,7 +23,10 @@ import {
   respondToDriverAssignment,
 } from "@/lib/service-order-driver-assignment";
 import { registerServiceOrderFollowUp } from "@/lib/service-order-operational-api";
-import { closeIntegratedMessage } from "@/lib/pscs-one/core/closeMessages";
+import {
+  OPERATIONAL_CLOSE_REPLAY,
+  OPERATIONAL_CLOSE_SUCCESS,
+} from "@/lib/service-order-operational-close";
 import {
   registerProposalFollowUp,
   resetProposalClientResponse,
@@ -156,6 +160,8 @@ export function ServiceOrderRowActions({
   const canPhoneResponse = isPendingClientProposal(row);
   const canDriverPhoneResponse = isPendingDriverAssignment(row);
   const canAssignDriver = canAssignDriverToServiceOrder(row);
+  const canReplaceDriver = canReplaceConfirmedDriver(row);
+  const [assignReplacement, setAssignReplacement] = useState(false);
   const driverRejected = isDriverAssignmentRejected(row);
   const canResetProposal =
     Boolean(row.proposal_sent_at) && (row.proposal_response ?? "pending") !== "pending";
@@ -340,7 +346,7 @@ export function ServiceOrderRowActions({
   const handleCompleteFreight = async () => {
     if (
       !window.confirm(
-        `Registrar conclusão do frete OS ${row.code}?\n\nA OS só fica «Concluído» se o recebível do cliente for registrado no PSCS One.`
+        `Registrar conclusão do frete OS ${row.code}?\n\nA conclusão fica no Logistics e exige motorista confirmado.`
       )
     ) {
       return;
@@ -349,7 +355,9 @@ export function ServiceOrderRowActions({
     setCompleting(true);
     type ClosePayload = {
       ok?: boolean;
+      already_completed?: boolean;
       receivable_created?: boolean;
+      message?: string;
       order?: { service_completed_at?: string | null };
       error?: { code?: string; message?: string };
     };
@@ -360,23 +368,12 @@ export function ServiceOrderRowActions({
         headers: { Accept: "application/json" },
       });
       payload = (await response.json()) as ClosePayload;
-      if (!response.ok || payload?.ok !== true) {
-        window.alert(
-          closeIntegratedMessage({
-            ok: false,
-            code: payload?.error?.code,
-            fallback: payload?.error?.message,
-          })
-        );
+      if (!response.ok || payload?.ok !== true || payload.receivable_created === true) {
+        window.alert(payload?.error?.message ?? "Não foi possível concluir a OS. Tente novamente.");
         return;
       }
     } catch {
-      window.alert(
-        closeIntegratedMessage({
-          ok: false,
-          code: "core_unavailable",
-        })
-      );
+      window.alert("Não foi possível concluir a OS. Tente novamente.");
       return;
     } finally {
       setCompleting(false);
@@ -384,10 +381,9 @@ export function ServiceOrderRowActions({
 
     const completedAt = payload?.order?.service_completed_at ?? null;
     onServiceOrderCompleted?.(row.id, completedAt);
-    const headline = closeIntegratedMessage({
-      ok: true,
-      receivableCreated: payload?.receivable_created === true,
-    });
+    const headline =
+      payload?.message ??
+      (payload?.already_completed ? OPERATIONAL_CLOSE_REPLAY : OPERATIONAL_CLOSE_SUCCESS);
     if (manualCompanyDriverExpense) {
       window.alert(
         `${headline}\n\nEsta OS é legado/importada e não tem valor de motorista/ajudante na designação.\n\nAutorizado: lançar em DRE → Lançamentos da empresa (conta Motorista/Ajudante).\nObrigatório informar o nº da OS — sem isso o rateio por sócios não aloca a despesa.`
@@ -483,6 +479,20 @@ export function ServiceOrderRowActions({
             <span className="hidden sm:inline">DRE legado</span>
           </Link>
         ) : null}
+        {canReplaceDriver && (
+          <button
+            type="button"
+            title="Substituir o motorista confirmado. O aceite anterior fica no histórico e o novo motorista precisa aceitar."
+            onClick={() => {
+              setAssignReplacement(true);
+              setAssignOpen(true);
+            }}
+            className={`${glassAction("amber", true)} action-icon-btn`}
+          >
+            <span className="sm:hidden">Troca</span>
+            <span className="hidden sm:inline">Nova designação</span>
+          </button>
+        )}
         {canAssignDriver && (
           <button
             type="button"
@@ -491,7 +501,10 @@ export function ServiceOrderRowActions({
                 ? "Designar outro motorista (anterior recusou)"
                 : "Designar motorista disponível"
             }
-            onClick={() => setAssignOpen(true)}
+            onClick={() => {
+              setAssignReplacement(false);
+              setAssignOpen(true);
+            }}
             className={`${glassAction(driverRejected ? "red" : "brand", true)} action-icon-btn`}
           >
             {driverRejected ? (
@@ -636,6 +649,7 @@ export function ServiceOrderRowActions({
       <AssignDriverModal
         open={assignOpen}
         order={row}
+        replacement={assignReplacement}
         onClose={() => setAssignOpen(false)}
         onAssigned={(driverId, driverName) => {
           onDriverAssigned?.(row.id, driverId, driverName);
