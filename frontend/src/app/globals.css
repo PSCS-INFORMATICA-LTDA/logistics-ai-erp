@@ -1456,6 +1456,27 @@ body {
   }
 }
 
+/**
+ * OS: a coluna Motorista precisa de largura real.
+ * Com table-layout:fixed e min-width:0 na tabela, min-width da célula é ignorado
+ * e o nome quebra no meio da palavra (cerca de 55px em 768px).
+ * A rolagem fica só no quadro da tabela; a página não acompanha.
+ */
+.data-table-scroll--compact.data-table-scroll--fit:has(.os-driver-col) table {
+  width: max(100%, 56rem) !important;
+  min-width: 56rem !important;
+}
+
+.data-table-scroll--compact.data-table-scroll--fit th.os-driver-col,
+.data-table-scroll--compact.data-table-scroll--fit td.os-driver-col {
+  width: 13rem;
+  min-width: 13rem;
+  max-width: 18rem;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 /** Lista densa (OS): cabe em 100% no desktop; coluna Ações com wrap. */
 .data-table-scroll--compact.data-table-scroll--fit.data-table-scroll--sticky-last thead th:last-child,
 .data-table-scroll--compact.data-table-scroll--fit.data-table-scroll--sticky-last tbody td:last-child {

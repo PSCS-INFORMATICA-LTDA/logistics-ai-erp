@@ -522,6 +522,7 @@ function OrdensServicoPageContent() {
       table="service_orders"
       auditScreenKey="operacional.ordens-servico"
       compactTable
+      cardsUntil="xl"
       orderBy="service_date"
       softDelete={false}
       transformItems={transformItems}
@@ -625,7 +626,7 @@ function OrdensServicoPageContent() {
           key: "driver_name",
           label: "Motorista",
           wrapContent: true,
-          className: "min-w-[9rem] max-w-[18rem]",
+          className: "os-driver-col w-[13rem] min-w-[13rem] max-w-[18rem]",
           render: (r) => {
             const label = resolveServiceOrderDriverColumnLabel(r);
             const tone = isDriverAssignmentRejected(r)

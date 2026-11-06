@@ -85,6 +85,11 @@ type CrudPageProps<T extends { id: string }> = {
    * No desktop: mantém a tabela. Ideal para Contas DRE / listas com nomes longos.
    */
   cardsOnMobile?: boolean;
+  /**
+   * Até qual largura os cartões substituem a tabela.
+   * `xl` cobre tablet em que a tabela densa não cabe sem esconder o status.
+   */
+  cardsUntil?: "md" | "xl";
 };
 
 export function CrudPage<T extends { id: string }>({
@@ -113,6 +118,7 @@ export function CrudPage<T extends { id: string }>({
   compactTable = true,
   /** Padrão: cartões legíveis no celular — o usuário precisa ler nome/código sem truncar. */
   cardsOnMobile = true,
+  cardsUntil = "md",
 }: CrudPageProps<T>) {
   const { companyId, loading: companyLoading } = useCompany();
   const { canEditScreen, canDeleteScreen, isAdmin, loading: accessLoading } = useAccess();
@@ -556,7 +562,7 @@ export function CrudPage<T extends { id: string }>({
           ) : (
             <>
               {cardsOnMobile ? (
-                <ul className="space-y-3 bg-slate-50/60 p-3 md:hidden">
+                <ul className={cardsUntil === "xl" ? "space-y-3 bg-slate-50/60 p-3 xl:hidden" : "space-y-3 bg-slate-50/60 p-3 md:hidden"}>
                   {visibleItems.map((row) => {
                     const canEdit = screenCanEdit && (canEditRow?.(row) ?? true);
                     const editTitle = !screenCanEdit
@@ -689,7 +695,7 @@ export function CrudPage<T extends { id: string }>({
                   fitWidth: true,
                   className: compactTable ? "data-table-scroll--compact" : undefined,
                 }),
-                cardsOnMobile && "hidden md:block"
+                cardsOnMobile && (cardsUntil === "xl" ? "hidden xl:block" : "hidden md:block")
               )}
             >
             <table className={compactTable ? "w-full text-[11px] leading-snug sm:text-xs" : "w-full text-sm"}>
