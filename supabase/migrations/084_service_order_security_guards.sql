@@ -8,6 +8,14 @@
 -- Não devolver TRUNCATE a authenticated ou service_role.
 -- Não devolver EXECUTE de seed_drivers a anon, PUBLIC ou authenticated.
 --
+-- Histórico aplicado no DEV (jmbajdpkvlrslirwzyze), versão 20261105145223:
+-- o REVOKE de seed_drivers era incondicional. A função existe no DEV, então
+-- o efeito daquela execução é o mesmo deste arquivo. Não reaplicar no DEV.
+-- PROD (tqeenmswotxqainkyyct) não tem public.seed_drivers(uuid). O REVOKE
+-- incondicional aborta 084 antes dos gatilhos. A revisão abaixo só torna
+-- essa revogação condicional. Os outros REVOKE/GRANT de 080–085 permanecem:
+-- o alvo já existe em PROD ou é criado antes do comando, na mesma cadeia.
+--
 -- Se o formulário não conseguir marcar Concluido ou reabrir uma ordem
 -- Cancelado, a alternativa é o fluxo oficial: complete_service_order para
 -- concluir, e uma RPC futura para reabrir. Não desfazer o gatilho para isso.
@@ -50,11 +58,20 @@ REVOKE ALL ON FUNCTION public.send_driver_assignment(uuid, uuid, numeric, numeri
 GRANT EXECUTE ON FUNCTION public.send_driver_assignment(uuid, uuid, numeric, numeric) TO authenticated;
 
 -- O aplicativo não chama seed_drivers. A função grava motoristas na empresa
--- recebida sem conferir o usuário. Fica restrita ao service_role.
-REVOKE ALL ON FUNCTION public.seed_drivers(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.seed_drivers(uuid) FROM anon;
-REVOKE ALL ON FUNCTION public.seed_drivers(uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.seed_drivers(uuid) TO service_role;
+-- recebida sem conferir o usuário. Quando existir, fica restrita ao service_role.
+-- to_regprocedure devolve NULL se a assinatura não existe e não aborta a transação.
+-- BEGIN seed_drivers revoke
+DO $revoke_seed_drivers$
+BEGIN
+  IF to_regprocedure('public.seed_drivers(uuid)') IS NOT NULL THEN
+    REVOKE ALL ON FUNCTION public.seed_drivers(uuid) FROM PUBLIC;
+    REVOKE ALL ON FUNCTION public.seed_drivers(uuid) FROM anon;
+    REVOKE ALL ON FUNCTION public.seed_drivers(uuid) FROM authenticated;
+    GRANT EXECUTE ON FUNCTION public.seed_drivers(uuid) TO service_role;
+  END IF;
+END
+$revoke_seed_drivers$;
+-- END seed_drivers revoke
 
 CREATE OR REPLACE FUNCTION public.guard_service_order_direct_confirmation()
 RETURNS trigger
