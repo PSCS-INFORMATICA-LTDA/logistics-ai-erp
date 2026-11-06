@@ -83,7 +83,9 @@ describe("migration 084 — testes negativos do contrato", () => {
       migration,
       /REVOKE ALL ON FUNCTION public\.send_driver_assignment\(uuid, uuid, numeric, numeric\) FROM anon/,
     );
+    assert.match(migration, /to_regprocedure\('public\.seed_drivers\(uuid\)'\) IS NOT NULL/);
     assert.match(migration, /REVOKE ALL ON FUNCTION public\.seed_drivers\(uuid\) FROM authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.seed_drivers\(uuid\) TO service_role/);
     assert.doesNotMatch(migration, /get_public_driver_assignment/);
     assert.doesNotMatch(migration, /REVOKE ALL ON FUNCTION public\.respond_to_driver_assignment/);
   });
