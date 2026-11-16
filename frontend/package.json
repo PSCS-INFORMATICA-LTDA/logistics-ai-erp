@@ -26,6 +26,7 @@
     "test:084-seed-drivers": "npx tsx --test scripts/test-084-seed-drivers-revoke.ts",
     "test:driver-reassignment": "npx tsx --test scripts/test-driver-reassignment.ts",
     "test:service-order-client": "npx tsx --test scripts/test-service-order-client.ts",
+    "test:role-access": "npx tsx --test scripts/test-role-access.ts",
     "qa:core-ar:dev": "npx tsx scripts/core-ar-dev-live.mjs",
     "demo:freight:seed": "node scripts/freight-demo-dev.mjs seed",
     "demo:freight:verify": "node scripts/freight-demo-dev.mjs verify",

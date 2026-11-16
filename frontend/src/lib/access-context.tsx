@@ -9,11 +9,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { APP_SCREENS, FULL_ACCESS, type ScreenPermissionFlags } from "@/lib/app-screens";
+import {
+  APP_SCREENS,
+  asCompanyMemberRole,
+  canRoleDeleteScreen,
+  canRoleEditScreen,
+  canRoleViewScreen,
+  type CompanyMemberRole,
+  type ScreenPermissionFlags,
+} from "@/lib/app-screens";
 import { useCompany } from "@/lib/company-context";
 import { createClient } from "@/lib/supabase/client";
 
-export type MemberRole = "admin" | "financeiro" | "operacional" | "socio";
+export type MemberRole = CompanyMemberRole;
 
 type AccessContextValue = {
   loading: boolean;
@@ -33,9 +41,9 @@ const AccessContext = createContext<AccessContextValue>({
   role: null,
   partnerId: null,
   isAdmin: false,
-  canViewScreen: () => true,
-  canEditScreen: () => true,
-  canDeleteScreen: () => true,
+  canViewScreen: () => false,
+  canEditScreen: () => false,
+  canDeleteScreen: () => false,
   permissionsByScreen: {},
   refreshAccess: async () => {},
 });
@@ -49,8 +57,8 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const [permissionsByScreen, setPermissionsByScreen] = useState<
     Record<string, ScreenPermissionFlags>
   >({});
-  /** Sócio com partner_id: permissões finas. Sem partner após load = legado full. */
-  const [accessMode, setAccessMode] = useState<"loading" | "full" | "restricted">(
+  /** full só para admin. restricted usa matriz de sócio ou allowlist do papel. */
+  const [accessMode, setAccessMode] = useState<"loading" | "full" | "restricted" | "denied">(
     "loading"
   );
 
@@ -71,7 +79,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       setRole(null);
       setPartnerId(null);
       setPermissionsByScreen({});
-      setAccessMode("full");
+      setAccessMode("denied");
       setLoading(false);
       return;
     }
@@ -83,17 +91,25 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const memberRole = (membership?.role as MemberRole | undefined) ?? null;
+    const memberRole = asCompanyMemberRole(membership?.role);
     const linkedPartnerId = (membership?.partner_id as string | null) ?? null;
     setRole(memberRole);
     setPartnerId(linkedPartnerId);
 
-    if (memberRole === "admin" || !linkedPartnerId) {
-      // Admin = tudo. Sem partner vinculado: mantém acesso legado completo.
+    if (memberRole === "admin") {
       const full: Record<string, ScreenPermissionFlags> = {};
-      for (const screen of APP_SCREENS) full[screen.key] = { ...FULL_ACCESS };
+      for (const screen of APP_SCREENS) {
+        full[screen.key] = { can_view: true, can_edit: true, can_delete: true };
+      }
       setPermissionsByScreen(full);
       setAccessMode("full");
+      setLoading(false);
+      return;
+    }
+
+    if (!linkedPartnerId) {
+      setPermissionsByScreen({});
+      setAccessMode(memberRole ? "restricted" : "denied");
       setLoading(false);
       return;
     }
@@ -133,25 +149,33 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       permissionsByScreen,
       refreshAccess,
       canViewScreen: (screenKey: string) => {
-        if (!accessReady) return false;
-        if (accessMode === "full" || isAdmin) return true;
-        if (
-          screenKey === "configuracoes.parametros" ||
-          screenKey === "configuracoes.historico-exclusoes"
-        ) {
-          return false;
-        }
-        return Boolean(permissionsByScreen[screenKey]?.can_view);
+        if (!accessReady || accessMode === "denied") return false;
+        return canRoleViewScreen({
+          role,
+          partnerId,
+          screenKey,
+          partnerCanView: Boolean(permissionsByScreen[screenKey]?.can_view),
+        });
       },
       canEditScreen: (screenKey: string) => {
-        if (!accessReady) return false;
-        if (accessMode === "full" || isAdmin) return true;
-        return Boolean(permissionsByScreen[screenKey]?.can_edit);
+        if (!accessReady || accessMode === "denied") return false;
+        return canRoleEditScreen({
+          role,
+          partnerId,
+          screenKey,
+          partnerCanView: Boolean(permissionsByScreen[screenKey]?.can_view),
+          partnerCanEdit: Boolean(permissionsByScreen[screenKey]?.can_edit),
+        });
       },
       canDeleteScreen: (screenKey: string) => {
-        if (!accessReady) return false;
-        if (accessMode === "full" || isAdmin) return true;
-        return Boolean(permissionsByScreen[screenKey]?.can_delete);
+        if (!accessReady || accessMode === "denied") return false;
+        return canRoleDeleteScreen({
+          role,
+          partnerId,
+          screenKey,
+          partnerCanView: Boolean(permissionsByScreen[screenKey]?.can_view),
+          partnerCanDelete: Boolean(permissionsByScreen[screenKey]?.can_delete),
+        });
       },
     }),
     [

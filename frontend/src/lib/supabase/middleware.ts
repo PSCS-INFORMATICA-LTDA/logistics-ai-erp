@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveAuthEntryRedirect } from "@/lib/auth/recovery-redirect";
 import {
+  resolveApiAccess,
   resolveForbiddenRedirect,
   resolvePostLoginPath,
 } from "@/lib/access-server";
@@ -101,6 +102,16 @@ export async function updateSession(request: NextRequest) {
     }
 
     const pathname = request.nextUrl.pathname;
+    if (pathname.startsWith("/api/") && !isBillingWebhook) {
+      const apiAccess = await resolveApiAccess(supabase, user.id, pathname, mappedCompanyId);
+      if (apiAccess === "deny") {
+        return NextResponse.json(
+          { error: "Sem permissão para esta operação." },
+          { status: 403 },
+        );
+      }
+    }
+
     if (
       !pathname.startsWith("/api/") &&
       !isPublicProposal &&
