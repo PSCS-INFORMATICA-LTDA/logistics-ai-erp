@@ -93,6 +93,12 @@ export const APP_SCREENS: AppScreen[] = [
     group: "Financeiro",
     href: "/financeiro/contas",
   },
+  {
+    key: "financeiro.pagamentos-motorista",
+    label: "Pagamentos de motorista",
+    group: "Financeiro",
+    href: "/cadastros/motoristas/pagamentos",
+  },
   { key: "cadastros.socios", label: "Sócios", group: "Cadastros", href: "/cadastros/socios" },
   { key: "cadastros.veiculos", label: "Veículos", group: "Cadastros", href: "/cadastros/veiculos" },
   {
@@ -177,10 +183,11 @@ export const APP_SCREENS: AppScreen[] = [
 ];
 
 export function screenKeyFromPath(pathname: string): string | null {
-  const match = APP_SCREENS.find(
-    (s) => pathname === s.href || pathname.startsWith(`${s.href}/`)
+  const matches = APP_SCREENS.filter(
+    (s) => pathname === s.href || pathname.startsWith(`${s.href}/`),
   );
-  return match?.key ?? null;
+  matches.sort((a, b) => b.href.length - a.href.length);
+  return matches[0]?.key ?? null;
 }
 
 /** Primeira tela liberada (ordem do menu), ou null se nenhuma. */
@@ -214,8 +221,9 @@ export type CompanyMemberRole = "admin" | "financeiro" | "operacional" | "socio"
  * - operacional e socio sem partner_id: OS (proposta, follow-up, fechamento e
  *   designação na mesma tela) e cadastro de motoristas. Sem financeiro, DRE,
  *   pátio ou configurações.
- * - financeiro sem partner_id: Contas a Pagar e Contas Financeiras. Sem DRE,
- *   sem configurações e sem administração.
+ * - financeiro sem partner_id: Contas a Pagar, Contas Financeiras e a baixa
+ *   de pagamento do motorista. Sem DRE, sem configurações e sem administração.
+ * - /cadastros/motoristas/pagamentos não herda o cadastro de motoristas.
  * - DRE permanece só com admin até haver regra de negócio explícita.
  * - Com partner_id, a matriz partner_screen_permissions continua valendo, mas
  *   não devolve financeiro a operacional/socio nem configurações a quem não é admin.
@@ -230,6 +238,7 @@ export const OPERATIONAL_SCREEN_KEYS = [
 export const FINANCE_ROLE_SCREEN_KEYS = [
   "financeiro.contas-a-pagar",
   "financeiro.contas",
+  "financeiro.pagamentos-motorista",
 ] as const;
 
 const OPERATIONAL_SCREEN_SET = new Set<string>(OPERATIONAL_SCREEN_KEYS);

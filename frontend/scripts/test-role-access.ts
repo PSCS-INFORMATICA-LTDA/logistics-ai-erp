@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   apiAuthorization,
   canRoleDeleteScreen,
   canRoleEditScreen,
   canRoleViewScreen,
+  screenKeyFromPath,
 } from "../src/lib/app-screens.ts";
 
 const base = {
@@ -32,6 +34,14 @@ describe("matriz de papéis sem partner_id", () => {
     assert.equal(
       canRoleViewScreen({ ...base, role: "operacional", screenKey: "cadastros.motoristas" }),
       true,
+    );
+    assert.equal(
+      canRoleViewScreen({
+        ...base,
+        role: "operacional",
+        screenKey: "financeiro.pagamentos-motorista",
+      }),
+      false,
     );
     assert.equal(
       canRoleViewScreen({ ...base, role: "operacional", screenKey: "financeiro.contas" }),
@@ -66,6 +76,22 @@ describe("matriz de papéis sem partner_id", () => {
     );
     assert.equal(
       canRoleViewScreen({ ...base, role: "financeiro", screenKey: "financeiro.contas" }),
+      true,
+    );
+    assert.equal(
+      canRoleViewScreen({
+        ...base,
+        role: "financeiro",
+        screenKey: "financeiro.pagamentos-motorista",
+      }),
+      true,
+    );
+    assert.equal(
+      canRoleEditScreen({
+        ...base,
+        role: "financeiro",
+        screenKey: "financeiro.pagamentos-motorista",
+      }),
       true,
     );
     assert.equal(
@@ -123,6 +149,48 @@ describe("matriz de papéis sem partner_id", () => {
       }),
       true,
     );
+  });
+});
+
+describe("rota de pagamento do motorista", () => {
+  it("não herda a permissão do cadastro de motoristas", () => {
+    assert.equal(
+      screenKeyFromPath("/cadastros/motoristas"),
+      "cadastros.motoristas",
+    );
+    assert.equal(
+      screenKeyFromPath("/cadastros/motoristas/pagamentos"),
+      "financeiro.pagamentos-motorista",
+    );
+    assert.equal(
+      canRoleViewScreen({
+        ...base,
+        role: "operacional",
+        screenKey: screenKeyFromPath("/cadastros/motoristas/pagamentos") ?? "",
+      }),
+      false,
+    );
+    assert.equal(
+      canRoleViewScreen({
+        ...base,
+        role: "admin",
+        screenKey: "financeiro.pagamentos-motorista",
+      }),
+      true,
+    );
+  });
+
+  it("a migration 087 exige papel financeiro na baixa e revoga anon", () => {
+    const sql = readFileSync(
+      new URL("../../supabase/migrations/087_driver_payment_and_finance_rpc_guards.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(sql, /auth_user_can_access_company_finance/);
+    assert.match(sql, /Sem acesso financeiro à empresa/);
+    assert.match(sql, /REVOKE ALL ON FUNCTION public\.mark_driver_payment_paid\(uuid\) FROM anon/);
+    assert.match(sql, /seed_dashboard_demo_impl/);
+    assert.match(sql, /_ap_post_competence_impl/);
+    assert.doesNotMatch(sql, /APPLY MIGRATION/);
   });
 });
 
