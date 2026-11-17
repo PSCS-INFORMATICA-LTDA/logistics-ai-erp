@@ -16,7 +16,11 @@ Sempre consultar esse arquivo no início de tarefas relevantes. Em conflito, o M
 - **Philippe/Filipe (PSCS):** conta Cursor, produto multiempresa, cobrança.
 - **Rafael (GRX):** cliente operacional do sistema atual.
 - Produto = ERP reutilizável (`company_id`), não projeto one-off.
-- Ajustes prontos → **produção + desenvolvimento** (push `main`).
+- Ajustes prontos devem ser validados e publicados em DEV/Preview, conforme o fluxo autorizado.
+- Produção exige autorização explícita do usuário na solicitação atual, identificando o ambiente e a operação.
+- A expressão "pronto para o cliente" não autoriza deploy, merge ou migration.
+- Push em `main` não constitui, por si só, autorização para publicar em produção.
+- Em caso de conflito, prevalece a exigência de autorização explícita estabelecida no MASTER PROMPT.
 - Repo GitHub oficial: **PSCS-INFORMATICA-LTDA/logistics-ai-erp** (`origin` = https://github.com/PSCS-INFORMATICA-LTDA/logistics-ai-erp.git).
 - Cobrança Asaas: **pausada** até Felipe decidir conta sandbox.
 - DRE veículo e anti-duplicata data+OS já existem — evoluir, não duplicar conceito.
