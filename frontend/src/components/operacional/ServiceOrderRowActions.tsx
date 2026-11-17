@@ -32,6 +32,7 @@ import {
   resetProposalClientResponse,
   respondToProposal,
 } from "@/lib/service-order-proposal-api";
+import { useAccess } from "@/lib/access-context";
 import { createClient } from "@/lib/supabase/client";
 import type { ServiceOrderListRow } from "@/lib/service-order-filters";
 import type { ProposalResponse, DriverAssignmentResponse } from "@/types/database";
@@ -168,7 +169,9 @@ export function ServiceOrderRowActions({
   const canOperationalFollowUp = isFreightInExecution(row);
   const canCompleteFreight = isFreightInExecution(row);
   const completed = isServiceOrderCompleted(row);
-  const showFinance = serviceOrderShowsFinanceAction(row);
+  const { canViewScreen } = useAccess();
+  const showFinance =
+    serviceOrderShowsFinanceAction(row) && canViewScreen("financeiro.contas-a-pagar");
   const showDriverVoucher = canViewDriverVoucher(row) || completed;
   const manualCompanyDriverExpense = needsManualCompanyDriverExpense(row);
 

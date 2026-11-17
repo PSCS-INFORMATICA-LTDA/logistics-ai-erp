@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function MotoristasPagamentosPage() {
   const { companyId } = useCompany();
   const { canEditScreen } = useAccess();
-  const canEdit = canEditScreen("cadastros.motoristas");
+  const canEdit = canEditScreen("financeiro.pagamentos-motorista");
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchDriverPaymentRows>>["rows"]>([]);
   const [loading, setLoading] = useState(true);
