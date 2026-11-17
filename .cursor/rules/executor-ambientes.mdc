@@ -1,0 +1,104 @@
+---
+description: Executor Cloud e Desktop, separação DEV/Preview/PROD e aprovação de operações críticas
+alwaysApply: true
+---
+
+# Executor e ambientes — Logistics AI
+
+O MASTER em `prompts/Master/MASTER_PROMPT_PSCS.md` continua sendo a referência de produto.
+
+Esta regra define os executores, ambientes e limites de autorização. Em caso de conflito sobre autorização de produção, prevalece a exigência de autorização explícita.
+
+## Executores
+
+- Cursor Cloud Agent: executor remoto padrão. Linux, bash, checkout em `/agent/repos/logistics-ai-erp`.
+- Cursor Desktop: executor local Windows, PowerShell e repositório na unidade D:.
+- Não presumir o caminho exato do repositório Windows.
+- Antes de executar, confirmar executor, ambiente, projeto e branch.
+- Não simular acesso ao Windows pelo Cloud Agent.
+
+## Ambientes
+
+Supabase DEV:
+`jmbajdpkvlrslirwzyze`
+
+Supabase PROD:
+`tqeenmswotxqainkyyct`
+
+Vercel DEV:
+`logistics-ai-erp-dev`
+`prj_66iyhROGiuqcxl9PzeyfgV0m4o2v`
+
+Vercel PROD:
+`grx-management`
+
+GitHub:
+`PSCS-INFORMATICA-LTDA/logistics-ai-erp`
+
+O ambiente padrão de trabalho é DEV/Preview.
+
+PROD permanece bloqueado sem autorização explícita.
+
+Não alterar o alias estável:
+`logistics-ai-erp-dev.vercel.app`
+
+## Credenciais
+
+- Nunca revelar senhas, tokens, hashes ou chaves.
+- Não registrar credenciais em logs, commits ou mensagens.
+- Não criar tokens sem autorização.
+- Utilizar o princípio do menor privilégio.
+- Não utilizar automaticamente credenciais injetadas cuja identidade e escopo não tenham sido confirmados.
+
+## GitHub
+
+- Confirmar branch e SHA antes de commit ou push.
+- Não realizar merge sem autorização explícita.
+- Preservar branches e PRs fora do escopo autorizado.
+
+## Supabase
+
+- Confirmar o project ref antes de qualquer operação.
+- DEV é o ambiente padrão.
+- Não executar migrations, seeds, SQL de escrita ou alterações de usuários sem autorização específica.
+- Não usar scripts de seed como mecanismo de recuperação de senhas.
+- Não acessar ou modificar PROD sem autorização explícita que identifique o projeto e a operação.
+
+## Vercel
+
+- Preview somente no projeto DEV autorizado.
+- Não usar `--prod` sem autorização explícita.
+- Não promover deployments sem autorização.
+- Não alterar aliases ou conectar novos repositórios sem aprovação.
+- Não modificar o projeto `grx-management` sem autorização específica.
+
+## PowerShell
+
+No Cursor Desktop, iniciar os comandos no diretório correto do repositório na unidade D:.
+
+No Cursor Cloud Agent, utilizar bash no checkout Linux.
+
+## Aprovação obrigatória
+
+Exigem autorização explícita:
+
+- Merge.
+- Migrations e alterações estruturais de banco.
+- Deploy de produção.
+- Alterações em configurações de produção.
+- Mudanças de aliases.
+- Criação ou exclusão de usuários.
+- Redefinição de senhas.
+- Alteração de ferramentas MCP.
+- Instalação de ferramentas.
+- Operações destrutivas ou irreversíveis.
+
+## Regra definitiva de produção
+
+Publicações em produção exigem autorização explícita do usuário na solicitação atual, identificando o ambiente de produção e a operação autorizada.
+
+A expressão "pronto para o cliente" indica conclusão funcional, mas NÃO autoriza automaticamente deploy, merge ou migrations.
+
+Sem autorização explícita, executar somente em DEV e Preview.
+
+A PR #22 deve permanecer inalterada durante esta configuração.
