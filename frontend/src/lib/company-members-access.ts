@@ -1,34 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MemberRole } from "@/lib/access-context";
+import {
+  planMemberRoleChange,
+  presentMemberRole,
+  type KnownMemberRole,
+} from "./member-role-plan";
 
-export type ManageableRole = "admin" | "operacional";
+export {
+  ASSIGNABLE_ROLES,
+  authorizeMemberInvite,
+  parseAssignableRole,
+  planMemberRoleChange,
+  presentMemberRole,
+  roleLabel,
+  type AssignableRole,
+} from "./member-role-plan";
 
 export type CompanyMemberRow = {
   id: string;
   user_id: string;
-  role: MemberRole;
+  role: KnownMemberRole | null;
   created_at: string;
   email: string | null;
   full_name: string | null;
-  /** Papel simplificado na UI MVP. */
-  ui_role: ManageableRole;
   can_approve_launches: boolean;
 };
 
-export function toUiRole(role: string | null | undefined): ManageableRole {
-  return role === "admin" ? "admin" : "operacional";
-}
-
-export function roleLabel(role: string | null | undefined): string {
-  if (role === "admin") return "Administrador";
-  if (role === "financeiro") return "Operacional (financeiro)";
-  if (role === "socio") return "Operacional (sócio)";
-  return "Operacional";
-}
-
 export async function listCompanyMembers(
   supabase: SupabaseClient,
-  companyId: string
+  companyId: string,
 ): Promise<{ rows: CompanyMemberRow[]; error: string | null }> {
   const { data: members, error } = await supabase
     .from("company_members")
@@ -64,17 +63,15 @@ export async function listCompanyMembers(
 
   const rows: CompanyMemberRow[] = list.map((m) => {
     const profile = profileById.get(m.user_id);
-    const role = (m.role as MemberRole) ?? "operacional";
-    const ui_role = toUiRole(role);
+    const presented = presentMemberRole(m.role);
     return {
       id: m.id,
       user_id: m.user_id,
-      role,
+      role: presented.role,
       created_at: m.created_at,
       email: profile?.email ?? null,
       full_name: profile?.full_name ?? null,
-      ui_role,
-      can_approve_launches: ui_role === "admin",
+      can_approve_launches: presented.canApproveLaunches,
     };
   });
 
@@ -85,10 +82,8 @@ export async function setCompanyMemberRole(
   supabase: SupabaseClient,
   companyId: string,
   memberId: string,
-  nextUiRole: ManageableRole
+  requestedRole: unknown,
 ): Promise<{ error: string | null }> {
-  const nextRole: MemberRole = nextUiRole === "admin" ? "admin" : "operacional";
-
   const { data: target, error: targetErr } = await supabase
     .from("company_members")
     .select("id, user_id, role")
@@ -99,7 +94,8 @@ export async function setCompanyMemberRole(
   if (targetErr) return { error: targetErr.message };
   if (!target) return { error: "Usuário não encontrado nesta empresa." };
 
-  if (toUiRole(target.role) === "admin" && nextRole !== "admin") {
+  let adminCount = 0;
+  if (target.role === "admin") {
     const { count, error: countErr } = await supabase
       .from("company_members")
       .select("id", { count: "exact", head: true })
@@ -107,17 +103,20 @@ export async function setCompanyMemberRole(
       .eq("role", "admin");
 
     if (countErr) return { error: countErr.message };
-    if ((count ?? 0) <= 1) {
-      return {
-        error:
-          "Não é possível remover o último administrador. Promova outra pessoa a Admin antes.",
-      };
-    }
+    adminCount = count ?? 0;
   }
+
+  const plan = planMemberRoleChange({
+    currentRole: target.role,
+    requestedRole,
+    adminCount,
+  });
+  if (!plan.ok) return { error: plan.error };
+  if (plan.role === target.role) return { error: null };
 
   const { error } = await supabase
     .from("company_members")
-    .update({ role: nextRole })
+    .update({ role: plan.role })
     .eq("id", memberId)
     .eq("company_id", companyId);
 

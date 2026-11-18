@@ -13,12 +13,100 @@ import { useCompany } from "@/lib/company-context";
 import {
   listCompanyMembers,
   roleLabel,
-  setCompanyMemberRole,
+  type AssignableRole,
   type CompanyMemberRow,
-  type ManageableRole,
 } from "@/lib/company-members-access";
 import { glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
+
+function RoleActions({
+  row,
+  adminCount,
+  busy,
+  onChange,
+}: {
+  row: CompanyMemberRow;
+  adminCount: number;
+  busy: boolean;
+  onChange: (next: AssignableRole) => void;
+}) {
+  if (row.role === "socio" || row.role === null) {
+    return (
+      <span className="text-xs text-slate-500">
+        {row.role === "socio" ? "Papel de sócio preservado." : "Papel desconhecido."}
+      </span>
+    );
+  }
+
+  const lastAdmin = row.role === "admin" && adminCount <= 1;
+  return (
+    <>
+      {row.role !== "admin" ? (
+        <Button
+          type="button"
+          size="sm"
+          className="action-icon-btn"
+          disabled={busy}
+          title="Promover a Admin"
+          onClick={() => onChange("admin")}
+        >
+          <span className="sm:hidden">Admin</span>
+          <span className="hidden sm:inline">Promover a Admin</span>
+        </Button>
+      ) : null}
+      {row.role === "operacional" ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="action-icon-btn"
+          disabled={busy}
+          title="Tornar financeiro"
+          onClick={() => onChange("financeiro")}
+        >
+          <span className="sm:hidden">Fin.</span>
+          <span className="hidden sm:inline">Tornar financeiro</span>
+        </Button>
+      ) : null}
+      {row.role === "admin" ? (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="action-icon-btn"
+            disabled={busy || lastAdmin}
+            title={
+              lastAdmin
+                ? "Promova outro Admin antes de rebaixar o último."
+                : "Tornar operacional"
+            }
+            onClick={() => onChange("operacional")}
+          >
+            <span className="sm:hidden">Op.</span>
+            <span className="hidden sm:inline">Tornar operacional</span>
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="action-icon-btn"
+            disabled={busy || lastAdmin}
+            title={
+              lastAdmin
+                ? "Promova outro Admin antes de rebaixar o último."
+                : "Tornar financeiro"
+            }
+            onClick={() => onChange("financeiro")}
+          >
+            <span className="sm:hidden">Fin.</span>
+            <span className="hidden sm:inline">Tornar financeiro</span>
+          </Button>
+        </>
+      ) : null}
+    </>
+  );
+}
 
 export default function UsuariosAcessosPage() {
   const { companyId } = useCompany();
@@ -33,7 +121,7 @@ export default function UsuariosAcessosPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<ManageableRole>("operacional");
+  const [inviteRole, setInviteRole] = useState<AssignableRole>("operacional");
   const [inviting, setInviting] = useState(false);
 
   const load = useCallback(async () => {
@@ -59,24 +147,31 @@ export default function UsuariosAcessosPage() {
     void load();
   }, [accessLoading, isAdmin, load]);
 
-  const adminCount = rows.filter((r) => r.ui_role === "admin").length;
+  const adminCount = rows.filter((r) => r.role === "admin").length;
 
-  async function changeRole(row: CompanyMemberRow, next: ManageableRole) {
-    if (!companyId || next === row.ui_role) return;
+  async function changeRole(row: CompanyMemberRow, next: AssignableRole) {
+    if (!companyId || next === row.role) return;
     setBusyId(row.id);
     setError(null);
     setMsg(null);
-    const { error: err } = await setCompanyMemberRole(supabase, companyId, row.id, next);
-    if (err) {
-      setError(err);
+    try {
+      const res = await fetch("/api/company/members/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: row.id, role: next }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        setError(data?.error || "Falha ao alterar o papel.");
+        setBusyId(null);
+        return;
+      }
+    } catch {
+      setError("Falha de rede ao alterar o papel.");
       setBusyId(null);
       return;
     }
-    setMsg(
-      next === "admin"
-        ? `${row.email || "Usuário"} agora é Administrador e pode aprovar lançamentos.`
-        : `${row.email || "Usuário"} voltou a Operacional.`
-    );
+    setMsg(`${row.email || "Usuário"} agora é ${roleLabel(next)}.`);
     await load();
     if (row.user_id === currentUserId) {
       await refreshAccess();
@@ -143,7 +238,7 @@ export default function UsuariosAcessosPage() {
       <Card>
         <CardHeader
           title="Membros da empresa"
-          description="Admin pode aprovar lançamentos manuais. Operacional lança, mas não aprova (salvo Senha Máster nos parâmetros de alçada)."
+          description="Administrador aprova lançamentos manuais. Financeiro e operacional não aprovam por este papel. Sócio permanece como está."
         />
         <CardBody>
           {loading ? (
@@ -155,7 +250,6 @@ export default function UsuariosAcessosPage() {
               <ul className="space-y-3 md:hidden">
                 {rows.map((row) => {
                   const isSelf = row.user_id === currentUserId;
-                  const demoteBlocked = row.ui_role === "admin" && adminCount <= 1;
                   return (
                     <li
                       key={row.id}
@@ -174,14 +268,9 @@ export default function UsuariosAcessosPage() {
                           <p className="mt-1 break-all text-sm text-slate-600">
                             {row.email || row.user_id}
                           </p>
-                          {row.role !== "admin" && row.role !== "operacional" ? (
-                            <p className="mt-1 text-xs text-slate-400">
-                              Registro: {roleLabel(row.role)}
-                            </p>
-                          ) : null}
                           <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <Badge variant={row.ui_role === "admin" ? "success" : "default"}>
-                              {row.ui_role === "admin" ? "Administrador" : "Operacional"}
+                            <Badge variant={row.role === "admin" ? "success" : "default"}>
+                              {roleLabel(row.role)}
                             </Badge>
                             <span className="text-xs text-slate-600">
                               Aprova lançamentos:{" "}
@@ -195,32 +284,12 @@ export default function UsuariosAcessosPage() {
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                        {row.ui_role === "admin" ? (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            disabled={busyId === row.id || demoteBlocked}
-                            onClick={() => void changeRole(row, "operacional")}
-                            title={
-                              demoteBlocked
-                                ? "Promova outro Admin antes de rebaixar o último."
-                                : "Tornar operacional"
-                            }
-                          >
-                            Tornar operacional
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={busyId === row.id}
-                            title="Promover a Admin"
-                            onClick={() => void changeRole(row, "admin")}
-                          >
-                            Promover a Admin
-                          </Button>
-                        )}
+                        <RoleActions
+                          row={row}
+                          adminCount={adminCount}
+                          busy={busyId === row.id}
+                          onChange={(next) => void changeRole(row, next)}
+                        />
                       </div>
                     </li>
                   );
@@ -241,7 +310,6 @@ export default function UsuariosAcessosPage() {
                 <tbody>
                   {rows.map((row) => {
                     const isSelf = row.user_id === currentUserId;
-                    const demoteBlocked = row.ui_role === "admin" && adminCount <= 1;
                     return (
                       <tr key={row.id} className="border-b border-slate-100">
                         <td className="px-1.5 py-2">
@@ -256,15 +324,10 @@ export default function UsuariosAcessosPage() {
                           <div className="truncate text-slate-500" title={row.email || row.user_id}>
                             {row.email || row.user_id}
                           </div>
-                          {row.role !== "admin" && row.role !== "operacional" ? (
-                            <div className="mt-0.5 text-xs text-slate-400">
-                              Registro: {roleLabel(row.role)}
-                            </div>
-                          ) : null}
                         </td>
                         <td className="hidden px-1.5 py-2 md:table-cell">
-                          <Badge variant={row.ui_role === "admin" ? "success" : "default"}>
-                            {row.ui_role === "admin" ? "Administrador" : "Operacional"}
+                          <Badge variant={row.role === "admin" ? "success" : "default"}>
+                            {roleLabel(row.role)}
                           </Badge>
                         </td>
                         <td className="hidden px-1.5 py-2 lg:table-cell">
@@ -276,36 +339,12 @@ export default function UsuariosAcessosPage() {
                         </td>
                         <td className="px-1.5 py-2">
                           <div className="os-row-actions">
-                          {row.ui_role === "admin" ? (
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="action-icon-btn"
-                              disabled={busyId === row.id || demoteBlocked}
-                              onClick={() => void changeRole(row, "operacional")}
-                              title={
-                                demoteBlocked
-                                  ? "Promova outro Admin antes de rebaixar o último."
-                                  : "Tornar operacional"
-                              }
-                            >
-                              <span className="sm:hidden">Op.</span>
-                              <span className="hidden sm:inline">Tornar operacional</span>
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="action-icon-btn"
-                              disabled={busyId === row.id}
-                              title="Promover a Admin"
-                              onClick={() => void changeRole(row, "admin")}
-                            >
-                              <span className="sm:hidden">Admin</span>
-                              <span className="hidden sm:inline">Promover a Admin</span>
-                            </Button>
-                          )}
+                            <RoleActions
+                              row={row}
+                              adminCount={adminCount}
+                              busy={busyId === row.id}
+                              onChange={(next) => void changeRole(row, next)}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -338,9 +377,10 @@ export default function UsuariosAcessosPage() {
             <GlassSelect
               label="Papel inicial"
               value={inviteRole}
-              onChange={(v) => setInviteRole(v as ManageableRole)}
+              onChange={(v) => setInviteRole(v as AssignableRole)}
               options={[
                 { value: "operacional", label: "Operacional" },
+                { value: "financeiro", label: "Financeiro" },
                 { value: "admin", label: "Administrador" },
               ]}
             />
