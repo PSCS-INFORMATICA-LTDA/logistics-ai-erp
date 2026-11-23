@@ -29,6 +29,7 @@
     "test:service-order-client": "npx tsx --test scripts/test-service-order-client.ts",
     "test:role-access": "npx tsx --test scripts/test-role-access.ts",
     "test:member-roles": "node --experimental-strip-types --test scripts/test-member-roles.ts",
+    "test:approval-status-guard": "node --experimental-strip-types --test scripts/test-approval-status-guard.ts",
     "qa:core-ar:dev": "npx tsx scripts/core-ar-dev-live.mjs",
     "demo:freight:seed": "node scripts/freight-demo-dev.mjs seed",
     "demo:freight:verify": "node scripts/freight-demo-dev.mjs verify",
