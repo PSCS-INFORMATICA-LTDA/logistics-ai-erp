@@ -12,7 +12,10 @@ import {
   evaluateApprovalStatusBatch,
   evaluateApprovalStatusUpdate,
   evaluateApprovedSensitiveUpdate,
+  evaluateCorrectionEventWrite,
+  evaluateCorrectionLinks,
   evaluateFinancialDelete,
+  persistAuditedCorrection,
   type ApprovalStatusUpdateInput,
 } from "../src/lib/approval-status-guard.ts";
 
@@ -400,6 +403,30 @@ describe("campos de lançamento já aprovado", () => {
     assert.doesNotMatch(rollback, /trg_financial_transactions_approval_status/);
     assert.doesNotMatch(rollback, /trg_financial_transactions_approval_insert/);
     assert.doesNotMatch(rollback, /trg_financial_transactions_direct_delete/);
+    assert.doesNotMatch(rollback, /drop table if exists public\.financial_correction_events/);
+    const purge = readFileSync(
+      new URL("../../supabase/rollbacks/090_financial_correction_events_purge.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(purge, /drop table if exists public\.financial_correction_events/);
+    assert.match(purge, /Não faz parte do rollback operacional/);
+    assert.match(sql, /revoke all on table public\.financial_correction_events from service_role/);
+    assert.match(sql, /before insert or update or delete on public\.financial_correction_events/);
+    assert.match(sql, /before truncate on public\.financial_correction_events/);
+    assert.match(sql, /A trilha de correção não aceita alteração nem exclusão/);
+    const returningAt = sql.indexOf("returning *");
+    const rereadAt = sql.indexOf("into v_reread");
+    const auditAt = sql.indexOf("insert into public.financial_correction_events");
+    assert.ok(returningAt > 0 && rereadAt > returningAt && auditAt > rereadAt);
+    assert.match(sql, /v_persisted\.classification/);
+    assert.match(sql, /v_persisted\.transaction_type/);
+    assert.match(sql, /O estado lido depois do update divergiu do RETURNING/);
+    assert.match(sql, /if p_patch \? 'chart_of_account_id' then/);
+    for (const table of ["branches", "clients", "suppliers", "drivers", "service_orders", "vehicles"]) {
+      assert.match(sql, new RegExp(`from public\\.${table}`));
+      assert.match(sql, /company_id = v_new\.company_id/);
+    }
+    assert.ok(sql.indexOf("for update") < sql.indexOf("perform set_config('app.ft_audited_correction'"));
   });
 
   it("estorno, baixa e pátio não dependem de alterar valor já aprovado", () => {
@@ -426,5 +453,107 @@ describe("campos de lançamento já aprovado", () => {
       }),
     );
     assert.deepEqual(statusGate, { ok: true });
+  });
+
+  it("grava a descrição pedida e não mexe no tipo quando a conta fica de fora", () => {
+    const result = persistAuditedCorrection({
+      oldRow: {
+        amount: 10,
+        entrySource: "company_ledger",
+        description: "Antes",
+        transactionType: "Despesa",
+        classification: "Administrativo",
+        chartOfAccountId: "conta-desp",
+        companyId: "empresa-a",
+      },
+      patch: { description: "Depois da auditoria" },
+      chart: { classification: "Receitas", transactionType: "Receita" },
+    });
+    assert.equal(result.persisted.description, "Depois da auditoria");
+    assert.equal(result.persisted.transactionType, "Despesa");
+    assert.equal(result.persisted.classification, "Administrativo");
+    assert.deepEqual(result.newValues, { description: "Depois da auditoria" });
+    assert.deepEqual(result.oldValues, { description: "Antes" });
+  });
+
+  it("registra a classificação e o tipo persistidos pela conta, não o valor pedido", () => {
+    const result = persistAuditedCorrection({
+      oldRow: {
+        amount: 10,
+        entrySource: "company_ledger",
+        description: "Combustível",
+        transactionType: "Despesa",
+        classification: "Administrativo",
+        chartOfAccountId: "conta-desp",
+        companyId: "empresa-a",
+      },
+      patch: {
+        chartOfAccountId: "conta-rec",
+        classification: "Valor que a trigger descarta",
+        transactionType: "Outros",
+      },
+      chart: { classification: "Receitas", transactionType: "Receita" },
+    });
+    assert.equal(result.persisted.classification, "Receitas");
+    assert.equal(result.persisted.transactionType, "Receita");
+    assert.equal(result.newValues.classification, "Receitas");
+    assert.equal(result.newValues.transactionType, "Receita");
+    assert.equal(result.oldValues.classification, "Administrativo");
+    assert.equal(result.oldValues.transactionType, "Despesa");
+    assert.equal(result.newValues.chartOfAccountId, "conta-rec");
+  });
+
+  it("a correção seguinte enxerga o estado que a anterior persistiu", () => {
+    const first = persistAuditedCorrection({
+      oldRow: {
+        amount: 10,
+        entrySource: "company_ledger",
+        description: "Original",
+        transactionType: "Despesa",
+        classification: "Administrativo",
+        chartOfAccountId: "conta-desp",
+        companyId: "empresa-a",
+      },
+      patch: { description: "Primeira correção" },
+      chart: null,
+    });
+    const second = persistAuditedCorrection({
+      oldRow: first.persisted,
+      patch: { amount: 12 },
+      chart: null,
+    });
+    assert.equal(second.oldValues.description, undefined);
+    assert.equal(second.oldValues.amount, 10);
+    assert.equal(second.persisted.description, "Primeira correção");
+    assert.equal(second.newValues.amount, 12);
+  });
+
+  it("recusa vínculo de outra empresa e aceita o da própria", () => {
+    const foreign = evaluateCorrectionLinks({
+      companyId: "empresa-a",
+      links: { driver_id: "motorista-b", client_id: null },
+      companyByEntityId: { "motorista-b": "empresa-b" },
+    });
+    assert.deepEqual(foreign, { ok: false, field: "driver_id" });
+    const same = evaluateCorrectionLinks({
+      companyId: "empresa-a",
+      links: { driver_id: "motorista-a", supplier_id: "fornecedor-a" },
+      companyByEntityId: { "motorista-a": "empresa-a", "fornecedor-a": "empresa-a" },
+    });
+    assert.deepEqual(same, { ok: true });
+    const missing = evaluateCorrectionLinks({
+      companyId: "empresa-a",
+      links: { branch_id: "filial-inexistente" },
+      companyByEntityId: {},
+    });
+    assert.equal(missing.ok, false);
+  });
+
+  it("impede alterar ou apagar a trilha e só inclui pelo caminho auditado", () => {
+    assert.deepEqual(evaluateCorrectionEventWrite({ op: "UPDATE", viaAuditedCorrection: true }), { ok: false });
+    assert.deepEqual(evaluateCorrectionEventWrite({ op: "DELETE", viaAuditedCorrection: true }), { ok: false });
+    assert.deepEqual(evaluateCorrectionEventWrite({ op: "TRUNCATE", viaAuditedCorrection: true }), { ok: false });
+    assert.deepEqual(evaluateCorrectionEventWrite({ op: "INSERT", viaAuditedCorrection: false }), { ok: false });
+    assert.deepEqual(evaluateCorrectionEventWrite({ op: "INSERT", viaAuditedCorrection: true }), { ok: true });
   });
 });

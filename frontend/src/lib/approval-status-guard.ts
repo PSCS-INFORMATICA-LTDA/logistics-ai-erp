@@ -160,3 +160,102 @@ export function evaluateApprovalStatusBatch(
   }
   return { ok: true };
 }
+
+export const CORRECTION_LINK_FIELDS = [
+  "branch_id",
+  "client_id",
+  "supplier_id",
+  "driver_id",
+  "service_order_id",
+  "allocation_vehicle_id",
+  "operational_vehicle_id",
+] as const;
+
+/** Vínculo nulo é válido. Id de outra empresa, ou id inexistente, não entra. */
+export function evaluateCorrectionLinks(input: {
+  companyId: string;
+  links: Partial<Record<(typeof CORRECTION_LINK_FIELDS)[number], string | null>>;
+  companyByEntityId: Readonly<Record<string, string>>;
+}): { ok: true } | { ok: false; field: string } {
+  for (const field of CORRECTION_LINK_FIELDS) {
+    const entityId = input.links[field];
+    if (!entityId) continue;
+    if (input.companyByEntityId[entityId] !== input.companyId) {
+      return { ok: false, field };
+    }
+  }
+  return { ok: true };
+}
+
+export type PersistedCorrectionRow = {
+  amount: number;
+  entrySource: string | null;
+  description: string | null;
+  transactionType: string;
+  classification: string;
+  chartOfAccountId: string;
+  companyId: string;
+};
+
+/**
+ * Espelho do UPDATE da 090 e da trigger sync_transaction_classification.
+ * A conta só entra no SET quando o patch a traz. Nesse caso a trigger
+ * reescreve classification e transaction_type, e o evento usa esse resultado.
+ */
+export function persistAuditedCorrection(input: {
+  oldRow: PersistedCorrectionRow;
+  patch: Partial<PersistedCorrectionRow>;
+  chart: { classification: string; transactionType: string } | null;
+}): {
+  persisted: PersistedCorrectionRow;
+  oldValues: Partial<PersistedCorrectionRow>;
+  newValues: Partial<PersistedCorrectionRow>;
+} {
+  const chartInSet = Object.prototype.hasOwnProperty.call(input.patch, "chartOfAccountId");
+  const persisted: PersistedCorrectionRow = { ...input.oldRow };
+  if (Object.prototype.hasOwnProperty.call(input.patch, "amount") && input.patch.amount !== undefined) {
+    persisted.amount = input.patch.amount;
+  }
+  if (Object.prototype.hasOwnProperty.call(input.patch, "entrySource")) {
+    persisted.entrySource = input.patch.entrySource ?? null;
+  }
+  if (Object.prototype.hasOwnProperty.call(input.patch, "description")) {
+    persisted.description = input.patch.description ?? null;
+  }
+  if (Object.prototype.hasOwnProperty.call(input.patch, "companyId") && input.patch.companyId) {
+    persisted.companyId = input.patch.companyId;
+  }
+  if (chartInSet && input.patch.chartOfAccountId) {
+    persisted.chartOfAccountId = input.patch.chartOfAccountId;
+    if (input.chart) {
+      persisted.classification = input.chart.classification;
+      persisted.transactionType = input.chart.transactionType;
+    }
+  } else {
+    if (Object.prototype.hasOwnProperty.call(input.patch, "classification") && input.patch.classification) {
+      persisted.classification = input.patch.classification;
+    }
+    if (Object.prototype.hasOwnProperty.call(input.patch, "transactionType") && input.patch.transactionType) {
+      persisted.transactionType = input.patch.transactionType;
+    }
+  }
+
+  const oldValues: Partial<PersistedCorrectionRow> = {};
+  const newValues: Partial<PersistedCorrectionRow> = {};
+  for (const key of Object.keys(persisted) as (keyof PersistedCorrectionRow)[]) {
+    if (persisted[key] !== input.oldRow[key]) {
+      oldValues[key] = input.oldRow[key] as never;
+      newValues[key] = persisted[key] as never;
+    }
+  }
+  return { persisted, oldValues, newValues };
+}
+
+/** A trilha aceita inclusão só no caminho auditado. Update, delete e truncate nunca. */
+export function evaluateCorrectionEventWrite(input: {
+  op: "INSERT" | "UPDATE" | "DELETE" | "TRUNCATE";
+  viaAuditedCorrection: boolean;
+}): { ok: true } | { ok: false } {
+  if (input.op === "INSERT" && input.viaAuditedCorrection) return { ok: true };
+  return { ok: false };
+}
