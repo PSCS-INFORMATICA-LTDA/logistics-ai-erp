@@ -72,6 +72,9 @@ AS $seed_chart$
 DECLARE
     v_inserted INTEGER;
 BEGIN
+  -- Membro da empresa, não somente administrador. A calculadora da OS e
+  -- Parâmetros de frete chamam a inicialização para o usuário logado.
+  -- O insert direto do plano e da tarifa já é permitido a qualquer membro.
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Não autenticado'
       USING ERRCODE = '42501';
@@ -188,6 +191,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $seed_freight$
 BEGIN
+  -- Membro da empresa, não somente administrador. A calculadora da OS e
+  -- Parâmetros de frete chamam a inicialização para o usuário logado.
+  -- O insert direto do plano e da tarifa já é permitido a qualquer membro.
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Não autenticado'
       USING ERRCODE = '42501';
@@ -392,8 +398,6 @@ $dev_migrations$;
 
 COMMENT ON TABLE public._dev_schema_migrations IS
   'Controle do runner DEV. Sem policy: authenticated não lê nem grava. O dono postgres grava.';
-
-
 do $m091_post$
 declare
   r record;

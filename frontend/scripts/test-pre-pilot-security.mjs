@@ -501,6 +501,10 @@ describe("migration 091 no Postgres local", () => {
       `select public.seed_chart_of_accounts('${A}'::uuid) as n`
     );
     assert.ok(Number(chart.rows[0].n) > 0);
+    const memberIsAdmin = await db.query(
+      `select public.auth_user_is_company_admin('${A}'::uuid) as v`
+    );
+    assert.equal(memberIsAdmin.rows[0].v, false);
     await failIf(
       db,
       `select public.seed_chart_of_accounts('${B}'::uuid)`,
@@ -511,7 +515,7 @@ describe("migration 091 no Postgres local", () => {
       `select count(*)::int as n from public.chart_of_accounts where company_id = '${B}'`
     );
     assert.equal(chartB.rows[0].n, 0);
-    note("frete e plano: membro da A grava A e não grava B");
+    note("frete e plano: membro não administrador grava A e não grava B");
 
     await setSession(db, "anon", null, "anon");
     await failIf(

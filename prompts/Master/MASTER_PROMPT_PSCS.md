@@ -106,7 +106,7 @@ Regras Cursor correspondentes: `.cursor/rules/deploy-prod-and-dev.mdc` e `.curso
 
 ### Segurança pré-piloto (23/11/2026)
 
-A migration **091** fecha as seeds executáveis sem vínculo com a empresa, revoga `EXECUTE` herdado de `PUBLIC` e liga RLS sem policy em `public._dev_schema_migrations`. O script do SQL Editor é `frontend/scripts/apply-091-sql-editor.sql`. Não foi aplicado no Supabase DEV `jmbajdpkvlrslirwzyze` nem em produção. A aplicação espera autorização explícita.
+A migration **091** fecha as seeds executáveis sem vínculo com a empresa, revoga `EXECUTE` herdado de `PUBLIC` e liga RLS sem policy em `public._dev_schema_migrations`. Plano de contas e tarifas exigem membro da empresa, não só administrador: a OS e Parâmetros de frete inicializam a tarifa para o usuário logado, e a RLS de insert já é de membro. O script do SQL Editor é `frontend/scripts/apply-091-sql-editor.sql`. A matriz autenticada é `frontend/scripts/homolog-091-matrix.md`. O rollback reabre as permissões vulneráveis e não entra na aplicação; exige aprovação específica. Não foi aplicado no Supabase DEV `jmbajdpkvlrslirwzyze` nem em produção. A aplicação espera autorização explícita.
 
 ---
 

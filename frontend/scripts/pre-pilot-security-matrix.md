@@ -20,8 +20,8 @@ Leitura de 23/11/2026, 19h10 no horário de Brasília, no Supabase DEV. A coluna
 | `restore_deleted_from_audit(uuid, text)` | sim / sim / sim | não / sim / sim | Tela autenticada; o corpo já exige sessão |
 | `restore_soft_deleted_from_audit(uuid, text)` | sim / sim / sim | não / sim / sim | Encaminha para a função acima |
 | `ensure_patio_ticket_token(text, uuid)` | sim / sim / sim | não / sim / sim | Tela autenticada; o corpo já exige a empresa |
-| `seed_chart_of_accounts(uuid)` | sim / sim / sim | não / sim / não | Membro da empresa antes de gravar |
-| `seed_freight_rate_defaults(uuid)` | sim / sim / sim | não / sim / não | Tela de frete, só a própria empresa |
+| `seed_chart_of_accounts(uuid)` | sim / sim / sim | não / sim / não | Membro da empresa, não só administrador |
+| `seed_freight_rate_defaults(uuid)` | sim / sim / sim | não / sim / não | Membro da empresa. A OS chama esta função |
 | `seed_demo_freight_os(uuid)` | sim / sim / sim | não / não / não | Fora da aplicação até haver autorização |
 | `handle_new_user()` | sim / sim / sim | não / não / não | Trigger de cadastro. `supabase_auth_admin` mantém EXECUTE |
 | `_ap_assert_row_company_consistency()` | sim / sim / sim | não / não / não | Trigger. O dono continua executando |
@@ -40,6 +40,16 @@ Aprovação, estorno, pátio (`post_parking_revenue`, `post_car_wash_revenue`) e
 | authenticated | select, insert, update, delete, truncate | sem GRANT, e RLS sem policy |
 | service_role | todos os privilégios, com `bypassrls` | igual. Residual aceito: o runner não usa esse papel |
 | postgres | dono, `bypassrls` | dono. O runner continua inserindo o arquivo |
+
+## Quem inicializa plano e tarifas
+
+A regra é membro da empresa, não administrador.
+
+A calculadora da ordem de serviço e a tela Parâmetros de frete chamam `seed_freight_rate_defaults` para o usuário logado, inclusive operacional. Exigir administrador quebraria a OS quando a empresa ainda não tem tarifa. O plano de contas segue a mesma fronteira: a policy de insert em `chart_of_accounts` já autoriza qualquer membro. As duas funções recusam empresa da qual o usuário não participa.
+
+## Rollback
+
+`supabase/rollbacks/091_pre_pilot_security.sql` devolve `EXECUTE` a `anon` e `PUBLIC` e tira a checagem de membro. O buraco da auditoria volta. Não entra na aplicação nem na homologação. Só roda com aprovação específica, no mesmo banco em que a 091 tiver sido aplicada.
 
 ## O que a 091 não faz
 

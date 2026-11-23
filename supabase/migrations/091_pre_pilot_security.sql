@@ -19,6 +19,9 @@ AS $seed_chart$
 DECLARE
     v_inserted INTEGER;
 BEGIN
+  -- Membro da empresa, não somente administrador. A calculadora da OS e
+  -- Parâmetros de frete chamam a inicialização para o usuário logado.
+  -- O insert direto do plano e da tarifa já é permitido a qualquer membro.
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Não autenticado'
       USING ERRCODE = '42501';
@@ -135,6 +138,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $seed_freight$
 BEGIN
+  -- Membro da empresa, não somente administrador. A calculadora da OS e
+  -- Parâmetros de frete chamam a inicialização para o usuário logado.
+  -- O insert direto do plano e da tarifa já é permitido a qualquer membro.
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Não autenticado'
       USING ERRCODE = '42501';

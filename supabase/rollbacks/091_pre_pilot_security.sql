@@ -1,5 +1,10 @@
--- Rollback da 091. Reabre o EXECUTE que a auditoria classificou como bloqueio.
--- Só com autorização explícita no mesmo banco em que a 091 foi aplicada.
+-- Rollback da 091.
+-- Reabre o EXECUTE de anon e PUBLIC nas seeds e nas funções internas.
+-- Isso restaura o buraco da auditoria de 23/11/2026: qualquer company_id
+-- volta a ser aceito e o anon volta a executar funções SECURITY DEFINER.
+-- Não faz parte da aplicação nem da homologação.
+-- Exige aprovação específica, separada da autorização da 091,
+-- no mesmo banco em que a 091 tiver sido aplicada.
 -- Não aplicar em PROD.
 
 CREATE OR REPLACE FUNCTION public.seed_chart_of_accounts(p_company_id UUID)
