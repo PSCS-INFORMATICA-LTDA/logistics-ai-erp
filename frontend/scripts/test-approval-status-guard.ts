@@ -3,9 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   APPROVAL_COMPANY_MOVE_ERROR,
+  APPROVAL_DELETE_DIRECT_ERROR,
+  APPROVAL_INSERT_ADMIN_ERROR,
   APPROVAL_STATUS_ADMIN_ERROR,
+  evaluateApprovalInsert,
   evaluateApprovalStatusBatch,
   evaluateApprovalStatusUpdate,
+  evaluateFinancialDelete,
   type ApprovalStatusUpdateInput,
 } from "../src/lib/approval-status-guard.ts";
 
@@ -165,6 +169,22 @@ describe("contrato do banco e do servidor", () => {
     }
   });
 
+  it("a 089 muda o padrão para submitted e não cria função pública que liga a flag de exclusão", () => {
+    const sql = readFileSync(
+      new URL("../../supabase/migrations/089_financial_insert_delete_guard.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(sql, /alter column approval_status set default 'submitted'/);
+    assert.match(sql, /before insert on public\.financial_transactions/);
+    assert.match(sql, /before delete on public\.financial_transactions/);
+    assert.match(sql, /current_user in \('postgres', 'supabase_admin'\)/);
+    assert.match(sql, /auto_approve_below_amount/);
+    assert.match(sql, /app\.ft_audited_delete/);
+    assert.doesNotMatch(sql, /create or replace function public\.allow_financial_delete/i);
+    assert.match(sql, /QA-OS-ND-001/);
+    assert.match(sql, /2026-11-23 16:15:59\.856477\+00/);
+  });
+
   it("a função de aprovação lê o papel e ignora isAdmin e Senha Máster", () => {
     const source = readFileSync(
       new URL("../src/lib/financial-approval.ts", import.meta.url),
@@ -175,5 +195,91 @@ describe("contrato do banco e do servidor", () => {
     assert.doesNotMatch(source, /if \(isAdmin\) return \{ ok: true \}/);
     assert.doesNotMatch(source, /isMasterSessionUnlocked|verifyMasterPassword/);
     assert.doesNotMatch(source, /isAdmin: boolean/);
+  });
+});
+
+describe("criação com approval_status", () => {
+  it("trata coluna omitida como submitted", () => {
+    assert.deepEqual(
+      evaluateApprovalInsert({
+        actorRole: "financeiro",
+        internalWriter: false,
+        requestedStatus: null,
+        entrySource: "company_ledger",
+        amount: 5000,
+        autoApproveBelowAmount: null,
+      }),
+      { ok: true, status: "submitted" },
+    );
+  });
+
+  it("nega financeiro que envia approved fora da alçada", () => {
+    const decision = evaluateApprovalInsert({
+      actorRole: "financeiro",
+      internalWriter: false,
+      requestedStatus: "approved",
+      entrySource: "company_ledger",
+      amount: 100,
+      autoApproveBelowAmount: null,
+    });
+    assert.equal(decision.ok, false);
+    if (!decision.ok) assert.equal(decision.reason, APPROVAL_INSERT_ADMIN_ERROR);
+  });
+
+  it("nega approved com entry_source de pátio vindo do cliente", () => {
+    const decision = evaluateApprovalInsert({
+      actorRole: "financeiro",
+      internalWriter: false,
+      requestedStatus: "approved",
+      entrySource: "parking",
+      amount: 10,
+      autoApproveBelowAmount: 1000,
+    });
+    assert.equal(decision.ok, false);
+  });
+
+  it("permite approved manual dentro da alçada e o caminho interno", () => {
+    assert.deepEqual(
+      evaluateApprovalInsert({
+        actorRole: "financeiro",
+        internalWriter: false,
+        requestedStatus: "approved",
+        entrySource: "vehicle_expense",
+        amount: 40,
+        autoApproveBelowAmount: 50,
+      }),
+      { ok: true, status: "approved" },
+    );
+    assert.deepEqual(
+      evaluateApprovalInsert({
+        actorRole: "financeiro",
+        internalWriter: true,
+        requestedStatus: "approved",
+        entrySource: "driver_payment",
+        amount: 200,
+        autoApproveBelowAmount: null,
+      }),
+      { ok: true, status: "approved" },
+    );
+    assert.deepEqual(
+      evaluateApprovalInsert({
+        actorRole: "admin",
+        internalWriter: false,
+        requestedStatus: "approved",
+        entrySource: "company_ledger",
+        amount: 9000,
+        autoApproveBelowAmount: null,
+      }),
+      { ok: true, status: "approved" },
+    );
+  });
+});
+
+describe("exclusão de lançamento", () => {
+  it("bloqueia delete direto e libera só a função auditada", () => {
+    const denied = evaluateFinancialDelete({ viaAuditedFunction: false });
+    assert.equal(denied.ok, false);
+    if (!denied.ok) assert.equal(denied.reason, APPROVAL_DELETE_DIRECT_ERROR);
+    assert.deepEqual(evaluateFinancialDelete({ viaAuditedFunction: true }), { ok: true });
   });
 });

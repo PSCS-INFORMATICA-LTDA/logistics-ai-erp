@@ -214,47 +214,64 @@ export async function approveDeletionApprovalRequest(input: {
     };
   }
 
-  const { entityCode, summary } = summarizeDeletedRow(existing, table);
-  const logged = await recordDeletion({
-    supabase: input.supabase,
-    companyId: input.companyId,
-    entityType: table,
-    entityId: id,
-    entityCode: req.entity_code || entityCode,
-    summary: req.summary || summary,
-    reason: req.reason,
-    reasonCode: req.reason_code,
-    screenKey: req.screen_key,
-    deleteMode: req.delete_mode,
-    payload: existing,
-  });
-  if (logged.error) return { error: logged.error };
-
-  const { error: delErr } =
-    req.delete_mode === "soft"
-      ? await input.supabase
-          .from(table)
-          .update(
-            table === "partners"
-              ? { deleted_at: new Date().toISOString(), status: "Inativo" }
-              : { deleted_at: new Date().toISOString() }
-          )
-          .eq("id", id)
-          .eq("company_id", input.companyId)
-      : await input.supabase.from(table).delete().eq("id", id).eq("company_id", input.companyId);
-
-  if (delErr) return { error: delErr.message };
-
   const actor = await resolveActor(input.supabase, input.companyId);
-  const { data: auditRow } = await input.supabase
-    .from("deletion_audit_events")
-    .select("id")
-    .eq("company_id", input.companyId)
-    .eq("entity_type", table)
-    .eq("entity_id", String(id))
-    .order("occurred_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let auditId: string | null = null;
+
+  if (table === "financial_transactions") {
+    const { data: auditedId, error: rpcError } = await input.supabase.rpc(
+      "delete_financial_transaction_audited",
+      {
+        p_id: id,
+        p_reason: req.reason,
+        p_reason_code: req.reason_code,
+        p_screen_key: req.screen_key,
+      },
+    );
+    if (rpcError) return { error: rpcError.message };
+    auditId = (auditedId as string | null) ?? null;
+  } else {
+    const { entityCode, summary } = summarizeDeletedRow(existing, table);
+    const logged = await recordDeletion({
+      supabase: input.supabase,
+      companyId: input.companyId,
+      entityType: table,
+      entityId: id,
+      entityCode: req.entity_code || entityCode,
+      summary: req.summary || summary,
+      reason: req.reason,
+      reasonCode: req.reason_code,
+      screenKey: req.screen_key,
+      deleteMode: req.delete_mode,
+      payload: existing,
+    });
+    if (logged.error) return { error: logged.error };
+
+    const { error: delErr } =
+      req.delete_mode === "soft"
+        ? await input.supabase
+            .from(table)
+            .update(
+              table === "partners"
+                ? { deleted_at: new Date().toISOString(), status: "Inativo" }
+                : { deleted_at: new Date().toISOString() }
+            )
+            .eq("id", id)
+            .eq("company_id", input.companyId)
+        : await input.supabase.from(table).delete().eq("id", id).eq("company_id", input.companyId);
+
+    if (delErr) return { error: delErr.message };
+
+    const { data: auditRow } = await input.supabase
+      .from("deletion_audit_events")
+      .select("id")
+      .eq("company_id", input.companyId)
+      .eq("entity_type", table)
+      .eq("entity_id", String(id))
+      .order("occurred_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    auditId = (auditRow?.id as string | undefined) ?? null;
+  }
 
   const { error } = await input.supabase
     .from("deletion_approval_requests")
@@ -265,7 +282,7 @@ export async function approveDeletionApprovalRequest(input: {
       reviewed_by_email: actor.email,
       reviewed_at: new Date().toISOString(),
       review_note: input.reviewNote?.trim() || "Pedido aprovado e exclusão executada.",
-      audit_event_id: (auditRow?.id as string) ?? null,
+      audit_event_id: auditId,
     })
     .eq("id", req.id)
     .eq("company_id", input.companyId)
