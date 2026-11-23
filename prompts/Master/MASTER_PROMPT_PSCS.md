@@ -104,6 +104,12 @@ Regras Cursor correspondentes: `.cursor/rules/deploy-prod-and-dev.mdc` e `.curso
 
 ---
 
+### Segurança pré-piloto (23/11/2026)
+
+A migration **091** fecha as seeds executáveis sem vínculo com a empresa, revoga `EXECUTE` herdado de `PUBLIC` e liga RLS sem policy em `public._dev_schema_migrations`. O script do SQL Editor é `frontend/scripts/apply-091-sql-editor.sql`. Não foi aplicado no Supabase DEV `jmbajdpkvlrslirwzyze` nem em produção. A aplicação espera autorização explícita.
+
+---
+
 ## 6. Padrões de implementação PSCS
 
 - Seguir UI/glass existente; não reinventar design system.
