@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { COMPANY_LEDGER_ENTRY_SOURCE } from "@/lib/company-ledger";
 import { VEHICLE_EXPENSE_ENTRY_SOURCE } from "@/lib/vehicle-expense-categories";
-import { isMasterSessionUnlocked, verifyMasterPassword } from "@/lib/master-password";
+import {
+  evaluateApprovalStatusUpdate,
+  type ApprovalActorRole,
+} from "@/lib/approval-status-guard";
 import {
   recordDeletion,
   summarizeDeletedRow,
@@ -134,58 +137,55 @@ export async function buildApprovalInsertFields(
   };
 }
 
-export async function canUserApproveFinancial(
+async function loadCallerRoleInCompany(
   supabase: SupabaseClient,
   companyId: string,
-  isAdmin: boolean,
-  masterPassword?: string
-): Promise<{ ok: boolean; error?: string }> {
-  const settings = await loadFinancialApprovalSettings(supabase, companyId);
-  const mode = settings.approver_mode;
-
+): Promise<ApprovalActorRole> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const masterUnlocked = Boolean(
-    user?.id && isMasterSessionUnlocked(companyId, user.id)
-  );
+  if (!user) return null;
 
-  if (mode === "admin" || mode === "admin_or_master") {
-    if (isAdmin) return { ok: true };
+  const { data, error } = await supabase
+    .from("company_members")
+    .select("role")
+    .eq("company_id", companyId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error || !data?.role) return null;
+  const role = data.role as string;
+  if (
+    role === "admin" ||
+    role === "financeiro" ||
+    role === "operacional" ||
+    role === "socio"
+  ) {
+    return role;
   }
+  return null;
+}
 
-  if (mode === "master_only" || mode === "admin_or_master") {
-    if (masterUnlocked) return { ok: true };
-    if (!masterPassword) {
-      if (mode === "master_only") {
-        return { ok: false, error: "Informe a Senha Máster para aprovar." };
-      }
-      if (!isAdmin) {
-        return { ok: false, error: "Somente administrador ou Senha Máster podem aprovar." };
-      }
-      return { ok: false, error: "Somente administrador pode aprovar lançamentos." };
-    }
-    const { data: security } = await supabase
-      .from("company_security_settings")
-      .select("master_password_salt, master_password_hash")
-      .eq("company_id", companyId)
-      .maybeSingle();
-    if (!security?.master_password_salt || !security?.master_password_hash) {
-      return {
-        ok: false,
-        error: "Cadastre a Senha Máster em Parâmetros para aprovar neste modo.",
-      };
-    }
-    const valid = await verifyMasterPassword(
-      masterPassword,
-      security.master_password_salt as string,
-      security.master_password_hash as string
-    );
-    if (!valid) return { ok: false, error: "Senha Máster incorreta." };
-    return { ok: true };
-  }
-
-  return { ok: false, error: "Somente administrador pode aprovar lançamentos." };
+/**
+ * Autorização efetiva do vínculo na empresa do lançamento.
+ * O booleano isAdmin da tela e a Senha Máster não autorizam approval_status.
+ * A trigger 088 repete a mesma regra no banco.
+ */
+export async function canUserApproveFinancial(
+  supabase: SupabaseClient,
+  companyId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const role = await loadCallerRoleInCompany(supabase, companyId);
+  const decision = evaluateApprovalStatusUpdate({
+    actorRoleInOldCompany: role,
+    actorRoleInNewCompany: role,
+    oldStatus: "submitted",
+    newStatus: "approved",
+    oldCompanyId: companyId,
+    newCompanyId: companyId,
+  });
+  if (!decision.ok) return { ok: false, error: decision.reason };
+  return { ok: true };
 }
 
 export async function listPendingFinancialApprovals(
@@ -315,16 +315,9 @@ export async function approveFinancialTransaction(input: {
   supabase: SupabaseClient;
   companyId: string;
   transactionId: string;
-  isAdmin: boolean;
-  masterPassword?: string;
   note?: string | null;
 }): Promise<{ error: string | null }> {
-  const gate = await canUserApproveFinancial(
-    input.supabase,
-    input.companyId,
-    input.isAdmin,
-    input.masterPassword
-  );
+  const gate = await canUserApproveFinancial(input.supabase, input.companyId);
   if (!gate.ok) return { error: gate.error ?? "Sem permissão." };
 
   const reviewer = await resolveReviewerName(input.supabase, input.companyId);
@@ -348,8 +341,6 @@ export async function rejectFinancialTransaction(input: {
   supabase: SupabaseClient;
   companyId: string;
   transactionId: string;
-  isAdmin: boolean;
-  masterPassword?: string;
   note: string;
 }): Promise<{ error: string | null }> {
   const reasonError = validateDeletionReason(input.note);
@@ -357,12 +348,7 @@ export async function rejectFinancialTransaction(input: {
     return { error: reasonError.replace("motivo", "motivo da rejeição") };
   }
 
-  const gate = await canUserApproveFinancial(
-    input.supabase,
-    input.companyId,
-    input.isAdmin,
-    input.masterPassword
-  );
+  const gate = await canUserApproveFinancial(input.supabase, input.companyId);
   if (!gate.ok) return { error: gate.error ?? "Sem permissão." };
 
   const reviewer = await resolveReviewerName(input.supabase, input.companyId);
