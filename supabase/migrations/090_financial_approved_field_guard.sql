@@ -219,6 +219,8 @@ declare
   v_set text;
   v_old_json jsonb := '{}'::jsonb;
   v_new_json jsonb := '{}'::jsonb;
+  v_returned_json jsonb;
+  v_reread_json jsonb;
   v_audit_id uuid;
 begin
   if auth.uid() is null then
@@ -513,12 +515,55 @@ begin
   from public.financial_transactions
   where id = v_row.id;
 
-  if v_reread.classification is distinct from v_persisted.classification
-     or v_reread.transaction_type is distinct from v_persisted.transaction_type
-     or v_reread.amount is distinct from v_persisted.amount
-     or v_reread.chart_of_account_id is distinct from v_persisted.chart_of_account_id
-     or v_reread.description is distinct from v_persisted.description
-  then
+  v_returned_json := jsonb_build_object(
+    'id', v_persisted.id,
+    'amount', v_persisted.amount,
+    'entry_source', v_persisted.entry_source,
+    'description', v_persisted.description,
+    'transaction_type', v_persisted.transaction_type,
+    'transaction_date', v_persisted.transaction_date,
+    'service_date', v_persisted.service_date,
+    'chart_of_account_id', v_persisted.chart_of_account_id,
+    'classification', v_persisted.classification,
+    'company_id', v_persisted.company_id,
+    'branch_id', v_persisted.branch_id,
+    'client_id', v_persisted.client_id,
+    'supplier_id', v_persisted.supplier_id,
+    'driver_id', v_persisted.driver_id,
+    'service_order_id', v_persisted.service_order_id,
+    'allocation_vehicle_id', v_persisted.allocation_vehicle_id,
+    'operational_vehicle_id', v_persisted.operational_vehicle_id,
+    'legacy_number', v_persisted.legacy_number,
+    'submitted_by', v_persisted.submitted_by,
+    'submitted_at', v_persisted.submitted_at,
+    'created_at', v_persisted.created_at,
+    'created_by', v_persisted.created_by
+  );
+  v_reread_json := jsonb_build_object(
+    'id', v_reread.id,
+    'amount', v_reread.amount,
+    'entry_source', v_reread.entry_source,
+    'description', v_reread.description,
+    'transaction_type', v_reread.transaction_type,
+    'transaction_date', v_reread.transaction_date,
+    'service_date', v_reread.service_date,
+    'chart_of_account_id', v_reread.chart_of_account_id,
+    'classification', v_reread.classification,
+    'company_id', v_reread.company_id,
+    'branch_id', v_reread.branch_id,
+    'client_id', v_reread.client_id,
+    'supplier_id', v_reread.supplier_id,
+    'driver_id', v_reread.driver_id,
+    'service_order_id', v_reread.service_order_id,
+    'allocation_vehicle_id', v_reread.allocation_vehicle_id,
+    'operational_vehicle_id', v_reread.operational_vehicle_id,
+    'legacy_number', v_reread.legacy_number,
+    'submitted_by', v_reread.submitted_by,
+    'submitted_at', v_reread.submitted_at,
+    'created_at', v_reread.created_at,
+    'created_by', v_reread.created_by
+  );
+  if v_returned_json is distinct from v_reread_json then
     raise exception 'O estado lido depois do update divergiu do RETURNING.'
       using errcode = '40001';
   end if;

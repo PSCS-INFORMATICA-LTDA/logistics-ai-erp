@@ -421,6 +421,26 @@ describe("campos de lançamento já aprovado", () => {
     assert.match(sql, /v_persisted\.classification/);
     assert.match(sql, /v_persisted\.transaction_type/);
     assert.match(sql, /O estado lido depois do update divergiu do RETURNING/);
+    for (const field of SENSITIVE_APPROVED_FIELDS) {
+      assert.match(sql, new RegExp(`v_persisted\\.${field}`));
+      assert.match(sql, new RegExp(`v_reread\\.${field}`));
+    }
+    const editor = readFileSync(
+      new URL("../../frontend/scripts/apply-090-sql-editor.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(editor, /^begin;/m);
+    assert.match(editor, /^commit;/m);
+    assert.match(editor, /trg_financial_transactions_approval_status/);
+    assert.match(editor, /trg_financial_transactions_approval_insert/);
+    assert.match(editor, /trg_financial_transactions_direct_delete/);
+    assert.match(editor, /Interromper/);
+    assert.doesNotMatch(editor, /drop table if exists public\.financial_correction_events/);
+    assert.doesNotMatch(editor, /090_financial_correction_events_purge/);
+    assert.match(editor, /v_reread\.legacy_number/);
+    assert.match(editor, /v_reread\.created_by/);
+    assert.match(editor, /has_function_privilege\('service_role', 'public\._ap_post_competence_impl\(uuid\)', 'execute'\)/);
+    assert.match(editor, /has_table_privilege\('service_role', 'public\.financial_correction_events', 'delete'\)/);
     assert.match(sql, /if p_patch \? 'chart_of_account_id' then/);
     for (const table of ["branches", "clients", "suppliers", "drivers", "service_orders", "vehicles"]) {
       assert.match(sql, new RegExp(`from public\\.${table}`));
