@@ -80,7 +80,7 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | DRE motorista | Pagamentos + lançamento automático Motorista/Ajudante. |
 | DRE veículo | Aba **Despesas do veículo** por placa (pedágio, combustível, pneu, oficina, outros). Anti-duplicata: mesma **data + OS + conta DRE**. SQL: `apply-038-vehicle-expenses.sql`. |
 | DRE rateio OS | Aba **Rateio por OS** (consulta): por período/placa/sócio, calcula a cota de cada sócio na OS com base no % de participação vigente na data da OS. Receita = frete acordado (senão valor do serviço); despesa = FT Despesa com `service_order_id`. |
-| Aprovação lançamentos | Fase 4: despesas **manuais** (empresa/veículo) nascem `submitted` até Admin (e/ou Máster, parametrizável) aprovar em **DRE → Aprovações**. Receitas OS/pátio e pagamento motorista da designação = `approved` automático. Totais DRE/dashboard/rateio só `approved`. SQL `apply-056-financial-approval.sql`. Alçada `auto_approve_below_amount` opcional; default sem auto. |
+| Aprovação lançamentos | Fase 4: despesas **manuais** (empresa/veículo) nascem `submitted` até o administrador aprovar em **DRE → Aprovações**. Receitas de pátio, postagem de contas a pagar e pagamento do motorista nascem `approved` por função interna. Totais DRE/dashboard/rateio só `approved`. Alçada `auto_approve_below_amount` opcional; omissão da coluna não usa a alçada. SQL `056`, `088` e `089`. Estado no DEV em 23/11/2026: abaixo. |
 | Usuários e acessos | MVP (antes da Fase 2 completa): **Configurações → Usuários e acessos** — Admin lista membros, promove/rebaixa **Admin ↔ Operacional**, convite por e-mail; coluna “Aprova lançamentos”. Impede remover o último Admin. SQL `apply-057-company-members-admin-access.sql`. Matriz completa de papéis (Frota, Consulta etc.) fica na Fase 2. |
 | Mobile web | Shell responsivo: menu ☰ (drawer), formulários com Salvar sticky, tabelas com scroll horizontal + ações fixas. Abrir/editar no celular pelo mesmo URL. |
 | Agenda frota | Aba **Agenda da frota** (semana por placa, horários livres, baseada em OS entrada/saída). Quadro com scroll próprio: **placa + cabeçalho dos dias fixos** (sem precisar zoom 50%). |
@@ -97,6 +97,20 @@ Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
 | Documento único | **CNPJ/CPF não pode repetir** na mesma empresa em Clientes, Fornecedores, Motoristas e Sócios. **Código único** (8 dígitos) em todos os cadastros com código, inclusive **Veículos** — o padrão Philippe é no código, não na placa. SQL: `apply-053-unique-party-documents.sql`. |
 
 ---
+
+### Segurança financeira no DEV (23/11/2026)
+
+Registro da migration **089**, aplicada e homologada com **PASS** somente no Supabase DEV `jmbajdpkvlrslirwzyze`. Não está em produção. Não reaplicar. A **088** permanece ativa no mesmo projeto.
+
+Evidência da 089: padrão `approval_status` = `submitted`; triggers `trg_financial_transactions_approval_status`, `trg_financial_transactions_approval_insert` e `trg_financial_transactions_direct_delete` habilitadas. Financeiro não cria `approved`, não apaga direto e não liga `app.ft_audited_delete`. Administrador aprova, cria `approved` e exclui com motivo. Alçada só vale para lançamento manual enviado como `approved`. Baixa de motorista, contas a pagar e pátio continuam gravando `approved` pelas funções internas. A 088 continua bloqueando mudança de status pelo financeiro.
+
+Resíduos preservados, sem restauração e sem apagar auditoria:
+
+- OS `QA-OS-ND-001` (`06017813-bde8-4802-afda-8936ad81f042`): `updated_at` `2026-11-23 16:15:59.856477+00`. Valor anterior `2026-11-05 19:48:34.526378+00`. `driver_payment_paid_at` nulo.
+- 11 eventos em `deletion_audit_events` com `screen_key = homolog.089`.
+- 1 evento `dashboard.demo` da limpeza da linha DEMO de teste.
+
+A migration **090** é a proposta seguinte. Ainda não existe SQL e não está autorizada. Ela deve congelar, depois de `approved`, `amount`, `entry_source` e os demais campos econômicos, e permitir correção de administrador só com auditoria. Ficam fora dela, em registro separado: `cash_flow_entries`, exclusão de empresa em cascata e a limpeza DEMO por prefixo de descrição.
 
 ## 6. Padrões de implementação PSCS
 

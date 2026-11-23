@@ -24,6 +24,60 @@ export const APPROVAL_STATUS_ADMIN_ERROR =
 export const APPROVAL_COMPANY_MOVE_ERROR =
   "A empresa do lançamento só pode ser alterada por administrador das duas empresas.";
 
+export const APPROVAL_INSERT_ADMIN_ERROR =
+  "Somente administrador da empresa pode criar lançamento já aprovado.";
+
+export const APPROVAL_DELETE_DIRECT_ERROR =
+  "Exclusão direta de lançamento financeiro não é permitida. A exclusão precisa de administrador e de auditoria.";
+
+export const MANUAL_APPROVAL_ENTRY_SOURCES = ["company_ledger", "vehicle_expense"] as const;
+
+export type ApprovalInsertInput = {
+  actorRole: ApprovalActorRole;
+  /** true só dentro de função SECURITY DEFINER de posse do postgres. O cliente não liga isso. */
+  internalWriter: boolean;
+  /** null reproduz a coluna omitida. O padrão novo é submitted. */
+  requestedStatus: string | null;
+  entrySource: string | null;
+  amount: number;
+  autoApproveBelowAmount: number | null;
+};
+
+export type ApprovalInsertDecision =
+  | { ok: true; status: "draft" | "submitted" | "approved" | "rejected" | "cancelled" | string }
+  | { ok: false; reason: string };
+
+/**
+ * Espelho da trigger guard_financial_transaction_approval_insert.
+ * A autoridade é o banco. Esta função serve à tela e aos testes.
+ */
+export function evaluateApprovalInsert(input: ApprovalInsertInput): ApprovalInsertDecision {
+  const status = input.requestedStatus ?? "submitted";
+  if (status !== "approved") return { ok: true, status };
+
+  if (input.actorRole === "admin" || input.internalWriter) {
+    return { ok: true, status: "approved" };
+  }
+
+  const manual = MANUAL_APPROVAL_ENTRY_SOURCES.includes(
+    input.entrySource as (typeof MANUAL_APPROVAL_ENTRY_SOURCES)[number],
+  );
+  const limit = input.autoApproveBelowAmount;
+  if (manual && limit != null && Number.isFinite(limit) && input.amount <= limit) {
+    return { ok: true, status: "approved" };
+  }
+
+  return { ok: false, reason: APPROVAL_INSERT_ADMIN_ERROR };
+}
+
+/** Espelho da trigger de DELETE. Sem a função auditada, a exclusão direta falha. */
+export function evaluateFinancialDelete(input: {
+  viaAuditedFunction: boolean;
+}): { ok: true } | { ok: false; reason: string } {
+  if (input.viaAuditedFunction) return { ok: true };
+  return { ok: false, reason: APPROVAL_DELETE_DIRECT_ERROR };
+}
+
 export function evaluateApprovalStatusUpdate(
   input: ApprovalStatusUpdateInput,
 ): ApprovalStatusUpdateDecision {

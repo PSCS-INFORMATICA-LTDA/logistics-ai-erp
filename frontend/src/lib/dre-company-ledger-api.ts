@@ -3,8 +3,17 @@ import {
   COMPANY_LEDGER_ENTRY_SOURCE,
   COMPANY_LEDGER_ENTRY_SOURCES,
 } from "@/lib/company-ledger";
-import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
 import { buildApprovalInsertFields } from "@/lib/financial-approval";
+
+function schemaLacksColumn(message: string, column: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    text.includes(column.toLowerCase()) &&
+    (text.includes("does not exist") ||
+      text.includes("não existe") ||
+      text.includes("schema cache"))
+  );
+}
 
 export type CompanyLedgerRow = {
   id: string;
@@ -208,23 +217,24 @@ export async function createCompanyLedgerEntry(
     .single();
 
   if (
-    error?.message.includes("entry_source") ||
-    error?.message.includes("approval_status") ||
-    error?.message.includes("legacy_number") ||
-    error?.message.includes("service_order_id")
+    error?.message &&
+    (schemaLacksColumn(error.message, "entry_source") ||
+      schemaLacksColumn(error.message, "approval_status") ||
+      schemaLacksColumn(error.message, "legacy_number") ||
+      schemaLacksColumn(error.message, "service_order_id"))
   ) {
-    if (error.message.includes("approval_status")) {
+    if (schemaLacksColumn(error.message, "approval_status")) {
       delete payload.approval_status;
       delete payload.submitted_by;
       delete payload.submitted_at;
     }
-    if (error.message.includes("entry_source")) {
+    if (schemaLacksColumn(error.message, "entry_source")) {
       delete payload.entry_source;
     }
-    if (error.message.includes("legacy_number")) {
+    if (schemaLacksColumn(error.message, "legacy_number")) {
       delete payload.legacy_number;
     }
-    if (error.message.includes("service_order_id")) {
+    if (schemaLacksColumn(error.message, "service_order_id")) {
       delete payload.service_order_id;
     }
     const retry = await supabase
@@ -288,39 +298,29 @@ export async function deleteCompanyLedgerEntry(
   reason?: string | null,
   reasonCode?: string | null
 ): Promise<{ error: string | null }> {
-  const { data: existing } = await supabase
+  const { data: existing, error: loadError } = await supabase
     .from("financial_transactions")
-    .select("*")
+    .select("id, entry_source")
     .eq("company_id", companyId)
     .eq("id", id)
-    .eq("entry_source", COMPANY_LEDGER_ENTRY_SOURCE)
     .maybeSingle();
 
-  if (existing) {
-    const row = existing as Record<string, unknown>;
-    const { entityCode, summary } = summarizeDeletedRow(row, "financial_transactions");
-    const logged = await recordDeletion({
-      supabase,
-      companyId,
-      entityType: "financial_transactions",
-      entityId: id,
-      entityCode,
-      summary,
-      reason,
-      reasonCode,
-      screenKey: "dre.lancamentos",
-      deleteMode: "hard",
-      payload: row,
-    });
-    if (logged.error) return { error: logged.error };
+  if (loadError) return { error: loadError.message };
+  if (!existing) return { error: "Lançamento não encontrado." };
+  if (
+    !COMPANY_LEDGER_ENTRY_SOURCES.includes(
+      existing.entry_source as (typeof COMPANY_LEDGER_ENTRY_SOURCES)[number],
+    )
+  ) {
+    return { error: "Este lançamento não é da tela de lançamentos da empresa." };
   }
 
-  const { error } = await supabase
-    .from("financial_transactions")
-    .delete()
-    .eq("company_id", companyId)
-    .eq("id", id)
-    .eq("entry_source", COMPANY_LEDGER_ENTRY_SOURCE);
+  const { error } = await supabase.rpc("delete_financial_transaction_audited", {
+    p_id: id,
+    p_reason: reason ?? "",
+    p_reason_code: reasonCode ?? null,
+    p_screen_key: "dre.lancamentos",
+  });
   return { error: error?.message ?? null };
 }
 
