@@ -69,8 +69,25 @@ export function authorizeMemberInvite(
 }
 
 /**
- * Troca de papel. Financeiro não cai para operacional por omissão,
- * e sócio não é reescrito por esta ação.
+ * Quem pode gravar a troca: administrador do vínculo da empresa do alvo.
+ * Financeiro, operacional, sócio e quem não pertence a essa empresa não alteram papéis.
+ */
+export function authorizeMemberRoleCaller(
+  callerRoleInTargetCompany: string | null | undefined,
+): { ok: true } | { ok: false; status: 403; error: string } {
+  if (callerRoleInTargetCompany !== "admin") {
+    return {
+      ok: false,
+      status: 403,
+      error: "Somente administrador pode alterar papéis.",
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Troca explícita entre administrador, financeiro e operacional.
+ * Papel omitido ou desconhecido não vira operacional, e sócio não é reescrito.
  */
 export function planMemberRoleChange(input: {
   currentRole: string | null | undefined;
@@ -91,12 +108,6 @@ export function planMemberRoleChange(input: {
   if (current === "socio") {
     return { ok: false, error: "O papel de sócio não é alterado por esta ação." };
   }
-  if (current === "financeiro" && requested === "operacional") {
-    return {
-      ok: false,
-      error: "O papel financeiro não pode ser substituído por operacional nesta ação.",
-    };
-  }
   if (current === "admin" && requested !== "admin" && input.adminCount <= 1) {
     return {
       ok: false,
@@ -104,4 +115,55 @@ export function planMemberRoleChange(input: {
     };
   }
   return { ok: true, role: requested };
+}
+
+export type MemberRoleRecord = {
+  id: string;
+  companyId: string;
+  role: string;
+};
+
+/**
+ * Aplica a troca só na linha cujo id e empresa coincidem.
+ * As demais linhas, inclusive de outra empresa, permanecem como estavam.
+ */
+export function persistMemberRoleChange(input: {
+  members: readonly MemberRoleRecord[];
+  memberId: string;
+  companyId: string;
+  requestedRole: unknown;
+  adminCount: number;
+  callerRole: string | null | undefined;
+}):
+  | { ok: true; role: AssignableRole; members: MemberRoleRecord[] }
+  | { ok: false; status: 403 | 404 | 409; error: string; members: MemberRoleRecord[] } {
+  const members = input.members.map((member) => ({ ...member }));
+  const caller = authorizeMemberRoleCaller(input.callerRole);
+  if (!caller.ok) {
+    return { ok: false, status: caller.status, error: caller.error, members };
+  }
+
+  const index = members.findIndex(
+    (member) => member.id === input.memberId && member.companyId === input.companyId,
+  );
+  if (index < 0) {
+    return {
+      ok: false,
+      status: 404,
+      error: "Usuário não encontrado nesta empresa.",
+      members,
+    };
+  }
+
+  const plan = planMemberRoleChange({
+    currentRole: members[index].role,
+    requestedRole: input.requestedRole,
+    adminCount: input.adminCount,
+  });
+  if (!plan.ok) {
+    return { ok: false, status: 409, error: plan.error, members };
+  }
+
+  members[index] = { ...members[index], role: plan.role };
+  return { ok: true, role: plan.role, members };
 }

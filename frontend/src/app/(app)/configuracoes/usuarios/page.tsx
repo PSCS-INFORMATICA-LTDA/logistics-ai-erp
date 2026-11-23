@@ -39,71 +39,42 @@ function RoleActions({
   }
 
   const lastAdmin = row.role === "admin" && adminCount <= 1;
+  const targets: AssignableRole[] =
+    row.role === "admin"
+      ? ["operacional", "financeiro"]
+      : row.role === "financeiro"
+        ? ["admin", "operacional"]
+        : ["admin", "financeiro"];
+
   return (
     <>
-      {row.role !== "admin" ? (
-        <Button
-          type="button"
-          size="sm"
-          className="action-icon-btn"
-          disabled={busy}
-          title="Promover a Admin"
-          onClick={() => onChange("admin")}
-        >
-          <span className="sm:hidden">Admin</span>
-          <span className="hidden sm:inline">Promover a Admin</span>
-        </Button>
-      ) : null}
-      {row.role === "operacional" ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="action-icon-btn"
-          disabled={busy}
-          title="Tornar financeiro"
-          onClick={() => onChange("financeiro")}
-        >
-          <span className="sm:hidden">Fin.</span>
-          <span className="hidden sm:inline">Tornar financeiro</span>
-        </Button>
-      ) : null}
-      {row.role === "admin" ? (
-        <>
+      {targets.map((next) => {
+        const leavingAdmin = lastAdmin && next !== "admin";
+        const label =
+          next === "admin"
+            ? "Promover a Admin"
+            : next === "financeiro"
+              ? "Tornar financeiro"
+              : "Tornar operacional";
+        const short = next === "admin" ? "Admin" : next === "financeiro" ? "Fin." : "Op.";
+        return (
           <Button
+            key={next}
             type="button"
-            variant="secondary"
+            variant={next === "admin" ? "primary" : "secondary"}
             size="sm"
             className="action-icon-btn"
-            disabled={busy || lastAdmin}
+            disabled={busy || leavingAdmin}
             title={
-              lastAdmin
-                ? "Promova outro Admin antes de rebaixar o último."
-                : "Tornar operacional"
+              leavingAdmin ? "Promova outro Admin antes de rebaixar o último." : label
             }
-            onClick={() => onChange("operacional")}
+            onClick={() => onChange(next)}
           >
-            <span className="sm:hidden">Op.</span>
-            <span className="hidden sm:inline">Tornar operacional</span>
+            <span className="sm:hidden">{short}</span>
+            <span className="hidden sm:inline">{label}</span>
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="action-icon-btn"
-            disabled={busy || lastAdmin}
-            title={
-              lastAdmin
-                ? "Promova outro Admin antes de rebaixar o último."
-                : "Tornar financeiro"
-            }
-            onClick={() => onChange("financeiro")}
-          >
-            <span className="sm:hidden">Fin.</span>
-            <span className="hidden sm:inline">Tornar financeiro</span>
-          </Button>
-        </>
-      ) : null}
+        );
+      })}
     </>
   );
 }
