@@ -8,11 +8,14 @@ import {
 export {
   ASSIGNABLE_ROLES,
   authorizeMemberInvite,
+  authorizeMemberRoleCaller,
   parseAssignableRole,
+  persistMemberRoleChange,
   planMemberRoleChange,
   presentMemberRole,
   roleLabel,
   type AssignableRole,
+  type MemberRoleRecord,
 } from "./member-role-plan";
 
 export type CompanyMemberRow = {

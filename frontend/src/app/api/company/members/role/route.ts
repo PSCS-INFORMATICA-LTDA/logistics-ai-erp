@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCompanyMember } from "@/lib/billing-server";
-import { planMemberRoleChange } from "@/lib/company-members-access";
+import { authorizeMemberRoleCaller, planMemberRoleChange } from "@/lib/company-members-access";
 
 export const runtime = "nodejs";
 
@@ -44,11 +44,9 @@ export async function POST(request: Request) {
   if (callerErr) {
     return NextResponse.json({ error: callerErr.message }, { status: 400 });
   }
-  if (caller?.role !== "admin") {
-    return NextResponse.json(
-      { error: "Somente administrador pode alterar papéis." },
-      { status: 403 },
-    );
+  const callerDecision = authorizeMemberRoleCaller(caller?.role);
+  if (!callerDecision.ok) {
+    return NextResponse.json({ error: callerDecision.error }, { status: callerDecision.status });
   }
 
   let adminCount = 0;
