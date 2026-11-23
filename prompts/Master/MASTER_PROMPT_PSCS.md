@@ -110,7 +110,7 @@ Resíduos preservados, sem restauração e sem apagar auditoria:
 - 11 eventos em `deletion_audit_events` com `screen_key = homolog.089`.
 - 1 evento `dashboard.demo` da limpeza da linha DEMO de teste.
 
-A migration **090** é a proposta seguinte. Ainda não existe SQL e não está autorizada. Ela deve congelar, depois de `approved`, `amount`, `entry_source` e os demais campos econômicos, e permitir correção de administrador só com auditoria. Ficam fora dela, em registro separado: `cash_flow_entries`, exclusão de empresa em cascata e a limpeza DEMO por prefixo de descrição.
+A migration **090** está escrita na branch e ainda não foi aplicada em nenhum banco. Ela congela `amount`, `entry_source` e os demais campos econômicos quando o lançamento está ou fica `approved`, e a correção de administrador grava o antes e o depois. A flag sozinha não libera o update. Ficam fora dela: `cash_flow_entries`, exclusão de empresa em cascata e a limpeza DEMO por prefixo de descrição.
 
 ## 6. Padrões de implementação PSCS
 

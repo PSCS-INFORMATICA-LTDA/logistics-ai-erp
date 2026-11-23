@@ -6,9 +6,12 @@ import {
   APPROVAL_DELETE_DIRECT_ERROR,
   APPROVAL_INSERT_ADMIN_ERROR,
   APPROVAL_STATUS_ADMIN_ERROR,
+  APPROVED_FIELD_CORRECTION_ERROR,
+  SENSITIVE_APPROVED_FIELDS,
   evaluateApprovalInsert,
   evaluateApprovalStatusBatch,
   evaluateApprovalStatusUpdate,
+  evaluateApprovedSensitiveUpdate,
   evaluateFinancialDelete,
   type ApprovalStatusUpdateInput,
 } from "../src/lib/approval-status-guard.ts";
@@ -281,5 +284,147 @@ describe("exclusão de lançamento", () => {
     assert.equal(denied.ok, false);
     if (!denied.ok) assert.equal(denied.reason, APPROVAL_DELETE_DIRECT_ERROR);
     assert.deepEqual(evaluateFinancialDelete({ viaAuditedFunction: true }), { ok: true });
+  });
+});
+
+describe("campos de lançamento já aprovado", () => {
+  it("deixa editar valor enquanto o lançamento não está approved", () => {
+    assert.deepEqual(
+      evaluateApprovedSensitiveUpdate({
+        oldStatus: "submitted",
+        newStatus: "submitted",
+        changedFields: ["amount", "description"],
+        viaAuditedCorrection: false,
+      }),
+      { ok: true },
+    );
+  });
+
+  it("deixa aprovar, rejeitar e estornar sem mexer no valor", () => {
+    for (const [oldStatus, newStatus] of [
+      ["submitted", "approved"],
+      ["submitted", "rejected"],
+      ["approved", "cancelled"],
+    ] as const) {
+      assert.deepEqual(
+        evaluateApprovedSensitiveUpdate({
+          oldStatus,
+          newStatus,
+          changedFields: ["approval_status", "review_note", "reviewed_by", "reviewed_at", "updated_at", "updated_by"],
+          viaAuditedCorrection: false,
+        }),
+        { ok: true },
+      );
+    }
+  });
+
+  it("bloqueia valor, origem e descrição depois de approved", () => {
+    for (const field of ["amount", "entry_source", "description"]) {
+      const decision = evaluateApprovedSensitiveUpdate({
+        oldStatus: "approved",
+        newStatus: "approved",
+        changedFields: [field],
+        viaAuditedCorrection: false,
+      });
+      assert.equal(decision.ok, false);
+      if (!decision.ok) assert.equal(decision.reason, APPROVED_FIELD_CORRECTION_ERROR);
+    }
+  });
+
+  it("não deixa a mudança de status carregar um campo sensível junto", () => {
+    const becomingApproved = evaluateApprovedSensitiveUpdate({
+      oldStatus: "submitted",
+      newStatus: "approved",
+      changedFields: ["approval_status", "amount"],
+      viaAuditedCorrection: false,
+    });
+    const leavingApproved = evaluateApprovedSensitiveUpdate({
+      oldStatus: "approved",
+      newStatus: "cancelled",
+      changedFields: ["approval_status", "entry_source"],
+      viaAuditedCorrection: false,
+    });
+    assert.equal(becomingApproved.ok, false);
+    assert.equal(leavingApproved.ok, false);
+  });
+
+  it("libera a correção só pelo caminho auditado, não pela flag sozinha", () => {
+    assert.deepEqual(
+      evaluateApprovedSensitiveUpdate({
+        oldStatus: "approved",
+        newStatus: "approved",
+        changedFields: ["amount"],
+        viaAuditedCorrection: true,
+      }),
+      { ok: true },
+    );
+    const flaggedOnly = evaluateApprovedSensitiveUpdate({
+      oldStatus: "approved",
+      newStatus: "approved",
+      changedFields: ["amount"],
+      viaAuditedCorrection: false,
+    });
+    assert.equal(flaggedOnly.ok, false);
+  });
+
+  it("a 090 exige postgres, o papel da conexão e o id da linha", () => {
+    const sql = readFileSync(
+      new URL("../../supabase/migrations/090_financial_approved_field_guard.sql", import.meta.url),
+      "utf8",
+    );
+    const rollback = readFileSync(
+      new URL("../../supabase/rollbacks/090_financial_approved_field_guard.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(sql, /before update on public\.financial_transactions/);
+    assert.match(sql, /current_user = 'postgres'/);
+    assert.match(sql, /session_user in \('authenticator', 'authenticated'\)/);
+    assert.match(sql, /app\.ft_audited_correction', true\) is not distinct from old\.id::text/);
+    assert.match(sql, /old\.approval_status is distinct from 'approved'/);
+    assert.match(sql, /new\.approval_status is distinct from 'approved'/);
+    for (const field of SENSITIVE_APPROVED_FIELDS) {
+      assert.match(sql, new RegExp(`new\\.${field} is distinct from old\\.${field}`));
+    }
+    assert.match(sql, /revoke all on function public\._ap_post_competence_impl\(uuid\) from service_role/);
+    assert.match(sql, /revoke all on function public\.seed_dashboard_demo_impl\(uuid\) from service_role/);
+    assert.doesNotMatch(sql, /revoke all on function public\._ap_post_competence\(uuid\) from service_role/);
+    assert.doesNotMatch(sql, /revoke all on function public\.seed_dashboard_demo\(uuid\) from service_role/);
+    assert.doesNotMatch(sql, /drop trigger if exists trg_financial_transactions_approval_status/);
+    assert.doesNotMatch(sql, /drop trigger if exists trg_financial_transactions_approval_insert/);
+    assert.doesNotMatch(sql, /drop trigger if exists trg_financial_transactions_direct_delete/);
+    assert.match(sql, /char_length\(v_reason\) < 8/);
+    assert.match(sql, /auth_user_is_company_admin\(v_row\.company_id\)/);
+    assert.match(sql, /dashboard_demo/);
+    assert.match(rollback, /grant execute on function public\._ap_post_competence_impl\(uuid\) to service_role/);
+    assert.match(rollback, /grant execute on function public\.seed_dashboard_demo_impl\(uuid\) to service_role/);
+    assert.doesNotMatch(rollback, /trg_financial_transactions_approval_status/);
+    assert.doesNotMatch(rollback, /trg_financial_transactions_approval_insert/);
+    assert.doesNotMatch(rollback, /trg_financial_transactions_direct_delete/);
+  });
+
+  it("estorno, baixa e pátio não dependem de alterar valor já aprovado", () => {
+    const sql089 = readFileSync(
+      new URL("../../supabase/migrations/089_financial_insert_delete_guard.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(sql089, /post_parking_revenue/);
+    assert.match(sql089, /post_car_wash_revenue/);
+    assert.match(sql089, /_ap_post_competence_impl/);
+    const estorno = evaluateApprovedSensitiveUpdate({
+      oldStatus: "approved",
+      newStatus: "cancelled",
+      changedFields: ["approval_status", "review_note", "reviewed_by", "reviewed_at", "updated_by", "updated_at"],
+      viaAuditedCorrection: false,
+    });
+    assert.deepEqual(estorno, { ok: true });
+    const statusGate = evaluateApprovalStatusUpdate(
+      change({
+        actorRoleInOldCompany: "admin",
+        actorRoleInNewCompany: "admin",
+        oldStatus: "approved",
+        newStatus: "cancelled",
+      }),
+    );
+    assert.deepEqual(statusGate, { ok: true });
   });
 });

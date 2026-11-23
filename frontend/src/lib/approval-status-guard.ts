@@ -30,6 +30,35 @@ export const APPROVAL_INSERT_ADMIN_ERROR =
 export const APPROVAL_DELETE_DIRECT_ERROR =
   "Exclusão direta de lançamento financeiro não é permitida. A exclusão precisa de administrador e de auditoria.";
 
+export const APPROVED_FIELD_CORRECTION_ERROR =
+  "Lançamento aprovado não aceita alteração direta de valor, origem ou vínculo. A correção precisa de administrador e de auditoria.";
+
+/** Campos que a 090 congela quando o lançamento está ou fica approved. */
+export const SENSITIVE_APPROVED_FIELDS = [
+  "amount",
+  "entry_source",
+  "description",
+  "transaction_type",
+  "transaction_date",
+  "service_date",
+  "chart_of_account_id",
+  "classification",
+  "company_id",
+  "branch_id",
+  "client_id",
+  "supplier_id",
+  "driver_id",
+  "service_order_id",
+  "allocation_vehicle_id",
+  "operational_vehicle_id",
+  "legacy_number",
+  "submitted_by",
+  "submitted_at",
+  "id",
+  "created_at",
+  "created_by",
+] as const;
+
 export const MANUAL_APPROVAL_ENTRY_SOURCES = ["company_ledger", "vehicle_expense"] as const;
 
 export type ApprovalInsertInput = {
@@ -76,6 +105,28 @@ export function evaluateFinancialDelete(input: {
 }): { ok: true } | { ok: false; reason: string } {
   if (input.viaAuditedFunction) return { ok: true };
   return { ok: false, reason: APPROVAL_DELETE_DIRECT_ERROR };
+}
+
+/**
+ * Espelho da trigger guard_financial_transaction_approved_fields.
+ * viaAuditedCorrection só é true dentro de correct_financial_transaction_audited:
+ * current_user postgres, session_user da conexão e flag igual ao id da linha.
+ * Ligar a flag por set_config não basta.
+ */
+export function evaluateApprovedSensitiveUpdate(input: {
+  oldStatus: string | null;
+  newStatus: string | null;
+  changedFields: readonly string[];
+  viaAuditedCorrection: boolean;
+}): { ok: true } | { ok: false; reason: string } {
+  const sensitive = input.changedFields.some((field) =>
+    (SENSITIVE_APPROVED_FIELDS as readonly string[]).includes(field),
+  );
+  if (!sensitive) return { ok: true };
+  const touchesApproved = input.oldStatus === "approved" || input.newStatus === "approved";
+  if (!touchesApproved) return { ok: true };
+  if (input.viaAuditedCorrection) return { ok: true };
+  return { ok: false, reason: APPROVED_FIELD_CORRECTION_ERROR };
 }
 
 export function evaluateApprovalStatusUpdate(
