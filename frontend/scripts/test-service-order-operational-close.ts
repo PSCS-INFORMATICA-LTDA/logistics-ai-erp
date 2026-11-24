@@ -255,12 +255,12 @@ describe("o fechamento operacional não fala com o Core", () => {
       path.join(root, "components/operacional/ServiceOrderRowActions.tsx"),
       "utf8",
     );
-    for (const source of [route, local]) {
-      assert.equal(source.includes("requireCoreArSession"), false);
-      assert.equal(source.includes("createReceivable"), false);
-      assert.equal(source.includes("closeServiceOrderWithCoreReceivable"), false);
-      assert.equal(source.includes("pscs-one/core"), false);
-    }
+    assert.equal(local.includes("requireCoreArSession"), false);
+    assert.equal(local.includes("createReceivable"), false);
+    assert.equal(local.includes("closeServiceOrderWithCoreReceivable"), false);
+    assert.equal(local.includes("pscs-one/core"), false);
+    assert.equal(route.includes("resolveServiceOrderCloseMode"), true);
+    assert.equal(route.includes("closeServiceOrderOperationally"), true);
     assert.equal(route.includes("complete_service_order") || local.includes("complete_service_order"), true);
     assert.equal(local.includes(OPERATIONAL_CLOSE_COLUMNS), true);
     assert.equal(OPERATIONAL_CLOSE_COLUMNS.includes("client_id"), false);

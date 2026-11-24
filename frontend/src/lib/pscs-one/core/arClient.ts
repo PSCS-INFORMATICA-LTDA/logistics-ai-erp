@@ -1,7 +1,7 @@
 import { buildCoreSupabaseAuthCookieHeader } from "./authCookie";
 import { pscsOneCoreApiBaseUrl } from "./config";
 import { CoreArError, mapCoreHttpError } from "./errors";
-import type { CoreArAuthSessionWithUser, CoreReceivablePayment, CoreReceivableSummary } from "./types";
+import type { CoreArAuthSessionWithUser, CoreReceivablePayment, CoreReceivablePaymentReversal, CoreReceivableSummary } from "./types";
 
 export const LOGISTICS_AR_SOURCE_SYSTEM = "logistics_ai";
 export const LOGISTICS_AR_SOURCE_ENTITY_TYPE = "service_order";
@@ -165,5 +165,82 @@ export class PscsOneCoreArClient {
       throw new CoreArError("core_invalid_response", "Core create receivable payload is invalid.", 502);
     }
     return { created: payload.created, receivable };
+  }
+
+  async postReceivablePayment(input: {
+    company_id: string;
+    receivable_id: string;
+    currency_code: "BRL";
+    amount: string;
+    reference_code?: string;
+    source_system?: typeof LOGISTICS_AR_SOURCE_SYSTEM;
+    source_entity_type?: string;
+    source_entity_id?: string;
+  }): Promise<{ payment: CoreReceivablePayment; receivable: CoreReceivableSummary | null }> {
+    if (!/^\d+\.\d{2}$/.test(input.amount) || Number(input.amount) <= 0) {
+      throw new CoreArError("COMMERCIAL_AMOUNT_INVALID", "Payment amount must be a positive decimal.", 422);
+    }
+    const response = await this.coreFetch("/api/receivables/payments", { method: "POST", body: input });
+    const body = await this.parseJson(response);
+    if (!response.ok) {
+      throw mapCoreHttpError(response.status, body);
+    }
+    const payload = body as {
+      ok?: boolean;
+      payment?: CoreReceivablePayment;
+      receivable?: CoreReceivableSummary;
+    };
+    if (payload.ok !== true || !payload.payment?.payment_id) {
+      throw new CoreArError("core_invalid_response", "Core payment payload is invalid.", 502);
+    }
+    if (payload.receivable && payload.receivable.company_id !== input.company_id) {
+      throw new CoreArError("core_unauthorized", "Core returned a payment for another company.", 403);
+    }
+    return { payment: payload.payment, receivable: payload.receivable ?? null };
+  }
+
+  async reverseReceivablePayment(input: {
+    company_id: string;
+    payment_id: string;
+    reason: string;
+    idempotency_key: string;
+  }): Promise<{
+    created: boolean;
+    reversal: CoreReceivablePaymentReversal;
+    receivable: CoreReceivableSummary | null;
+  }> {
+    if (!input.reason.trim()) {
+      throw new CoreArError("REFERENCE_CODE_INVALID", "Reversal reason is required.", 422);
+    }
+    const response = await this.coreFetch("/api/receivables/payments/reversals", {
+      method: "POST",
+      body: input,
+    });
+    const body = await this.parseJson(response);
+    if (!response.ok) {
+      throw mapCoreHttpError(response.status, body);
+    }
+    const payload = body as {
+      ok?: boolean;
+      created?: boolean;
+      reversal?: CoreReceivablePaymentReversal;
+      receivable?: CoreReceivableSummary;
+    };
+    if (
+      payload.ok !== true ||
+      (payload.created !== true && payload.created !== false) ||
+      !payload.reversal?.reversal_id ||
+      payload.reversal.payment_id !== input.payment_id
+    ) {
+      throw new CoreArError("core_invalid_response", "Core reversal payload is invalid.", 502);
+    }
+    if (payload.receivable && payload.receivable.company_id !== input.company_id) {
+      throw new CoreArError("core_unauthorized", "Core returned a reversal for another company.", 403);
+    }
+    return {
+      created: payload.created,
+      reversal: payload.reversal,
+      receivable: payload.receivable ?? null,
+    };
   }
 }

@@ -7,6 +7,7 @@ import { Alert, Loading } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { DataTableScroll } from "@/components/ui/DataTableScroll";
+import { AuditedLedgerCorrection } from "@/components/dre/AuditedLedgerCorrection";
 import { DeleteReasonModal } from "@/components/ui/DeleteReasonModal";
 import { GlassSelect } from "@/components/ui/GlassSelect";
 import {
@@ -18,6 +19,10 @@ import {
 import { useAccess } from "@/lib/access-context";
 import { useCompany } from "@/lib/company-context";
 import { summarizeDeletedRow } from "@/lib/deletion-audit";
+import {
+  listFinancialCorrectionEvents,
+  type FinancialCorrectionEvent,
+} from "@/lib/financial-approval";
 import { createDeletionApprovalRequest } from "@/lib/deletion-approvals";
 import { enqueueDeletionAlert } from "@/lib/deletion-alerts";
 import { assertCriticalDeleteGate } from "@/lib/deletion-gate";
@@ -101,6 +106,9 @@ function DreLancamentosPageContent() {
   const [description, setDescription] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [correctionRow, setCorrectionRow] = useState<CompanyLedgerRow | null>(null);
+  const [corrections, setCorrections] = useState<FinancialCorrectionEvent[]>([]);
+  const [correctionListError, setCorrectionListError] = useState<string | null>(null);
 
   const monthLabel = useMemo(
     () => new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
@@ -212,6 +220,20 @@ function DreLancamentosPageContent() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadCorrections = useCallback(async () => {
+    if (!companyId || !isAdmin) {
+      setCorrections([]);
+      return;
+    }
+    const result = await listFinancialCorrectionEvents(supabase, companyId);
+    setCorrections(result.rows);
+    setCorrectionListError(result.error);
+  }, [companyId, isAdmin, supabase]);
+
+  useEffect(() => {
+    void loadCorrections();
+  }, [loadCorrections]);
 
   /** Prefill a partir da OS legado (Despesas Motorista / ações da OS). */
   useEffect(() => {
@@ -728,16 +750,23 @@ function DreLancamentosPageContent() {
                         {formatCurrency(row.amount)}
                       </p>
                     </div>
-                    {canDelete ? (
+                    {canDelete || (isAdmin && row.approval_status === "approved") ? (
                       <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          onClick={() => requestDelete(row.id)}
-                        >
-                          Excluir
-                        </Button>
+                        {isAdmin && row.approval_status === "approved" ? (
+                          <Button type="button" variant="secondary" size="sm" onClick={() => setCorrectionRow(row)}>
+                            Corrigir lançamento
+                          </Button>
+                        ) : null}
+                        {canDelete ? (
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={() => requestDelete(row.id)}
+                          >
+                            Excluir
+                          </Button>
+                        ) : null}
                       </div>
                     ) : null}
                   </li>
@@ -816,21 +845,33 @@ function DreLancamentosPageContent() {
                           {formatCurrency(row.amount)}
                         </td>
                         <td className="px-1.5 py-1.5 text-right">
-                          {canDelete ? (
-                            <div className="os-row-actions inline-flex justify-end">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="action-icon-btn"
-                              title="Excluir"
-                              aria-label="Excluir"
-                              onClick={() => requestDelete(row.id)}
-                            >
-                              Excluir
-                            </Button>
-                            </div>
-                          ) : null}
+                          <div className="os-row-actions inline-flex justify-end gap-1">
+                            {isAdmin && row.approval_status === "approved" ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="action-icon-btn"
+                                aria-label="Corrigir lançamento"
+                                onClick={() => setCorrectionRow(row)}
+                              >
+                                Corrigir lançamento
+                              </Button>
+                            ) : null}
+                            {canDelete ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="action-icon-btn"
+                                title="Excluir"
+                                aria-label="Excluir"
+                                onClick={() => requestDelete(row.id)}
+                              >
+                                Excluir
+                              </Button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -843,11 +884,48 @@ function DreLancamentosPageContent() {
           )}
         </section>
 
+        {isAdmin ? (
+          <section className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-800">Histórico de correções</h3>
+            {correctionListError ? (
+              <p className="mt-2 text-sm text-red-600">{correctionListError}</p>
+            ) : corrections.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">Nenhuma correção auditada nesta empresa.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {corrections.map((event) => (
+                  <li key={event.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs text-slate-700">
+                    <span className="font-medium">{formatDate(event.occurred_at.slice(0, 10))}</span>
+                    {" · "}
+                    {event.reason}
+                    {event.old_amount != null && event.new_amount != null
+                      ? ` · ${formatCurrency(event.old_amount)} → ${formatCurrency(event.new_amount)}`
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
+
         <p className="text-xs text-slate-500">
           Despesas de <strong>placa</strong> e <strong>motorista</strong> continuam nas outras abas do
           DRE. Esta tela é o controle geral da empresa no mês (como na planilha do Rafael).
         </p>
       </CardBody>
+
+      <AuditedLedgerCorrection
+        open={Boolean(correctionRow)}
+        row={correctionRow}
+        supabase={supabase}
+        onCancel={() => setCorrectionRow(null)}
+        onSaved={async () => {
+          setCorrectionRow(null);
+          setMsg("Lançamento corrigido e registrado no histórico.");
+          await load();
+          await loadCorrections();
+        }}
+      />
 
       <DeleteReasonModal
         open={Boolean(pendingDeleteId)}

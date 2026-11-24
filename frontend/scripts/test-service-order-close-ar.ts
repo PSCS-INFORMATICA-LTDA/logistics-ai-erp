@@ -14,6 +14,7 @@ import {
   type LogisticsCloseStore,
   SERVICE_ORDER_CLOSE_COLUMNS,
   closeServiceOrderWithCoreReceivable,
+  resolveServiceOrderCloseMode,
 } from "../src/lib/pscs-one/core/closeServiceOrder.ts";
 import type { CoreIntegrationDirectory } from "../src/lib/pscs-one/core/coreDirectory.ts";
 import { CoreArError } from "../src/lib/pscs-one/core/errors.ts";
@@ -170,11 +171,22 @@ async function run(
   const directory = options?.directory ?? directoryFor();
   const http = coreClient(
     options?.fetch ??
-      (async () =>
-        new Response(JSON.stringify({ ok: true, created: true, receivable: { ...fixtureReceivable, status: "open", posted_amount: "0.00", balance: "800.00" } }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        })),
+      (async (_url, init) => {
+        if ((init?.method ?? "GET") !== "POST") {
+          return new Response(JSON.stringify({ ok: true, receivables: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            created: true,
+            receivable: { ...fixtureReceivable, status: "open", posted_amount: "0.00", balance: "800.00" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
   );
   const result = await closeServiceOrderWithCoreReceivable({
     authUserId: USER,
@@ -312,6 +324,9 @@ describe("close orchestrator gates", () => {
     const seen = { posts: 0 };
     const { http, completeCalls } = await run(openOrder(), {
       fetch: (_url, init) => {
+        if ((init?.method ?? "GET") !== "POST") {
+          return new Response(JSON.stringify({ ok: true, receivables: [] }), { status: 200 });
+        }
         seen.posts += 1;
         const body = init?.body ? JSON.parse(String(init.body)) : null;
         assert.ok(body && "due_at" in body);
@@ -328,7 +343,8 @@ describe("close orchestrator gates", () => {
     });
     assert.equal(seen.posts, 1);
     assert.equal(completeCalls, 1);
-    assert.equal((http[0]?.body as { due_at: null }).due_at, null);
+    const posted = http.find((call) => call.method === "POST");
+    assert.equal((posted?.body as { due_at: null }).due_at, null);
   });
 
   it("rejects an explicit invalid due date string", async () => {
@@ -355,7 +371,11 @@ describe("close saga", () => {
     const sequence: string[] = [];
     const { result, http } = await run(openOrder(), {
       fetch: async (_url, init) => {
-        sequence.push(init?.method ?? "GET");
+        const method = init?.method ?? "GET";
+        sequence.push(method);
+        if (method !== "POST") {
+          return new Response(JSON.stringify({ ok: true, receivables: [] }), { status: 200 });
+        }
         return new Response(
           JSON.stringify({
             ok: true,
@@ -370,10 +390,10 @@ describe("close saga", () => {
         return { status: "Concluido", service_completed_at: "2026-10-13T18:00:00.000Z" };
       },
     });
-    assert.deepEqual(sequence, ["POST", "complete"]);
+    assert.deepEqual(sequence, ["GET", "POST", "complete"]);
     assert.equal(result.receivable_created, true);
     assert.equal(result.order.status, "Concluido");
-    const body = http[0]?.body as {
+    const body = http.find((call) => call.method === "POST")?.body as {
       amount: string;
       due_at: string | null;
       source_entity_id: string;
@@ -393,19 +413,19 @@ describe("close saga", () => {
     assert.equal(body.source_entity_type, "service_order");
   });
 
-  it("retries with created=false and does not ask Core to insert again", async () => {
+  it("reuses a receivable found before create and does not post a second one", async () => {
     let posts = 0;
     const { result, http } = await run(openOrder(), {
-      fetch: async () => {
+      fetch: async (_url, init) => {
+        if ((init?.method ?? "GET") !== "POST") {
+          return new Response(JSON.stringify({ ok: true, receivables: [fixtureReceivable] }), { status: 200 });
+        }
         posts += 1;
-        return new Response(
-          JSON.stringify({ ok: true, created: false, receivable: fixtureReceivable }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ ok: true, created: true, receivable: fixtureReceivable }), { status: 200 });
       },
     });
-    assert.equal(posts, 1);
-    assert.equal(http.length, 1);
+    assert.equal(posts, 0);
+    assert.equal(http.some((call) => call.method === "POST"), false);
     assert.equal(result.receivable_created, false);
     assert.equal(result.receivable.receivable_id, RECEIVABLE_ID);
   });
@@ -459,14 +479,17 @@ describe("close saga", () => {
   });
 
   it("recovers a Core success followed by a local close failure without a second receivable", async () => {
-    let attempt = 0;
+    let stored: typeof fixtureReceivable | null = null;
     const createdFlags: boolean[] = [];
     const order = openOrder();
-    const first = await assert.rejects(
+    await assert.rejects(
       () =>
         run(order, {
-          fetch: async () => {
-            attempt += 1;
+          fetch: async (_url, init) => {
+            if ((init?.method ?? "GET") !== "POST") {
+              return new Response(JSON.stringify({ ok: true, receivables: stored ? [stored] : [] }), { status: 200 });
+            }
+            stored = fixtureReceivable;
             createdFlags.push(true);
             return new Response(
               JSON.stringify({ ok: true, created: true, receivable: fixtureReceivable }),
@@ -479,19 +502,16 @@ describe("close saga", () => {
         }),
       (error: unknown) => error instanceof CoreArError && error.code === "LOCAL_CLOSE_FAILED",
     );
-    assert.equal(first, undefined);
     const second = await run(order, {
-      fetch: async () => {
-        attempt += 1;
+      fetch: async (_url, init) => {
+        if ((init?.method ?? "GET") !== "POST") {
+          return new Response(JSON.stringify({ ok: true, receivables: stored ? [stored] : [] }), { status: 200 });
+        }
         createdFlags.push(false);
-        return new Response(
-          JSON.stringify({ ok: true, created: false, receivable: fixtureReceivable }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: { code: "IDEMPOTENCY_CONFLICT" } }), { status: 409 });
       },
     });
-    assert.equal(attempt, 2);
-    assert.deepEqual(createdFlags, [true, false]);
+    assert.deepEqual(createdFlags, [true]);
     assert.equal(second.result.receivable_created, false);
     assert.equal(second.result.receivable.receivable_id, RECEIVABLE_ID);
   });
@@ -570,7 +590,10 @@ describe("official fixture and regressions", () => {
       assert.doesNotMatch(src, /service_role|SERVICE_ROLE|createServiceClient|accounts_receivable/i);
     }
     assert.match(routeSrc, /closeServiceOrderOperationally/);
-    assert.doesNotMatch(routeSrc, /requireCoreArSession|createReceivable/);
+    assert.match(routeSrc, /resolveServiceOrderCloseMode/);
+    assert.match(closeSrc, /PSCS_ONE_CLOSE_WITH_AR/);
+    assert.equal(resolveServiceOrderCloseMode({}), "operational");
+    assert.equal(resolveServiceOrderCloseMode({ PSCS_ONE_CLOSE_WITH_AR: "1" }), "core_receivable");
     assert.match(closeSrc, /createReceivable/);
     assert.match(closeSrc, /complete_service_order/);
     assert.doesNotMatch(uiSrc, /recebível do cliente/);

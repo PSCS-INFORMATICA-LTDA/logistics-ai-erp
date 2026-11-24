@@ -1,0 +1,16 @@
+-- NÃO APLICAR.
+-- Contrato da entrega 1 para o Core DEV uvyaqklvqcakwfvfopof.
+-- Este arquivo não é migration e não entra no ledger do Logistics.
+-- A empresa B permanece planned. Não promover a B para testar a A.
+-- O company_id do Core da empresa A só é preenchido quando houver autorização
+-- explícita de escrita no Core DEV.
+
+-- insert into public.product_company_mappings (
+--   external_system, external_company_id, environment, status, company_id
+-- ) values (
+--   'logistics_ai',
+--   '92c4c90d-6856-4c41-a9a1-9eba6a7468f6',
+--   'dev',
+--   'active',
+--   '<core-company-id-da-empresa-a>'
+-- );

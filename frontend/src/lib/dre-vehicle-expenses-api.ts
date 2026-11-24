@@ -1,10 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { recordDeletion, summarizeDeletedRow } from "@/lib/deletion-audit";
 import {
   VEHICLE_EXPENSE_CATEGORIES,
   VEHICLE_EXPENSE_ENTRY_SOURCE,
   type VehicleExpenseCategoryKey,
 } from "@/lib/vehicle-expense-categories";
+
+function schemaLacksColumn(message: string, column: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    text.includes(column.toLowerCase()) &&
+    (text.includes("does not exist") ||
+      text.includes("não existe") ||
+      text.includes("schema cache"))
+  );
+}
 
 export type DreVehicleExpenseRow = {
   id: string;
@@ -252,15 +261,16 @@ export async function createVehicleExpense(
     .single();
 
   if (
-    error?.message.includes("entry_source") ||
-    error?.message.includes("approval_status")
+    error?.message &&
+    (schemaLacksColumn(error.message, "entry_source") ||
+      schemaLacksColumn(error.message, "approval_status"))
   ) {
-    if (error.message.includes("approval_status")) {
+    if (schemaLacksColumn(error.message, "approval_status")) {
       delete payload.approval_status;
       delete payload.submitted_by;
       delete payload.submitted_at;
     }
-    if (error.message.includes("entry_source")) {
+    if (schemaLacksColumn(error.message, "entry_source")) {
       delete payload.entry_source;
     }
     const retry = await supabase
@@ -320,37 +330,22 @@ export async function deleteVehicleExpense(
   reason?: string | null,
   reasonCode?: string | null
 ): Promise<{ error: string | null }> {
-  const { data: existing } = await supabase
+  const { data: existing, error: loadError } = await supabase
     .from("financial_transactions")
-    .select("*")
+    .select("id")
     .eq("company_id", companyId)
     .eq("id", id)
     .maybeSingle();
 
-  if (existing) {
-    const row = existing as Record<string, unknown>;
-    const { entityCode, summary } = summarizeDeletedRow(row, "financial_transactions");
-    const logged = await recordDeletion({
-      supabase,
-      companyId,
-      entityType: "financial_transactions",
-      entityId: id,
-      entityCode,
-      summary,
-      reason,
-      reasonCode,
-      screenKey: "dre.despesas-veiculo",
-      deleteMode: "hard",
-      payload: row,
-    });
-    if (logged.error) return { error: logged.error };
-  }
+  if (loadError) return { error: loadError.message };
+  if (!existing) return { error: "Lançamento não encontrado." };
 
-  const { error } = await supabase
-    .from("financial_transactions")
-    .delete()
-    .eq("company_id", companyId)
-    .eq("id", id);
+  const { error } = await supabase.rpc("delete_financial_transaction_audited", {
+    p_id: id,
+    p_reason: reason ?? "",
+    p_reason_code: reasonCode ?? null,
+    p_screen_key: "dre.despesas-veiculo",
+  });
   return { error: error?.message ?? null };
 }
 

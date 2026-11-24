@@ -19,6 +19,9 @@ export type CoreArErrorCode =
   | "PROPOSAL_NOT_ACCEPTED"
   | "PARTY_COMPANY_MISMATCH"
   | "IDEMPOTENCY_CONFLICT"
+  | "ALREADY_POSTED"
+  | "AMOUNT_EXCEEDS_BALANCE"
+  | "RECEIVABLE_CANCELLED"
   | "ISSUED_AT_REQUIRED"
   | "REFERENCE_CODE_INVALID"
   | "LOCAL_CLOSE_FAILED"
@@ -70,6 +73,19 @@ export function mapCoreHttpError(status: number, body: unknown): CoreArError {
       remoteMessage || "Core receivable already exists with a different payload.",
       409,
     );
+  }
+  if (status === 409 && remoteCode === "ALREADY_POSTED") {
+    return new CoreArError("ALREADY_POSTED", remoteMessage || "Payment already posted.", 409);
+  }
+  if (status === 409 && remoteCode === "AMOUNT_EXCEEDS_BALANCE") {
+    return new CoreArError(
+      "AMOUNT_EXCEEDS_BALANCE",
+      remoteMessage || "Payment amount exceeds the receivable balance.",
+      409,
+    );
+  }
+  if (status === 409 && remoteCode === "RECEIVABLE_CANCELLED") {
+    return new CoreArError("RECEIVABLE_CANCELLED", remoteMessage || "Receivable is cancelled.", 409);
   }
   if (status === 409) {
     return new CoreArError(
