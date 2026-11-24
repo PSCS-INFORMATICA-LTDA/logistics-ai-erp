@@ -17,6 +17,7 @@ import {
 } from "./tenantMapping";
 import { PSCS_ONE_MAPPED_COMPANY_COOKIE } from "../config";
 import { isCanonicalDriverConfirmed } from "@/lib/driver-confirmed";
+import { decideSharedIdentity, type IdentityActor } from "../identityGate";
 
 export const SERVICE_ORDER_CLOSE_COLUMNS =
   "id, company_id, code, status, client_id, service_type, service_date, service_amount, freight_agreed_amount, driver_id, driver_assignment_response, proposal_sent_at, proposal_response, service_completed_at";
@@ -61,6 +62,12 @@ export type CloseServiceOrderResult = {
   };
   receivable: CoreReceivableSummary;
   receivable_created: boolean;
+};
+
+export type CloseIdentityContext = {
+  logisticsCompanyId: string;
+  coreCompanyId: string;
+  mappedLogisticsCompanyId: string | null;
 };
 
 export type CloseDueAtResolver = (order: CloseOrderRow) => DueAtResult;
@@ -148,6 +155,14 @@ async function resolveAgreedCoreCompany(input: {
   return mapping.coreCompanyId;
 }
 
+function assertArIdentity(actor: IdentityActor) {
+  const decision = decideSharedIdentity(actor);
+  if (!decision.arWrite) {
+    fail("core_unauthorized", "A sessão não autoriza o recebível. A OS não foi concluída.", 403);
+  }
+  return decision;
+}
+
 function idempotentResult(
   order: CloseOrderRow,
   receivable: CoreReceivableSummary,
@@ -173,6 +188,7 @@ export async function closeServiceOrderWithCoreReceivable(input: {
   directory?: CoreIntegrationDirectory;
   coreClient?: PscsOneCoreArClient;
   resolveDueAt?: CloseDueAtResolver;
+  loadIdentity: (context: CloseIdentityContext) => Promise<IdentityActor>;
 }): Promise<CloseServiceOrderResult> {
   if (!input.authUserId) {
     fail("core_unauthenticated", "Authentication required.", 401);
@@ -191,7 +207,6 @@ export async function closeServiceOrderWithCoreReceivable(input: {
   }
 
   const directory = input.directory ?? new CoreUserDirectory(input.coreSession);
-  const coreClient = input.coreClient ?? new PscsOneCoreArClient(input.coreSession);
 
   let prepared:
     | {
@@ -242,6 +257,14 @@ export async function closeServiceOrderWithCoreReceivable(input: {
     cookieHeader: input.cookieHeader,
     directory,
   });
+  const identity = assertArIdentity(
+    await input.loadIdentity({
+      logisticsCompanyId: order.company_id,
+      coreCompanyId,
+      mappedLogisticsCompanyId: readCookieValue(input.cookieHeader, PSCS_ONE_MAPPED_COMPANY_COOKIE),
+    }),
+  );
+  const coreClient = input.coreClient ?? new PscsOneCoreArClient(input.coreSession, { identity });
 
   if (order.status === "Concluido") {
     const existing = await coreClient.findReceivableByLogisticsSource({

@@ -15,13 +15,20 @@ export function parseCoreSessionCookie(raw: string | undefined | null): CoreArAu
   if (!raw?.trim()) return null;
   try {
     const parsed = JSON.parse(raw) as CoreSupabaseSessionCookiePayload;
-    if (!parsed.access_token || !parsed.refresh_token || !parsed.expires_at) {
+    const expiresAt = Number(parsed.expires_at);
+    if (!parsed.access_token || !parsed.refresh_token || !Number.isFinite(expiresAt) || expiresAt <= 0) {
+      return null;
+    }
+    const rawUserId = (parsed as { user_id?: unknown }).user_id ?? parsed.user?.id;
+    const userId = typeof rawUserId === "string" ? rawUserId : undefined;
+    if (userId != null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
       return null;
     }
     return {
       access_token: parsed.access_token,
       refresh_token: parsed.refresh_token,
-      expires_at: Number(parsed.expires_at),
+      expires_at: expiresAt,
+      ...(userId ? { user_id: userId } : {}),
     };
   } catch {
     return null;

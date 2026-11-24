@@ -39,6 +39,69 @@ export type IdentityDecision = {
 
 const AR_WRITE_ROLES: readonly CoreMembershipRole[] = ["company_admin", "platform_admin"];
 
+export class IdentityGateError extends Error {
+  readonly code: IdentityDecisionCode;
+
+  constructor(code: IdentityDecisionCode) {
+    super(code);
+    this.name = "IdentityGateError";
+    this.code = code;
+  }
+}
+
+export function requireArWrite(decision: IdentityDecision): void {
+  if (!decision.arWrite) {
+    throw new IdentityGateError(decision.code);
+  }
+}
+
+const LOGISTICS_ROLES: readonly LogisticsRole[] = ["admin", "financeiro", "operacional", "socio"];
+const CORE_ROLES: readonly CoreMembershipRole[] = [
+  "company_admin",
+  "platform_admin",
+  "member",
+  "branch_manager",
+  "auditor",
+];
+
+export function actorFromRecords(input: {
+  logisticsUserId: string;
+  logisticsRole: string | null;
+  logisticsCompanyId: string;
+  pscsOneUserId: string | null;
+  coreUserId: string | null;
+  coreCompanyId: string | null;
+  mappedLogisticsCompanyId: string | null;
+  coreMembershipRole: string | null;
+  coreMembershipActive: boolean;
+  duplicateCoreEmail?: boolean;
+}): IdentityActor | null {
+  if (!LOGISTICS_ROLES.includes(input.logisticsRole as LogisticsRole)) return null;
+  if (input.coreMembershipRole != null && !CORE_ROLES.includes(input.coreMembershipRole as CoreMembershipRole)) {
+    return null;
+  }
+  return {
+    logisticsUserId: input.logisticsUserId,
+    logisticsRole: input.logisticsRole as LogisticsRole,
+    logisticsCompanyId: input.logisticsCompanyId,
+    pscsOneUserId: input.pscsOneUserId,
+    coreUserId: input.coreUserId,
+    coreCompanyId: input.coreCompanyId,
+    mappedLogisticsCompanyId: input.mappedLogisticsCompanyId,
+    coreMembershipRole: (input.coreMembershipRole as CoreMembershipRole | null) ?? null,
+    coreMembershipActive: input.coreMembershipActive,
+    duplicateCoreEmail: input.duplicateCoreEmail === true,
+  };
+}
+
+export function coreRoleForCompany(
+  memberships: Array<{ companyId: string; role: CoreMembershipRole; active: boolean }>,
+  companyId: string,
+): { role: CoreMembershipRole; active: boolean } | null {
+  const row = memberships.find((membership) => membership.companyId === companyId && membership.active);
+  return row ? { role: row.role, active: row.active } : null;
+}
+
 export function decideSharedIdentity(actor: IdentityActor): IdentityDecision {
   if (!actor.coreUserId) {
     return { code: "core_session_missing", arWrite: false, coreRead: false };

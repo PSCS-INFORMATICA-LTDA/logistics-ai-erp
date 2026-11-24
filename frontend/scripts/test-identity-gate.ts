@@ -4,6 +4,8 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  actorFromRecords,
+  coreRoleForCompany,
   decideSharedIdentity,
   logisticsApprovedResult,
   postPartial,
@@ -13,6 +15,7 @@ import {
   type IdentityActor,
   type ReceivableLedger,
 } from "../src/lib/pscs-one/identityGate.ts";
+import { revokedPscsOneSessionCookies } from "../src/lib/pscs-one/core/sessionRevocation.ts";
 
 const COMPANY = "92c4c90d-6856-4c41-a9a1-9eba6a7468f6";
 const CORE = "c0910000-0000-4000-8000-0000000000a1";
@@ -144,6 +147,63 @@ describe("E07B e E08B locais", () => {
       code: "LOCAL_CLOSE_FAILED",
     });
     assert.equal(reprocessServiceOrder({ receivableExists: true, localCompleted: true }).createReceivable, false);
+  });
+});
+
+describe("isolamento e sessão", () => {
+  it("não leva o platform_admin da empresa B para a empresa A", () => {
+    const role = coreRoleForCompany(
+      [{ companyId: "c0b00000-0000-4000-8000-00000000000b", role: "platform_admin", active: true }],
+      "c0910000-0000-4000-8000-0000000000a1",
+    );
+    assert.equal(role, null);
+    const actor = actorFromRecords({
+      logisticsUserId: "logistics-admin",
+      logisticsRole: "admin",
+      logisticsCompanyId: COMPANY,
+      pscsOneUserId: "core-user",
+      coreUserId: "core-user",
+      coreCompanyId: "c0910000-0000-4000-8000-0000000000a1",
+      mappedLogisticsCompanyId: COMPANY,
+      coreMembershipRole: null,
+      coreMembershipActive: false,
+    });
+    assert.equal(actor && decideSharedIdentity(actor).arWrite, false);
+  });
+
+  it("mostra que o próprio usuário ainda pode gravar pscs_one_user_id", () => {
+    const policy = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/057_company_members_admin_access.sql"),
+      "utf8",
+    );
+    const column = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/078_pscs_one_user_id.sql"),
+      "utf8",
+    );
+    assert.match(policy, /profiles_update_own/);
+    assert.doesNotMatch(policy, /pscs_one_user_id/);
+    assert.doesNotMatch(column, /revoke|trigger/i);
+  });
+
+  it("revoga os cookies da sessão do Core no logout", () => {
+    const route = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/app/api/service-orders/[id]/close/route.ts"),
+      "utf8",
+    );
+    const header = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/components/layout/Header.tsx"),
+      "utf8",
+    );
+    const payment = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/lib/pscs-one/core/arClient.ts"),
+      "utf8",
+    );
+    const cookies = revokedPscsOneSessionCookies();
+    assert.equal(cookies.some((cookie) => cookie.name === "pscs_one_core_session" && cookie.maxAge === 0), true);
+    assert.equal(cookies.some((cookie) => cookie.name === "pscs_one_core_company_id" && cookie.maxAge === 0), true);
+    assert.match(header, /\/api\/auth\/logout/);
+    assert.match(route, /decideSharedIdentity/);
+    assert.match(payment, /requireArWrite/);
   });
 });
 

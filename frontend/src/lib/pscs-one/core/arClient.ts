@@ -1,3 +1,4 @@
+import { IdentityGateError, requireArWrite, type IdentityDecision } from "../identityGate";
 import { buildCoreSupabaseAuthCookieHeader } from "./authCookie";
 import { pscsOneCoreApiBaseUrl } from "./config";
 import { CoreArError, mapCoreHttpError } from "./errors";
@@ -28,12 +29,14 @@ export type CoreArClientOptions = {
   baseUrl?: string;
   env?: Record<string, string | undefined>;
   fetchImpl?: typeof fetch;
+  identity?: IdentityDecision;
 };
 
 export class PscsOneCoreArClient {
   private readonly baseUrl: string;
   private readonly env: Record<string, string | undefined>;
   private readonly fetchImpl: typeof fetch;
+  private readonly identity: IdentityDecision | null;
 
   constructor(
     private readonly session: CoreArAuthSessionWithUser,
@@ -42,6 +45,20 @@ export class PscsOneCoreArClient {
     this.baseUrl = (options.baseUrl ?? pscsOneCoreApiBaseUrl(options.env)).replace(/\/+$/, "");
     this.env = options.env ?? process.env;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.identity = options.identity ?? null;
+  }
+
+  private assertWrite(): void {
+    try {
+      requireArWrite(
+        this.identity ?? { code: "identity_unbound", arWrite: false, coreRead: false },
+      );
+    } catch (error) {
+      if (error instanceof IdentityGateError) {
+        throw new CoreArError("core_unauthorized", "A sessão não autoriza o recebível.", 403, error.code);
+      }
+      throw error;
+    }
   }
 
   private async coreFetch(
@@ -149,6 +166,7 @@ export class PscsOneCoreArClient {
   }
 
   async createReceivable(input: CoreReceivableCreateRequest): Promise<CoreReceivableCreateResult> {
+    this.assertWrite();
     const response = await this.coreFetch("/api/receivables", { method: "POST", body: input });
     const body = await this.parseJson(response);
     if (!response.ok) {
@@ -177,6 +195,7 @@ export class PscsOneCoreArClient {
     source_entity_type?: string;
     source_entity_id?: string;
   }): Promise<{ payment: CoreReceivablePayment; receivable: CoreReceivableSummary | null }> {
+    this.assertWrite();
     if (!/^\d+\.\d{2}$/.test(input.amount) || Number(input.amount) <= 0) {
       throw new CoreArError("COMMERCIAL_AMOUNT_INVALID", "Payment amount must be a positive decimal.", 422);
     }
@@ -209,6 +228,7 @@ export class PscsOneCoreArClient {
     reversal: CoreReceivablePaymentReversal;
     receivable: CoreReceivableSummary | null;
   }> {
+    this.assertWrite();
     if (!input.reason.trim()) {
       throw new CoreArError("REFERENCE_CODE_INVALID", "Reversal reason is required.", 422);
     }
