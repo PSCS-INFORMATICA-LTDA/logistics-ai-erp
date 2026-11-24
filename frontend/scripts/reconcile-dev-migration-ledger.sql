@@ -4,6 +4,9 @@
 -- Não roda o corpo de nenhuma migration. Só insere nomes já conferidos.
 -- Não apaga 021_seed_demo_freight_os.sql nem 060_import_driver_confirmed.sql.
 -- Não usar em produção (tqeenmswotxqainkyyct).
+-- Validação somente leitura de 24/11/2026: as onze migrations abaixo foram PASS.
+-- applied_at fica com o default now() no instante da execução autorizada.
+-- Não gravar data retroativa. Se qualquer conferência falhar, a transação inteira desfaz.
 
 BEGIN;
 
