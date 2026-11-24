@@ -24,13 +24,19 @@ Revoga `EXECUTE` de `PUBLIC`, `anon` e `authenticated` em:
 
 Hoje `PUBLIC` e `anon` já não executam esses três. `authenticated` e `service_role` executam. O frontend não chama os três. Quem chama são RPCs `SECURITY DEFINER` cujo dono é `postgres`: aprovação de título, postagem e conclusão de OS. O dono continua podendo chamá-los depois da revogação. `service_role` não perde o `EXECUTE` neste pacote.
 
+## Aplicação
+
+O arquivo da migration não grava o ledger. Quem aplica, com autorização explícita, é `frontend/scripts/apply-093-sql-editor.sql`, inteiro, uma vez, como `postgres`, no SQL Editor do DEV. O runner não entra nesse caminho: ele não faz a trava nem a conferência dos 92 nomes.
+
+A transação trava `_dev_schema_migrations` em `SHARE ROW EXCLUSIVE`, exige a empresa A do DEV, exige 92 linhas e 92 nomes, exige a 092 e recusa a 093 já registrada. Depois aplica os mesmos `ALTER` e `REVOKE` da migration, insere `093_residual_search_path_and_helpers.sql` e só então confere 93 nomes, os timestamps anteriores, o corpo intacto das doze funções, o `search_path` e os privilégios. Exceção em qualquer passo aborta a transação antes do `commit`.
+
 ## Testes locais
 
 `node --test scripts/test-residual-security-093.mjs`
 
-Positivo: as nove ficam com `search_path=public`. Uma função `SECURITY DEFINER` do dono ainda chama o helper.
+Positivo: as nove ficam com `search_path=public`. Uma função `SECURITY DEFINER` do dono ainda chama o helper. O script registra a 093 e mantém os 92 `applied_at`.
 
-Negativo: o papel de aplicação recebe recusa ao chamar o helper direto. Anônimo e `PUBLIC` não ganham `EXECUTE` no rollback. A migration não cita `financial_correction_events` nem `seed_chart_of_accounts`.
+Negativo: ambiente incorreto, ledger com 91 nomes, ausência da 092 e 093 já registrada recusam sem mudar função. Uma falha injetada depois da revogação desfaz `search_path`, `EXECUTE` e o ledger. O papel de aplicação recebe recusa ao chamar o helper direto. Anônimo e `PUBLIC` não ganham `EXECUTE` no rollback. A migration não cita `financial_correction_events` nem `seed_chart_of_accounts`.
 
 ## service_role no ledger
 
