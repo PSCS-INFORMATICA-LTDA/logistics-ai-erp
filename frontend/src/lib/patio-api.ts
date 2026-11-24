@@ -7,8 +7,6 @@ import {
   calcRotativoTotal,
   nextChargeFromPeriodEnd,
   PARKING_SERVICE_NAMES,
-  PATIO_ENTRY_SOURCE_PARKING,
-  PATIO_ENTRY_SOURCE_WASH,
   type CarWashServiceRow,
   type ParkingBillingMode,
   type ParkingEntryRow,
@@ -114,24 +112,6 @@ export async function resolvePatioPrice(params: {
   return { price: Number(match.price), billingUnit: match.billing_unit };
 }
 
-async function resolveRevenueAccountId(
-  supabase: SupabaseClient,
-  companyId: string,
-  accountName: string
-): Promise<{ id: string; classification: string } | { error: string }> {
-  const { data, error } = await supabase
-    .from("chart_of_accounts")
-    .select("id, classification")
-    .eq("company_id", companyId)
-    .eq("name", accountName)
-    .eq("status", "Ativo")
-    .maybeSingle();
-  if (error || !data) {
-    return { error: `Conta DRE «${accountName}» não encontrada. Rode o SQL apply-041.` };
-  }
-  return { id: data.id as string, classification: (data.classification as string) || "Receitas" };
-}
-
 export async function postParkingRevenue(params: {
   supabase: SupabaseClient;
   companyId: string;
@@ -143,58 +123,12 @@ export async function postParkingRevenue(params: {
   const amount = Number(params.entry.total_amount);
   if (!amount || amount <= 0) return { transactionId: null, error: "Valor total inválido." };
 
-  const account = await resolveRevenueAccountId(
-    params.supabase,
-    params.companyId,
-    "Receita Estacionamento"
-  );
-  if ("error" in account) return { transactionId: null, error: account.error };
-
-  let { data, error } = await params.supabase
-    .from("financial_transactions")
-    .insert({
-      company_id: params.companyId,
-      transaction_date: params.entry.exit_date ?? params.entry.entry_date,
-      amount,
-      chart_of_account_id: account.id,
-      classification: account.classification,
-      transaction_type: "Receita",
-      description: `Estacionamento ${params.entry.code} — ${params.entry.plate}`,
-      entry_source: PATIO_ENTRY_SOURCE_PARKING,
-      approval_status: "approved",
-      submitted_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (error?.message?.includes("approval_status")) {
-    const retry = await params.supabase
-      .from("financial_transactions")
-      .insert({
-        company_id: params.companyId,
-        transaction_date: params.entry.exit_date ?? params.entry.entry_date,
-        amount,
-        chart_of_account_id: account.id,
-        classification: account.classification,
-        transaction_type: "Receita",
-        description: `Estacionamento ${params.entry.code} — ${params.entry.plate}`,
-        entry_source: PATIO_ENTRY_SOURCE_PARKING,
-      })
-      .select("id")
-      .single();
-    data = retry.data;
-    error = retry.error;
-  }
+  const { data, error } = await params.supabase.rpc("post_parking_revenue", {
+    p_entry_id: params.entry.id,
+  });
 
   if (error) return { transactionId: null, error: error.message };
-
-  const txId = (data as { id: string }).id;
-  await params.supabase
-    .from("parking_entries")
-    .update({ financial_transaction_id: txId })
-    .eq("id", params.entry.id);
-
-  return { transactionId: txId, error: null };
+  return { transactionId: (data as string | null) ?? null, error: null };
 }
 
 export async function postCarWashRevenue(params: {
@@ -208,56 +142,13 @@ export async function postCarWashRevenue(params: {
   const amount = Number(params.row.service_amount);
   if (!amount || amount <= 0) return { transactionId: null, error: "Valor do serviço inválido." };
 
-  const account = await resolveRevenueAccountId(
-    params.supabase,
-    params.companyId,
-    "Receita Lava Rápido"
-  );
-  if ("error" in account) return { transactionId: null, error: account.error };
-
-  let { data, error } = await params.supabase
-    .from("financial_transactions")
-    .insert({
-      company_id: params.companyId,
-      transaction_date: params.row.service_date,
-      amount,
-      chart_of_account_id: account.id,
-      classification: account.classification,
-      transaction_type: "Receita",
-      description: `Lava-rápido ${params.row.code} — ${params.row.plate} — ${params.row.service_name}`,
-      entry_source: PATIO_ENTRY_SOURCE_WASH,
-      approval_status: "approved",
-      submitted_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (error?.message?.includes("approval_status")) {
-    const retry = await params.supabase
-      .from("financial_transactions")
-      .insert({
-        company_id: params.companyId,
-        transaction_date: params.row.service_date,
-        amount,
-        chart_of_account_id: account.id,
-        classification: account.classification,
-        transaction_type: "Receita",
-        description: `Lava-rápido ${params.row.code} — ${params.row.plate} — ${params.row.service_name}`,
-        entry_source: PATIO_ENTRY_SOURCE_WASH,
-      })
-      .select("id")
-      .single();
-    data = retry.data;
-    error = retry.error;
-  }
+  const { data, error } = await params.supabase.rpc("post_car_wash_revenue", {
+    p_service_id: params.row.id,
+  });
 
   if (error) return { transactionId: null, error: error.message };
-
-  const txId = (data as { id: string }).id;
-  await params.supabase
-    .from("car_wash_services")
-    .update({ financial_transaction_id: txId })
-    .eq("id", params.row.id);
+  const txId = data as string | null;
+  if (!txId) return { transactionId: null, error: "Falha ao gravar a receita do lava-rápido." };
 
   return { transactionId: txId, error: null };
 }

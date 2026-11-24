@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireCompanyMember } from "@/lib/billing-server";
+import { authorizeMemberInvite } from "@/lib/company-members-access";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 
 type Body = {
   email?: string;
-  role?: "admin" | "operacional";
+  role?: string;
 };
 
 function normalizeEmail(value: string): string {
@@ -19,16 +20,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  if (auth.membership.role !== "admin") {
-    return NextResponse.json(
-      { error: "Somente administrador pode convidar usuários." },
-      { status: 403 }
-    );
-  }
-
   const body = (await request.json().catch(() => null)) as Body | null;
+  const decision = authorizeMemberInvite(auth.membership.role, body?.role);
+  if (!decision.ok) {
+    return NextResponse.json({ error: decision.error }, { status: decision.status });
+  }
+  const role = decision.role;
   const email = body?.email ? normalizeEmail(body.email) : "";
-  const role = body?.role === "admin" ? "admin" : "operacional";
 
   if (!email || !email.includes("@")) {
     return NextResponse.json({ error: "Informe um e-mail válido." }, { status: 400 });

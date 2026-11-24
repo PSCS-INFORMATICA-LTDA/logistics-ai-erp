@@ -23,7 +23,6 @@ import {
   type ApproverMode,
   type PendingApprovalRow,
 } from "@/lib/financial-approval";
-import { isMasterSessionUnlocked } from "@/lib/master-password";
 import { glassField, glassFilterPanel } from "@/lib/liquid-glass-styles";
 import { createClient } from "@/lib/supabase/client";
 import { groupByKeySorted } from "@/lib/table-row-groups";
@@ -63,8 +62,6 @@ export default function DreAprovacoesPage() {
   const [rejectNote, setRejectNote] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [masterPassword, setMasterPassword] = useState("");
-  const [needMaster, setNeedMaster] = useState(false);
 
   const [approverMode, setApproverMode] = useState<ApproverMode>("admin_or_master");
   const [autoBelow, setAutoBelow] = useState("");
@@ -87,12 +84,6 @@ export default function DreAprovacoesPage() {
         : String(settings.auto_approve_below_amount)
     );
     setLoading(false);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const unlocked = Boolean(user?.id && isMasterSessionUnlocked(companyId, user.id));
-    setNeedMaster(settings.approver_mode === "master_only" && !unlocked);
   }, [companyId, isAdmin, supabase]);
 
   useEffect(() => {
@@ -114,8 +105,8 @@ export default function DreAprovacoesPage() {
   if (!isAdmin) {
     return (
       <Alert variant="warning">
-        Aprovações de lançamentos disponíveis para administradores da empresa (e Senha Máster,
-        conforme parâmetro).
+        Aprovações de lançamentos disponíveis para administradores da empresa. A Senha Máster
+        não altera approval_status.
       </Alert>
     );
   }
@@ -156,7 +147,7 @@ export default function DreAprovacoesPage() {
       <Card>
         <CardHeader
           title="Parâmetros de alçada"
-          description="Default: tudo exige aprovação até configurar um valor de auto-aprovação."
+          description="A troca de approval_status exige administrador da empresa no banco. A Senha Máster não autoriza essa coluna. Auto-aprovação só vale na criação do lançamento."
         />
         <CardBody className="space-y-3">
           <div className={`grid gap-3 sm:grid-cols-2 ${glassFilterPanel()}`}>
@@ -222,19 +213,6 @@ export default function DreAprovacoesPage() {
           </Button>
         </CardBody>
       </Card>
-
-      {needMaster ? (
-        <label className="block max-w-md space-y-1">
-          <span className="text-sm font-medium text-slate-700">Senha Máster (modo atual)</span>
-          <input
-            type="password"
-            className={glassField(true)}
-            value={masterPassword}
-            onChange={(e) => setMasterPassword(e.target.value)}
-            placeholder="Necessária para aprovar/rejeitar"
-          />
-        </label>
-      ) : null}
 
       {loading ? <Loading /> : null}
 
@@ -314,8 +292,6 @@ export default function DreAprovacoesPage() {
                           supabase,
                           companyId,
                           transactionId: row.id,
-                          isAdmin,
-                          masterPassword: needMaster ? masterPassword : undefined,
                         });
                         setBusyId(null);
                         if (result.error) {
@@ -443,8 +419,6 @@ export default function DreAprovacoesPage() {
                                     supabase,
                                     companyId,
                                     transactionId: row.id,
-                                    isAdmin,
-                                    masterPassword: needMaster ? masterPassword : undefined,
                                   });
                                   setBusyId(null);
                                   if (result.error) {
@@ -532,8 +506,6 @@ export default function DreAprovacoesPage() {
                       supabase,
                       companyId,
                       transactionId: rejectId,
-                      isAdmin,
-                      masterPassword: needMaster ? masterPassword : undefined,
                       note: rejectNote,
                     });
                     setBusyId(null);
@@ -560,6 +532,7 @@ export default function DreAprovacoesPage() {
         description="Use quando o lançamento foi criado errado. O registro sai da fila e fica no Histórico de Exclusões (com possibilidade de restauração)."
         critical
         confirming={deleting}
+        serverError={error}
         confirmLabel="Excluir e registrar"
         onCancel={() => {
           if (deleting) return;

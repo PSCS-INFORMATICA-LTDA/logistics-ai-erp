@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { APP_SCREENS, screenKeyFromPath } from "@/lib/app-screens";
+import {
+  APP_SCREENS,
+  apiAuthorization,
+  asCompanyMemberRole,
+  canRoleViewScreen,
+  screenKeyFromPath,
+  type CompanyMemberRole,
+} from "@/lib/app-screens";
 import { pickMappedMembership } from "@/lib/pscs-one/preferMappedMembership";
 
 type Membership = {
@@ -21,9 +28,58 @@ async function loadMembership(
   return (pickMappedMembership(memberships ?? [], mappedCompanyId) as Membership | undefined) ?? null;
 }
 
+async function partnerViewSet(
+  supabase: SupabaseClient,
+  companyId: string,
+  partnerId: string,
+): Promise<Set<string>> {
+  const { data: rows } = await supabase
+    .from("partner_screen_permissions")
+    .select("screen_key, can_view")
+    .eq("company_id", companyId)
+    .eq("partner_id", partnerId)
+    .eq("can_view", true);
+
+  return new Set(
+    (rows ?? [])
+      .filter((row) => row.can_view)
+      .map((row) => row.screen_key as string),
+  );
+}
+
+function viewAllowed(
+  role: CompanyMemberRole | null,
+  partnerId: string | null,
+  screenKey: string,
+  partnerScreens: Set<string>,
+): boolean {
+  return canRoleViewScreen({
+    role,
+    partnerId,
+    screenKey,
+    partnerCanView: partnerScreens.has(screenKey),
+  });
+}
+
+async function firstAllowedPath(
+  supabase: SupabaseClient,
+  role: CompanyMemberRole | null,
+  companyId: string,
+  partnerId: string | null,
+): Promise<string | null> {
+  const partnerScreens = partnerId
+    ? await partnerViewSet(supabase, companyId, partnerId)
+    : new Set<string>();
+
+  for (const screen of APP_SCREENS) {
+    if (viewAllowed(role, partnerId, screen.key, partnerScreens)) return screen.href;
+  }
+  return null;
+}
+
 /**
  * Se o usuário não pode ver a rota atual, devolve o href da primeira tela liberada.
- * Admin / sem partner_id (legado) → null (sem redirect).
+ * Admin da própria empresa segue sem redirect. Sem partner_id usa a allowlist do papel.
  */
 export async function resolveForbiddenRedirect(
   supabase: SupabaseClient,
@@ -33,73 +89,49 @@ export async function resolveForbiddenRedirect(
 ): Promise<string | null> {
   const member = await loadMembership(supabase, userId, mappedCompanyId);
   if (!member?.company_id) return null;
-  if (member.role === "admin" || !member.partner_id) return null;
+
+  const role = asCompanyMemberRole(member.role);
+  if (role === "admin") return null;
 
   const screenKey = screenKeyFromPath(pathname);
   if (!screenKey) return null;
 
-  if (
-    screenKey === "configuracoes.parametros" ||
-    screenKey === "configuracoes.historico-exclusoes"
-  ) {
-    return firstAllowedPath(supabase, member.company_id, member.partner_id);
-  }
+  const partnerScreens = member.partner_id
+    ? await partnerViewSet(supabase, member.company_id, member.partner_id)
+    : new Set<string>();
 
-  const { data: perm } = await supabase
-    .from("partner_screen_permissions")
-    .select("can_view")
-    .eq("company_id", member.company_id)
-    .eq("partner_id", member.partner_id)
-    .eq("screen_key", screenKey)
-    .maybeSingle();
-
-  if (perm?.can_view) return null;
-  return firstAllowedPath(supabase, member.company_id, member.partner_id);
+  if (viewAllowed(role, member.partner_id, screenKey, partnerScreens)) return null;
+  return (
+    (await firstAllowedPath(supabase, role, member.company_id, member.partner_id)) ??
+    "/login?error=sem-acesso"
+  );
 }
 
-/** Destino pós-login para sócio com permissões finas. */
+/** Destino pós-login. Admin vai ao dashboard. Os demais vão à primeira tela do papel. */
 export async function resolvePostLoginPath(
   supabase: SupabaseClient,
   userId: string,
   mappedCompanyId?: string | null,
 ): Promise<string> {
   const member = await loadMembership(supabase, userId, mappedCompanyId);
-  if (!member?.company_id || member.role === "admin" || !member.partner_id) {
-    return "/dashboard";
-  }
+  if (!member?.company_id) return "/setup";
+  const role = asCompanyMemberRole(member.role);
+  if (role === "admin") return "/dashboard";
 
   return (
-    (await firstAllowedPath(supabase, member.company_id, member.partner_id)) ??
+    (await firstAllowedPath(supabase, role, member.company_id, member.partner_id)) ??
     "/login?error=sem-acesso"
   );
 }
 
-async function firstAllowedPath(
+/** 403 das APIs autenticadas. Não usa service role. */
+export async function resolveApiAccess(
   supabase: SupabaseClient,
-  companyId: string,
-  partnerId: string
-): Promise<string | null> {
-  const { data: rows } = await supabase
-    .from("partner_screen_permissions")
-    .select("screen_key, can_view")
-    .eq("company_id", companyId)
-    .eq("partner_id", partnerId)
-    .eq("can_view", true);
-
-  const allowed = new Set(
-    (rows ?? [])
-      .filter((r) => r.can_view)
-      .map((r) => r.screen_key as string)
-  );
-
-  for (const screen of APP_SCREENS) {
-    if (
-      screen.key === "configuracoes.parametros" ||
-      screen.key === "configuracoes.historico-exclusoes"
-    ) {
-      continue;
-    }
-    if (allowed.has(screen.key)) return screen.href;
-  }
-  return null;
+  userId: string,
+  pathname: string,
+  mappedCompanyId?: string | null,
+): Promise<"allow" | "deny"> {
+  const member = await loadMembership(supabase, userId, mappedCompanyId);
+  if (!member?.company_id) return "deny";
+  return apiAuthorization(asCompanyMemberRole(member.role), pathname);
 }

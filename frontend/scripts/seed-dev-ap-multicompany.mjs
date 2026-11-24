@@ -141,7 +141,18 @@ async function seedCompany(companyId, tag, adminUserId, finUserId) {
     [companyId, finUserId]
   );
 
-  await q(`select public.seed_chart_of_accounts($1::uuid)`, [companyId]);
+  await q(
+    `select public.seed_chart_of_accounts($1::uuid)
+       from (
+         select set_config('request.jwt.claim.sub', $2::text, true),
+                set_config('request.jwt.claims', $3::text, true)
+       ) as cfg`,
+    [
+      companyId,
+      adminUserId,
+      JSON.stringify({ sub: adminUserId, role: "authenticated" }),
+    ]
+  );
 
   await q(
     `insert into public.company_financial_approval_settings (company_id, ap_approval_enabled)

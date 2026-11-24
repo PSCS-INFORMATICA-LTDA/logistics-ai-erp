@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildSnapshot,
-  DASHBOARD_DEMO_ENTRY_SOURCE,
-  DASHBOARD_DEMO_PREFIX,
   resolveDashboardRange,
   type DashboardDateRange,
   type DashboardFilters,
@@ -148,40 +146,9 @@ export async function resetDashboardDemo(
   supabase: SupabaseClient,
   companyId: string
 ): Promise<{ deleted: number; error: string | null }> {
-  const { data, error } = await supabase
-    .from("financial_transactions")
-    .delete()
-    .eq("company_id", companyId)
-    .or(
-      `entry_source.eq.${DASHBOARD_DEMO_ENTRY_SOURCE},description.ilike.${DASHBOARD_DEMO_PREFIX}%`
-    )
-    .select("id");
-
-  if (error) {
-    const bySource = await supabase
-      .from("financial_transactions")
-      .delete()
-      .eq("company_id", companyId)
-      .eq("entry_source", DASHBOARD_DEMO_ENTRY_SOURCE)
-      .select("id");
-    if (bySource.error) return { deleted: 0, error: bySource.error.message };
-
-    const { data: listed } = await supabase
-      .from("financial_transactions")
-      .select("id, description")
-      .eq("company_id", companyId)
-      .like("description", `${DASHBOARD_DEMO_PREFIX}%`);
-
-    const ids = ((listed as { id: string }[]) ?? []).map((r) => r.id);
-    if (ids.length) {
-      const del = await supabase.from("financial_transactions").delete().in("id", ids);
-      if (del.error) return { deleted: 0, error: del.error.message };
-    }
-    return {
-      deleted: (bySource.data?.length ?? 0) + ids.length,
-      error: null,
-    };
-  }
-
-  return { deleted: data?.length ?? 0, error: null };
+  const { data, error } = await supabase.rpc("reset_dashboard_demo_financial", {
+    p_company_id: companyId,
+  });
+  if (error) return { deleted: 0, error: error.message };
+  return { deleted: Number(data ?? 0), error: null };
 }
