@@ -5,11 +5,7 @@ import {
   evaluateApprovalStatusUpdate,
   type ApprovalActorRole,
 } from "@/lib/approval-status-guard";
-import {
-  recordDeletion,
-  summarizeDeletedRow,
-  validateDeletionReason,
-} from "@/lib/deletion-audit";
+import { validateDeletionReason } from "@/lib/deletion-audit";
 
 export type ApprovalStatus =
   | "draft"
@@ -402,31 +398,93 @@ export async function deleteSubmittedFinancialTransaction(input: {
     return { error: "Lançamento pendente não encontrado (já aprovado, rejeitado ou excluído)." };
   }
 
-  const row = existing as Record<string, unknown>;
-  const { entityCode, summary } = summarizeDeletedRow(row, "financial_transactions");
-  const logged = await recordDeletion({
-    supabase: input.supabase,
-    companyId: input.companyId,
-    entityType: "financial_transactions",
-    entityId: input.transactionId,
-    entityCode,
-    summary,
-    reason: input.reason,
-    reasonCode: input.reasonCode,
-    screenKey: "dre.aprovacoes",
-    deleteMode: "hard",
-    payload: row,
+  const { error } = await input.supabase.rpc("delete_financial_transaction_audited", {
+    p_id: input.transactionId,
+    p_reason: input.reason,
+    p_reason_code: input.reasonCode ?? null,
+    p_screen_key: "dre.aprovacoes",
   });
-  if (logged.error) return { error: logged.error };
-
-  const { error } = await input.supabase
-    .from("financial_transactions")
-    .delete()
-    .eq("company_id", input.companyId)
-    .eq("id", input.transactionId)
-    .eq("approval_status", "submitted");
 
   return { error: error?.message ?? null };
+}
+
+export const AUDITED_CORRECTION_FIELDS = [
+  "amount",
+  "description",
+  "transaction_date",
+] as const;
+
+export type AuditedCorrectionPatch = {
+  amount?: number;
+  description?: string | null;
+  transaction_date?: string;
+};
+
+export async function correctApprovedLedgerEntry(input: {
+  supabase: SupabaseClient;
+  transactionId: string;
+  patch: AuditedCorrectionPatch;
+  reason: string;
+  reasonCode: string;
+}): Promise<{ error: string | null }> {
+  const reasonError = validateDeletionReason(input.reason);
+  if (reasonError) return { error: reasonError };
+  const patch: Record<string, string | number | null> = {};
+  if (input.patch.amount !== undefined) patch.amount = input.patch.amount;
+  if (input.patch.description !== undefined) patch.description = input.patch.description;
+  if (input.patch.transaction_date !== undefined) patch.transaction_date = input.patch.transaction_date;
+  if (Object.keys(patch).length === 0) {
+    return { error: "Informe ao menos um campo autorizado para corrigir." };
+  }
+  const { error } = await input.supabase.rpc("correct_financial_transaction_audited", {
+    p_id: input.transactionId,
+    p_reason: input.reason.trim().replace(/\s+/g, " "),
+    p_patch: patch,
+    p_reason_code: input.reasonCode,
+    p_screen_key: "dre.lancamentos",
+  });
+  return { error: error?.message ?? null };
+}
+
+export type FinancialCorrectionEvent = {
+  id: string;
+  occurred_at: string;
+  reason: string;
+  reason_code: string | null;
+  transaction_id: string;
+  old_amount: number | null;
+  new_amount: number | null;
+  old_description: string | null;
+  new_description: string | null;
+};
+
+export async function listFinancialCorrectionEvents(
+  supabase: SupabaseClient,
+  companyId: string
+): Promise<{ rows: FinancialCorrectionEvent[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from("financial_correction_events")
+    .select("id, occurred_at, reason, reason_code, transaction_id, old_values, new_values")
+    .eq("company_id", companyId)
+    .order("occurred_at", { ascending: false })
+    .limit(20);
+  if (error) return { rows: [], error: error.message };
+  const rows = (data ?? []).map((row) => {
+    const oldValues = (row.old_values ?? {}) as Record<string, unknown>;
+    const newValues = (row.new_values ?? {}) as Record<string, unknown>;
+    return {
+      id: String(row.id),
+      occurred_at: String(row.occurred_at),
+      reason: String(row.reason ?? ""),
+      reason_code: (row.reason_code as string | null) ?? null,
+      transaction_id: String(row.transaction_id),
+      old_amount: oldValues.amount == null ? null : Number(oldValues.amount),
+      new_amount: newValues.amount == null ? null : Number(newValues.amount),
+      old_description: (oldValues.description as string | null) ?? null,
+      new_description: (newValues.description as string | null) ?? null,
+    };
+  });
+  return { rows, error: null };
 }
 
 /** Filtro PostgREST: só aprovados (totais DRE/dashboard). */

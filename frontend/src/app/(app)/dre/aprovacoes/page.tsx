@@ -532,6 +532,7 @@ export default function DreAprovacoesPage() {
         description="Use quando o lançamento foi criado errado. O registro sai da fila e fica no Histórico de Exclusões (com possibilidade de restauração)."
         critical
         confirming={deleting}
+        serverError={error}
         confirmLabel="Excluir e registrar"
         onCancel={() => {
           if (deleting) return;
