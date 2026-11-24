@@ -6,8 +6,6 @@ Os identificadores principais continuam E01–E12. E07 e E08 se dividem para a c
 
 Empresas de apoio já existentes: A `92c4c90d-6856-4c41-a9a1-9eba6a7468f6` e B `bcd3c6c9-0e4a-4356-addd-4af925725576`. Não usar `HOM-092-ADMIN` nem `HOM-092-FIN` como empresa operacional. Não apagar `QA-OS-ND-001` nem eventos `homolog.089`.
 
-Classificação: **existe** quando o módulo e a guarda já passaram em cenário pontual; **ajuste** quando o fluxo existe mas ainda não foi percorrido inteiro com os vizinhos; **ausente** quando não há implementação no produto.
-
 | Cenário | Classe | Módulos | Pré-requisitos | Dados de teste | Resultado esperado | Lacuna | Evidência necessária |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | E01 Cadastro de cliente e parâmetros comerciais | READY | Clientes, parâmetros de frete, pátio | Admin ou operacional da empresa A | Cliente descartável com documento único; tarifas TF001–TF005 já presentes | Cliente visível só na A. Tarifa não duplica | Falta um roteiro único que grave o cliente e leia a tarifa na mesma OS | Cadastro, lista da outra empresa vazia, contagem de tarifas igual a 5 |
@@ -42,15 +40,27 @@ Massa descartável, só depois de autorização no DEV `jmbajdpkvlrslirwzyze`:
 - Pedágio 10,00 e motorista 20,00 na mesma OS. Ticket de pátio 8,00, se o parâmetro da A já existir.
 - Título novo de 15,00. Não reusar `AP-00000025`.
 
-Conciliação esperada depois do estorno do título:
+## Critérios de aceite da conciliação
 
-- Receita aprovada da OS: 100,00.
-- Despesa aprovada de pedágio: 10,00.
-- Despesa aprovada de motorista: 20,00.
-- Pátio, se executado: receita aprovada de 8,00.
-- O título volta a não compor o aprovado. O valor original permanece 15,00 e a postagem fica com `reversed_at`.
-- Resultado aprovado da OS sem o pátio: 70,00. Com o pátio: 78,00.
-- Dashboard e DRE leem só `approved` da empresa da sessão. `HOM-092-ADMIN` e `HOM-092-FIN` continuam fora.
+O pátio de 8,00 é receita adicional, não despesa. `post_parking_revenue` grava `transaction_type = Receita` na conta `Receita Estacionamento`, com `entry_source = parking` e `approval_status = approved`. `post_car_wash_revenue` faz o mesmo em `Receita Lava Rápido`, com `entry_source = car_wash`. Nenhum dos dois preenche `service_order_id`. O valor não entra no custo da OS de frete.
+
+| Composição | Resultado aprovado |
+| --- | --- |
+| Sem pátio: receita 100,00, pedágio 10,00, motorista 20,00 | 70,00 |
+| Pátio tratado como despesa | Rejeitado. O produto não lança o pátio assim |
+| Pátio como receita adicional de 8,00 | 78,00 |
+
+O título de 15,00 não reutiliza `AP-00000025`. O rateio do título fica com `service_order_id` nulo e com conta DRE diferente de Pedágio e da conta do motorista. A competência gera uma despesa própria, `entry_source = accounts_payable`, sem repetir a data, a OS e a conta do pedágio nem do motorista. Enquanto essa despesa está `approved`, o resultado da empresa cai 15,00. O rateio da OS de frete permanece 70,00.
+
+O pagamento do título não cria outro lançamento de DRE. O estorno marca a postagem com `reversed_at` e a transação com `approval_status = cancelled`. DRE, dashboard e rateio somam só `approved`, então o efeito líquido do título volta a zero. O valor original do título permanece 15,00.
+
+Aceite final, depois do estorno:
+
+- OS de frete: receita 100,00, pedágio 10,00, motorista 20,00, resultado 70,00.
+- Com o pátio executado: mais 8,00 de receita, resultado 78,00.
+- Título fora do aprovado, postagem estornada, valor original 15,00.
+- `QA-OS-ND-001` com `updated_at` `2026-11-23 16:15:59.856477+00`.
+- 11 eventos `homolog.089` e 1 evento `dashboard.demo`.
 
 Preservação da auditoria, conferida antes e depois, sem apagar linha:
 
