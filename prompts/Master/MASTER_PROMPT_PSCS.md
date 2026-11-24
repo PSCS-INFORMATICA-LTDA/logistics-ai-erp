@@ -2,7 +2,9 @@
 
 **Prioridade máxima neste Workspace.** Em conflito com outros documentos, este arquivo prevalece.
 
-Última atualização: 2026-10-13
+Para deploy, merge, migration e qualquer operação em produção, prevalece a autorização explícita da solicitação atual. Nenhuma regra de publicação automática dispensa essa autorização.
+
+Última atualização: 2026-11-17
 
 ---
 
@@ -12,7 +14,7 @@
 |--------|--------|
 | **Philippe / Filipe (PSCS)** | Dono da conta Cursor / operação técnica e comercial da PSCS. Decide arquitetura, cobrança, reuso do produto para outros clientes. |
 | **Rafael** | Dono da **GRX Transportes** — cliente principal do sistema atual. Valida telas e operação. |
-| **Cursor / agente** | Implementa no padrão PSCS; publica prod+dev quando houver ajuste pronto; não inventa escopo comercial sem alinhamento. |
+| **Cursor / agente** | Implementa no padrão PSCS. O padrão de trabalho é DEV e Preview. "Pronto para o cliente" não autoriza produção. Não inventa escopo comercial sem alinhamento. |
 
 Comunicação preferencial com o time: **português (Brasil)**, direto e objetivo.
 
@@ -26,7 +28,7 @@ O sistema nascido como **GRX Management** deve ser tratado como **ERP / framewor
 - **Não** refazer do zero: onboarding + white-label + módulos.
 - Stack típica: **Next.js (frontend)** + **Supabase (Postgres/Auth/RLS)** + **Vercel**.
 - Repo de referência: `logistics-ai-erp` (GitHub: [PSCS-INFORMATICA-LTDA/logistics-ai-erp](https://github.com/PSCS-INFORMATICA-LTDA/logistics-ai-erp)).
-- Produção: https://grx-management.vercel.app — branch principal: `main`.
+- Produção identificada: https://grx-management.vercel.app — branch principal do Git: `main`. Esse endereço não é o ambiente padrão de trabalho.
 
 ### Modelos de entrega para outro cliente
 
@@ -38,12 +40,16 @@ O sistema nascido como **GRX Management** deve ser tratado como **ERP / framewor
 
 ## 3. Deploy e operação (obrigatório)
 
-- Ajustes prontos para o cliente → **publicar em produção e desenvolvimento**.
-- Neste repo, só existe `main` → push em `main` dispara produção Vercel; Preview cobre o lado de desenvolvimento quando houver.
-- Commit/push quando o ajuste estiver validado no build; não deixar só local se o usuário pediu implementação.
-- Lembretes de SQL: scripts `frontend/scripts/apply-NNN-*.sql` devem ser aplicados no Supabase quando houver migration nova.
+- O ambiente padrão é **DEV e Preview**.
+- A expressão **"pronto para o cliente"** indica conclusão funcional. Não autoriza deploy, merge nem migration.
+- Deploy, merge e migration exigem autorização explícita na solicitação atual, conforme o ambiente e o impacto.
+- Autorização de produção deve identificar o ambiente e a operação. Sem isso, não há publicação em produção.
+- Nenhuma regra de publicação automática dispensa essa autorização. Em conflito, prevalece a exigência de autorização explícita para produção.
+- Commit e push seguem o pedido de implementação, na branch autorizada, depois de informar branch e SHA. Merge em `main` é operação separada.
+- Push em `main` pode acionar a Vercel se o projeto estiver conectado ao Git. Isso não autoriza o agente a fazer o merge nem a publicar produção.
+- SQL novo em `frontend/scripts/apply-NNN-*.sql` deve ser lembrado. Aplicar a migration só com autorização explícita que nomeie o ambiente. O padrão é o Supabase DEV `jmbajdpkvlrslirwzyze`. Produção (`tqeenmswotxqainkyyct`) só se a autorização a identificar.
 
-Regra Cursor espelhada: `.cursor/rules/deploy-prod-and-dev.mdc`.
+Regras Cursor correspondentes: `.cursor/rules/deploy-prod-and-dev.mdc` e `.cursor/rules/executor-ambientes.mdc`.
 
 ---
 
@@ -110,7 +116,13 @@ Resíduos preservados, sem restauração e sem apagar auditoria:
 - 11 eventos em `deletion_audit_events` com `screen_key = homolog.089`.
 - 1 evento `dashboard.demo` da limpeza da linha DEMO de teste.
 
-A migration **090** está na branch da PR #31 e ainda não foi aplicada em nenhum banco. A auditoria do commit `1752e6c` ficou aprovada com ressalvas para preparar a homologação, sem autorização de aplicação. O script do SQL Editor é `frontend/scripts/apply-090-sql-editor.sql`. Ele só roda como `postgres`, numa transação, se a 088 e a 089 já estiverem ativas. O purge do histórico não entra nesse script nem no rollback operacional. A aplicação no DEV `jmbajdpkvlrslirwzyze` espera autorização explícita.
+A migration **090** está aplicada no DEV `jmbajdpkvlrslirwzyze` e entra nesta candidata junto com a 086–089. Não reaplicar. O script do SQL Editor é `frontend/scripts/apply-090-sql-editor.sql`. O purge do histórico não entra nesse script nem no rollback operacional.
+
+### Segurança pré-piloto (23/11/2026)
+
+A migration **091** fecha as seeds executáveis sem vínculo com a empresa, revoga `EXECUTE` herdado de `PUBLIC` e liga RLS sem policy em `public._dev_schema_migrations`. Ela já está aplicada no DEV `jmbajdpkvlrslirwzyze`. Não reaplicar e não executar o rollback. Plano de contas e tarifas exigem membro da empresa, não só administrador: a OS e Parâmetros de frete inicializam a tarifa para o usuário logado, e a RLS de insert da tarifa já é de membro. O script do SQL Editor é `frontend/scripts/apply-091-sql-editor.sql`. A matriz autenticada é `frontend/scripts/homolog-091-matrix.md`. O rollback reabre as permissões vulneráveis e exige aprovação específica.
+
+---
 
 ## 6. Padrões de implementação PSCS
 
@@ -120,7 +132,7 @@ A migration **090** está na branch da PR #31 e ainda não foi aplicada em nenhu
 - Evitar duplicar lançamentos financeiros (OS vs manual — checar data/OS/conta).
 - Não criar markdown/docs extras sem pedido; **exceto** este MASTER e regras Cursor.
 - Não commitar segredos (`.env`, service role, API keys).
-- Commit só quando pedido **ou** quando o fluxo do workspace for “implementar + publicar” (já confirmado pelo usuário).
+- Commit só quando pedido ou quando a solicitação for implementar. Publicar em produção não faz parte desse fluxo sem autorização explícita.
 
 ---
 
@@ -140,5 +152,5 @@ A migration **090** está na branch da PR #31 e ainda não foi aplicada em nenhu
 1. Ler este MASTER primeiro.
 2. Ser conciso; português quando o usuário falar PT ou o contexto for GRX/PSCS.
 3. Em features novas: alinhar ao multi-tenant e ao DRE por placa/OS.
-4. Ao terminar ajuste de produto: build + publicar prod/dev + lembrar SQL se houver.
+4. Ao terminar ajuste de produto: validar o build, publicar em DEV/Preview e lembrar o SQL se houver. Produção, merge e migration ficam para autorização explícita que identifique o ambiente e a operação.
 5. Guardar decisões novas neste arquivo quando forem de longo prazo (Philippe / produto / cobrança / deploy).

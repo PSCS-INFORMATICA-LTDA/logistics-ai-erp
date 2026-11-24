@@ -1,14 +1,24 @@
 ---
-description: Sempre publicar ajustes em produção e desenvolvimento
+description: Publicar ajustes em DEV/Preview conforme o fluxo autorizado. Produção exige autorização explícita na solicitação atual, identificando ambiente e operação.
 alwaysApply: true
 ---
 
-# Deploy — produção e desenvolvimento
+# Deploy controlado — DEV/Preview por padrão; PROD mediante autorização explícita
 
 Sempre que houver ajuste pronto para o cliente (GRX / Rafael):
 
-1. **Publicar em desenvolvimento e em produção** (não só em um ambiente).
-2. Fazer commit, push para a branch que dispara o deploy (normalmente `main`) e confirmar o deploy na Vercel (prod + preview/dev, conforme o projeto).
-3. Não esperar o usuário pedir de novo “publicar” se ele já pediu ajuste e o fluxo deste workspace é publicar nos dois ambientes — salvo se ele pedir explicitamente para **não** publicar ainda.
+1. **Publicar em DEV/Preview**, no projeto e no fluxo já autorizados.
+2. Fazer commit e push na branch autorizada. Merge em `main` e publicação em produção são operações separadas.
+3. Não repetir o pedido de publicação em DEV/Preview se o usuário já pediu o ajuste e autorizou esse fluxo. Isso não autoriza produção.
 
-Preferência confirmada pelo usuário (Filipe / PSCS): ajustes podem e devem ir para **produção e desenvolvimento**.
+"Pronto para o cliente" indica conclusão funcional. Não autoriza deploy, merge nem migration em produção.
+
+## Condição obrigatória para publicação em produção
+
+A publicação automática em produção fica condicionada à autorização explícita do usuário na solicitação atual, identificando o ambiente e a operação de produção.
+
+A expressão "pronto para o cliente" não constitui autorização.
+
+Homologação, Preview e DEV não autorizam publicação em PROD.
+
+Em caso de conflito com instruções anteriores, nenhuma publicação em produção poderá ocorrer sem autorização explícita.

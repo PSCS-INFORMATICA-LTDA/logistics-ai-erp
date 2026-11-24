@@ -25,6 +25,8 @@
     "test:driver-presentation": "npx tsx --test scripts/test-driver-presentation-schedule.ts",
     "test:order-security": "npx tsx --test scripts/test-service-order-security.ts",
     "test:084-seed-drivers": "npx tsx --test scripts/test-084-seed-drivers-revoke.ts",
+    "test:pre-pilot-security": "node --test scripts/test-pre-pilot-security.mjs",
+    "test:reconcile-ledger": "node --test scripts/test-reconcile-ledger.mjs",
     "test:driver-reassignment": "npx tsx --test scripts/test-driver-reassignment.ts",
     "test:service-order-client": "npx tsx --test scripts/test-service-order-client.ts",
     "test:role-access": "npx tsx --test scripts/test-role-access.ts",
