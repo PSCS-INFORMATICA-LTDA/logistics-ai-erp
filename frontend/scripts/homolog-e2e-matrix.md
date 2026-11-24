@@ -1,0 +1,30 @@
+# Matriz integrada E01–E12
+
+Diagnóstico de leitura em 24/11/2026. Não autoriza escrita, migration nem execução. A execução com dados novos depende de autorização do PO no DEV `jmbajdpkvlrslirwzyze`.
+
+Empresas de apoio já existentes: A `92c4c90d-6856-4c41-a9a1-9eba6a7468f6` e B `bcd3c6c9-0e4a-4356-addd-4af925725576`. Não usar `HOM-092-ADMIN` nem `HOM-092-FIN` como empresa operacional. Não apagar `QA-OS-ND-001` nem eventos `homolog.089`.
+
+Classificação: **existe** quando o módulo e a guarda já passaram em cenário pontual; **ajuste** quando o fluxo existe mas ainda não foi percorrido inteiro com os vizinhos; **ausente** quando não há implementação no produto.
+
+| Cenário | Classe | Módulos | Pré-requisitos | Dados de teste | Resultado esperado | Lacuna | Evidência necessária |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| E01 Cadastro de cliente e parâmetros comerciais | Existe | Clientes, parâmetros de frete, pátio | Admin ou operacional da empresa A | Cliente descartável com documento único; tarifas TF001–TF005 já presentes | Cliente visível só na A. Tarifa não duplica | Falta um roteiro único que grave o cliente e leia a tarifa na mesma OS | Cadastro, lista da outra empresa vazia, contagem de tarifas igual a 5 |
+| E02 Cotação, proposta e aceite | Existe | Proposta pública | OS em rascunho da A | Token novo; ação aceite, reuso e ação inválida | Aceite único. Reuso recusado. Token curto não encontra | O runner antigo respondia antes de enviar a proposta. O roteiro novo exige `mark_proposal_sent` antes | Estado `proposal_response`, segunda chamada e token inválido |
+| E03 Criação da OS | Existe | Operacional, código sequencial | Sessão operacional válida | OS descartável, sem salvar por cima de `QA-OS-ND-001` | OS da A com cliente do E01 e natureza Frete ou Transporte | O formulário novo da baseline foi aberto e não salvo | Código gerado, empresa A, `updated_at` da OS histórica intacto |
+| E04 Designação, aceite e substituição | Existe | Designação pública, reassign | Proposta aceita | Motorista da A, depois outro motorista da A | Primeiro aceite único. Substituição limpa o aceite anterior e exige novo aceite | Não há um caso único que percorra aceite e substituição em sequência | Tokens, `driver_assignment_response`, motorista final |
+| E05 Execução do transporte e pátio | Ajuste | OS, estacionamento, lava-rápido | OS designada e parâmetro de pátio | Uma OS de transporte e um ticket de pátio descartável | Conclusão da OS só com motorista confirmado. Ticket público encontra o lançamento do pátio | Os dois módulos foram homologados separados, não na mesma viagem | Status da OS, ticket, receita de pátio `approved` |
+| E06 Receitas, despesas e custos da OS | Ajuste | DRE empresa, despesa de veículo, motorista, rateio | OS com valor e placa | Receita da OS, pedágio e pagamento de motorista na mesma OS | Sem duplicar data + OS + conta. Rateio usa o percentual vigente | O custo completo da mesma OS ainda não foi conferido numa só evidência | Três lançamentos, bloqueio da duplicata e linha de rateio |
+| E07 Contas a pagar e receber | Ajuste | Contas a pagar no Postgres. Contas a receber no Core externo | Título da A e Core configurado para a empresa | Título manual de valor baixo. Recebível gerado pela OS | Título nasce controlado pela RPC. Recebível aponta para a mesma OS | Recebível não é tabela local. Sem Core configurado, E07 de receber fica bloqueado | Número do título, id do recebível e ausência na empresa B |
+| E08 Aprovação, pagamento, recebimento e estorno | Ajuste | Aprovação financeira, pagamento de título, estorno | Admin e financeiro | Lançamento `submitted`, título aprovado de 15,00 ou outro valor descartável | Financeiro não aprova nem estorna. Admin aprova, paga e estorna sem mudar o valor original e sem evento de correção indevido | Pagamento e estorno de título já passaram em T21. Recebimento do Core não entrou nessa prova | Status, valor, postagem `reversed_at`, pagamento do recebível |
+| E09 DRE e indicadores | Existe | DRE e dashboard | Lançamentos `approved` da A | Período que contenha os lançamentos do E06 | Totais só `approved` e só da empresa da sessão. `HOM-092-*` fora | Falta a captura do dashboard depois da cadeia E01–E08 | Tela do dashboard e soma conferida com as linhas |
+| E10 Cancelamento, exclusão, restauração e auditoria | Existe | Auditoria de exclusão | Admin | Motivo com 8 caracteres ou mais. Um registro descartável | Exclusão direta bloqueada. Exclusão auditada gera evento. Restauração não apaga o evento | Restauração ainda não foi refeita na cadeia nova | Evento, linha restaurada, `homolog.089` intacto |
+| E11 Isolamento durante a cadeia | Existe | RLS e RPCs | Empresa B com admin próprio | Repetir leitura de cliente, OS, lançamento, título e tarifa da A com sessão da B | B não lê nem grava a cadeia da A | Precisa acompanhar a cadeia inteira, não só os pontos T19, T30 e T38 | Uma negativa por módulo da cadeia |
+| E12 Login, recuperação e RBAC | Ajuste | Auth, middleware, seeds | Usuários já existentes | Login do operacional, link de recuperação de teste, seed do plano | Operacional cai em Ordens de serviço. Recuperação não deixa o código na URL. Operacional não semeia plano. Financeiro e admin semeiam | Proteção contra senha vazada está disponível e desligada. Não entra nesta execução | URL pós-login, teste de redirect já existente, T34–T37 |
+
+## O que a execução futura precisa
+
+Uma autorização do PO nomeando o DEV e a cadeia E01–E12. Dados novos, descartáveis, na empresa A, com a B só na negativa. Sem migration, sem runner e sem produção.
+
+Bloqueio conhecido: contas a receber dependem do Core externo. Se o Core da empresa A não responder, E07 e a parte de recebimento de E08 param sem abrir atalho local.
+
+Escopo técnico da execução, quando autorizada: um cliente, uma OS, uma proposta, duas designações, um ticket de pátio, três lançamentos ligados à OS, um título com estorno e uma leitura de dashboard. A matriz acima é o roteiro. Nenhuma dessas escritas foi feita nesta etapa.
