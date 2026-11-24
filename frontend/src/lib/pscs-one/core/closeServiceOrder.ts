@@ -296,23 +296,37 @@ export async function closeServiceOrderWithCoreReceivable(input: {
     fail("AR_DUE_DATE_RULE_REQUIRED", "Vencimento do recebível é inválido. A OS não foi concluída.", 409);
   }
 
+  const existingForOpenOrder = await coreClient.findReceivableByLogisticsSource({
+    coreCompanyId,
+    serviceOrderId: order.id,
+  });
   let created: CoreReceivableCreateResult;
-  try {
-    created = await coreClient.createReceivable({
-      company_id: coreCompanyId,
-      party_id: party.partyId,
-      amount: prepared.commercialAmount,
-      currency: CANONICAL_RECEIVABLE_CURRENCY,
-      issued_at: prepared.issuedAt,
-      due_at: due.dueAt,
-      reference_code: prepared.referenceCode,
-      source_system: LOGISTICS_AR_SOURCE_SYSTEM,
-      source_entity_type: LOGISTICS_AR_SOURCE_ENTITY_TYPE,
-      source_entity_id: order.id,
-    });
-  } catch (error) {
-    if (error instanceof CoreArError) throw error;
-    fail("core_unavailable", "Não foi possível registrar o recebível. A OS não foi concluída.", 502);
+  if (existingForOpenOrder) {
+    if (
+      existingForOpenOrder.company_id !== coreCompanyId ||
+      existingForOpenOrder.party_id !== party.partyId
+    ) {
+      fail("PARTY_COMPANY_MISMATCH", "Recebível de outra empresa.", 403);
+    }
+    created = { created: false, receivable: existingForOpenOrder };
+  } else {
+    try {
+      created = await coreClient.createReceivable({
+        company_id: coreCompanyId,
+        party_id: party.partyId,
+        amount: prepared.commercialAmount,
+        currency: CANONICAL_RECEIVABLE_CURRENCY,
+        issued_at: prepared.issuedAt,
+        due_at: due.dueAt,
+        reference_code: prepared.referenceCode,
+        source_system: LOGISTICS_AR_SOURCE_SYSTEM,
+        source_entity_type: LOGISTICS_AR_SOURCE_ENTITY_TYPE,
+        source_entity_id: order.id,
+      });
+    } catch (error) {
+      if (error instanceof CoreArError) throw error;
+      fail("core_unavailable", "Não foi possível registrar o recebível. A OS não foi concluída.", 502);
+    }
   }
 
   if (created.receivable.company_id !== coreCompanyId || created.receivable.party_id !== party.partyId) {
@@ -341,6 +355,12 @@ export async function closeServiceOrderWithCoreReceivable(input: {
       503,
     );
   }
+}
+
+export function resolveServiceOrderCloseMode(
+  env: Record<string, string | undefined> = process.env,
+): "operational" | "core_receivable" {
+  return env.PSCS_ONE_CLOSE_WITH_AR === "1" ? "core_receivable" : "operational";
 }
 
 export function createSupabaseLogisticsCloseStore(supabase: SupabaseClient): LogisticsCloseStore {
