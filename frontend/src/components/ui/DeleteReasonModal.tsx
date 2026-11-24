@@ -27,6 +27,8 @@ type Props = {
   /** Exige senha master no modal (admin excluindo crítico). */
   requireMasterPassword?: boolean;
   confirmLabel?: string;
+  /** Erro vindo da operação, visível dentro do modal. */
+  serverError?: string | null;
   /** Quando true, usa lista padronizada de motivos. */
   useReasonCodes?: boolean;
   onCancel: () => void;
@@ -41,6 +43,7 @@ export function DeleteReasonModal({
   critical = false,
   requireMasterPassword = false,
   confirmLabel = "Excluir com registro",
+  serverError = null,
   useReasonCodes = true,
   onCancel,
   onConfirm,
@@ -210,12 +213,18 @@ export function DeleteReasonModal({
         ) : null}
 
         {localError ? <p className="mt-2 text-sm text-red-600">{localError}</p> : null}
+        {serverError ? <p className="mt-2 text-sm text-red-600">{serverError}</p> : null}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <Button type="button" variant="ghost" disabled={confirming} onClick={onCancel}>
             Cancelar
           </Button>
-          <Button type="button" disabled={confirming} onClick={() => void submit()}>
+          <Button
+            type="button"
+            disabled={confirming}
+            data-testid="delete-reason-confirm"
+            onClick={() => void submit()}
+          >
             {confirming ? "Processando…" : confirmLabel}
           </Button>
         </div>
