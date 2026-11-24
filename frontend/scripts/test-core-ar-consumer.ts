@@ -238,6 +238,187 @@ describe("Core AR client", () => {
   });
 });
 
+describe("Core AR payment posting", () => {
+  function client(fetchImpl: typeof fetch) {
+    return new PscsOneCoreArClient(
+      { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
+      {
+        baseUrl: "https://core.test",
+        env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
+        fetchImpl,
+      },
+    );
+  }
+
+  const payment = {
+    payment_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    amount: "40.00",
+    currency_code: "BRL",
+    status: "posted",
+    reference_code: "HOM-E2E-OS-P1",
+  };
+
+  it("posts a partial payment and returns the reduced balance", async () => {
+    const bodies: unknown[] = [];
+    const result = await client(async (_url, init) => {
+      bodies.push(init?.body ? JSON.parse(String(init.body)) : null);
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          payment,
+          receivable: { ...fixtureReceivable, original_amount: "100.00", posted_amount: "40.00", balance: "60.00", status: "open" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }).postReceivablePayment({
+      company_id: fixtureReceivable.company_id,
+      receivable_id: fixtureReceivable.receivable_id,
+      currency_code: "BRL",
+      amount: "40.00",
+      reference_code: "HOM-E2E-OS-P1",
+      source_system: "logistics_ai",
+      source_entity_type: "service_order_payment",
+      source_entity_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    });
+    assert.equal(result.payment.amount, "40.00");
+    assert.equal(result.receivable?.balance, "60.00");
+    assert.equal((bodies[0] as { amount: string }).amount, "40.00");
+  });
+
+  it("maps balance, idempotency and cancelled receivable without writing a local ledger row", async () => {
+    const cases = ["AMOUNT_EXCEEDS_BALANCE", "ALREADY_POSTED", "IDEMPOTENCY_CONFLICT", "RECEIVABLE_CANCELLED"] as const;
+    for (const code of cases) {
+      await assert.rejects(
+        () =>
+          client(async () =>
+            new Response(JSON.stringify({ error: { code, message: code } }), {
+              status: 409,
+              headers: { "Content-Type": "application/json" },
+            }),
+          ).postReceivablePayment({
+            company_id: fixtureReceivable.company_id,
+            receivable_id: fixtureReceivable.receivable_id,
+            currency_code: "BRL",
+            amount: "40.00",
+          }),
+        (error: unknown) => error instanceof CoreArError && error.code === code,
+      );
+    }
+    const source = require("node:fs").readFileSync(
+      new URL("../src/lib/pscs-one/core/arClient.ts", import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(source, /financial_transactions/);
+  });
+
+  it("rejects a non-positive amount before calling Core", async () => {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        client(async () => {
+          calls += 1;
+          return new Response("{}", { status: 500 });
+        }).postReceivablePayment({
+          company_id: fixtureReceivable.company_id,
+          receivable_id: fixtureReceivable.receivable_id,
+          currency_code: "BRL",
+          amount: "0.00",
+        }),
+      (error: unknown) => error instanceof CoreArError && error.code === "COMMERCIAL_AMOUNT_INVALID",
+    );
+    assert.equal(calls, 0);
+  });
+});
+
+describe("Core AR payment reversal", () => {
+  function client(fetchImpl: typeof fetch) {
+    return new PscsOneCoreArClient(
+      { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
+      {
+        baseUrl: "https://core.test",
+        env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
+        fetchImpl,
+      },
+    );
+  }
+
+  const reversal = {
+    reversal_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    payment_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    amount: "40.00",
+    reason: "Homologacao E2E estorno",
+    reversed_at: "2026-11-24T19:45:40.290851+00:00",
+    actor_user_id: "11111111-1111-4111-8111-111111111111",
+  };
+
+  it("restores the receivable balance and replays the same reversal", async () => {
+    const calls: Array<{ method: string; body: { idempotency_key?: string } | null }> = [];
+    let seen = false;
+    const api = client(async (_url, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      calls.push({ method: init?.method ?? "GET", body });
+      seen = true;
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          created: calls.length === 1,
+          reversal,
+          receivable: { ...fixtureReceivable, original_amount: "100.00", posted_amount: "0.00", balance: "100.00", status: "open" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    const input = {
+      company_id: fixtureReceivable.company_id,
+      payment_id: reversal.payment_id,
+      reason: reversal.reason,
+      idempotency_key: "hom-e2e-os-p1",
+    };
+    const first = await api.reverseReceivablePayment(input);
+    const second = await api.reverseReceivablePayment(input);
+    assert.equal(first.created, true);
+    assert.equal(second.created, false);
+    assert.equal(second.reversal.reversal_id, first.reversal.reversal_id);
+    assert.equal(second.receivable?.balance, "100.00");
+    assert.equal(calls.length, 2);
+    assert.equal(seen, true);
+    assert.doesNotMatch(JSON.stringify(calls), /DELETE/);
+  });
+
+  it("requires a reason and keeps the previous payment when Core denies another company", async () => {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        client(async () => {
+          calls += 1;
+          return new Response("{}", { status: 500 });
+        }).reverseReceivablePayment({
+          company_id: fixtureReceivable.company_id,
+          payment_id: reversal.payment_id,
+          reason: "   ",
+          idempotency_key: "hom-e2e-os-p1",
+        }),
+      (error: unknown) => error instanceof CoreArError && error.code === "REFERENCE_CODE_INVALID",
+    );
+    assert.equal(calls, 0);
+    await assert.rejects(
+      () =>
+        client(async () =>
+          new Response(JSON.stringify({ error: { code: "UNAUTHORIZED", message: "other company" } }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ).reverseReceivablePayment({
+          company_id: fixtureReceivable.company_id,
+          payment_id: reversal.payment_id,
+          reason: reversal.reason,
+          idempotency_key: "hom-e2e-os-p1",
+        }),
+      (error: unknown) => error instanceof CoreArError && error.code === "core_unauthorized",
+    );
+  });
+});
+
 describe("Logistics AR duplication guard", () => {
   it("does not introduce accounts_receivable in Core consumer modules", () => {
     const { readFileSync } = require("node:fs");

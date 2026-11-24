@@ -21,6 +21,15 @@ export type CoreReceivablePayment = {
   reference_code: string | null;
 };
 
+export type CoreReceivablePaymentReversal = {
+  reversal_id: string;
+  payment_id: string;
+  amount: string;
+  reason: string;
+  reversed_at: string;
+  actor_user_id: string | null;
+};
+
 export type CoreArAuthSession = {
   access_token: string;
   refresh_token: string;
