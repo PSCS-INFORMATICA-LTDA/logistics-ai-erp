@@ -62,6 +62,12 @@ describe("cobertura complementar sem nova escrita no DEV", () => {
     assert.match(rollback093, /rollback_093_requires_ledger_93/);
     assert.match(rollback093, /delete from public\._dev_schema_migrations/);
     assert.match(rollback093, /rollback_093_ledger_not_92/);
+    assert.match(rollback093, /rollback_093_dev_marker_missing/);
+    assert.match(rollback093, /lock table public\._dev_schema_migrations/i);
+    assert.match(rollback093, /rollback_093_requires_postgres/);
+    assert.match(rollback093, /count\(distinct filename\)/);
+    assert.match(rollback093, /rollback_093_timestamp_changed/);
+    assert.match(rollback093, /rollback_093_privilege_mismatch/);
     for (const helper of HELPERS) {
       assert.match(rollback093, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${helper}`));
     }
