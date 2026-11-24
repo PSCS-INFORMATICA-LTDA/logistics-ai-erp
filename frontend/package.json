@@ -29,6 +29,7 @@
     "test:pre-pilot-security": "node --test scripts/test-pre-pilot-security.mjs",
     "test:chart-seed-finance": "node --test scripts/test-chart-seed-finance.mjs",
     "test:residual-security-093": "node --test scripts/test-residual-security-093.mjs",
+    "test:coverage-complement": "node --test scripts/test-coverage-complement.mjs",
     "qa:homolog-092": "node scripts/homolog-092-rbac.mjs",
     "test:reconcile-ledger": "node --test scripts/test-reconcile-ledger.mjs",
     "test:driver-reassignment": "npx tsx --test scripts/test-driver-reassignment.ts",
