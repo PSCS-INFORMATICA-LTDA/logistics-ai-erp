@@ -5,12 +5,19 @@ import {
   createSupabaseOperationalCloseStore,
   OperationalCloseError,
 } from "@/lib/service-order-operational-close";
+import {
+  closeServiceOrderWithCoreReceivable,
+  createSupabaseLogisticsCloseStore,
+  resolveServiceOrderCloseMode,
+} from "@/lib/pscs-one/core/closeServiceOrder";
+import { CoreArError } from "@/lib/pscs-one/core/errors";
+import { requireCoreArSession } from "@/lib/pscs-one/core/requestAuth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function errorResponse(error: unknown) {
-  if (error instanceof OperationalCloseError) {
+  if (error instanceof OperationalCloseError || error instanceof CoreArError) {
     return NextResponse.json(
       { ok: false, error: { code: error.code, message: error.message } },
       { status: error.status },
@@ -29,7 +36,7 @@ function errorResponse(error: unknown) {
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id: serviceOrderId } = await context.params;
@@ -46,12 +53,28 @@ export async function POST(
   }
 
   try {
-    const result = await closeServiceOrderOperationally({
+    if (resolveServiceOrderCloseMode() === "operational") {
+      const result = await closeServiceOrderOperationally({
+        authUserId: user.id,
+        serviceOrderId,
+        store: createSupabaseOperationalCloseStore(supabase),
+      });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    const cookieHeader = request.headers.get("cookie");
+    const result = await closeServiceOrderWithCoreReceivable({
       authUserId: user.id,
       serviceOrderId,
-      store: createSupabaseOperationalCloseStore(supabase),
+      cookieHeader,
+      coreSession: requireCoreArSession(cookieHeader),
+      store: createSupabaseLogisticsCloseStore(supabase),
     });
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({
+      ok: true,
+      order: result.order,
+      receivable_created: result.receivable_created,
+    });
   } catch (error) {
     return errorResponse(error);
   }
