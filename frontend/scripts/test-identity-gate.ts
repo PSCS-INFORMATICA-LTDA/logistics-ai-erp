@@ -190,6 +190,9 @@ describe("isolamento e sessão", () => {
     assert.match(guard, /NÃO EXECUTAR/);
     assert.match(guard, /pscs_one_user_id_immutable/);
     assert.match(guard, /grant update \(full_name, email\)/i);
+    assert.match(guard, /grant insert \(id, full_name, email\)/i);
+    assert.match(guard, /apply_094_historical_row_changed/);
+    assert.match(guard, /apply_094_requires_ledger_93/);
     assert.match(guard, /service_role/);
   });
 

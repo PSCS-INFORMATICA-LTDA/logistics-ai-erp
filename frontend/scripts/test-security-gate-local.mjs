@@ -65,8 +65,19 @@ function identity() {
       for update to authenticated
       using (id = auth.uid())
       with check (id = auth.uid());
-    grant select, update on table public.profiles to authenticated;
-    grant update on table public.profiles to public, anon;
+    grant select, update, insert on table public.profiles to authenticated;
+    grant update, insert on table public.profiles to public, anon;
+    create table public.companies (id uuid primary key);
+    insert into public.companies (id) values
+      ('92c4c90d-6856-4c41-a9a1-9eba6a7468f6'),
+      ('bcd3c6c9-0e4a-4356-addd-4af925725576');
+    create table public._dev_schema_migrations (
+      filename text primary key,
+      applied_at timestamptz not null
+    );
+    insert into public._dev_schema_migrations (filename, applied_at)
+    select 'm' || lpad(i::text, 3, '0') || '.sql', timestamptz '2026-11-01 00:00:00+00' + make_interval(mins => i)
+    from generate_series(1, 93) as i;
     insert into public.profiles (id, full_name, email, pscs_one_user_id) values
       ('${ADMIN}', 'Admin', 'admin@example.com', null),
       ('${FINANCE}', 'Financeiro', 'fin@example.com', null),
@@ -145,7 +156,52 @@ function identity() {
     select pscs_one_user_id::text from public.profiles where id = '${ADMIN}';
   `);
   assert(sso.ok && sso.output.includes(LINKED), "SSO grava o vínculo", sso.output);
-  console.log("identity local: admin, financeiro, operacional e anon negados; nome editável; SSO gravou o vínculo");
+
+  const inserted = psql("logistics_identity_local", `
+    begin;
+    select set_config('request.jwt.claim.sub', '${ADMIN}', true);
+    set local role authenticated;
+    insert into public.profiles (id, full_name, email, pscs_one_user_id)
+    values ('44444444-4444-4444-8444-444444444444', 'Novo', 'novo@example.com', '${LINKED}');
+    commit;
+  `);
+  assert(!inserted.ok, "authenticated não insere o vínculo", inserted.output);
+  const forced = psql("logistics_identity_local", `
+    grant insert (id, full_name, email, pscs_one_user_id) on table public.profiles to authenticated;
+    begin;
+    select set_config('request.jwt.claim.sub', '${ADMIN}', true);
+    set local role authenticated;
+    insert into public.profiles (id, full_name, email, pscs_one_user_id)
+    values ('44444444-4444-4444-8444-444444444444', 'Novo', 'novo@example.com', '${LINKED}');
+    commit;
+  `);
+  assert(!forced.ok && forced.output.includes("pscs_one_user_id_immutable"), "gatilho segura o insert do vínculo", forced.output);
+  const ssoInsert = psql("logistics_identity_local", `
+    begin;
+    set local role service_role;
+    insert into public.profiles (id, full_name, email, pscs_one_user_id)
+    values ('55555555-5555-4555-8555-555555555555', 'SSO', 'sso@example.com', '${LINKED}');
+    commit;
+    select count(*) from public.profiles where id = '55555555-5555-4555-8555-555555555555';
+  `);
+  assert(ssoInsert.ok && ssoInsert.output.includes("1"), "SSO insere o vínculo", ssoInsert.output);
+  const ledger = psql("logistics_identity_local", `
+    select count(*) as rows,
+           (select applied_at from public._dev_schema_migrations where filename = 'm001.sql') as first_at
+    from public._dev_schema_migrations;
+  `);
+  assert(ledger.ok && ledger.output.includes("94") && ledger.output.includes("2026-11-01 00:01:00"), "ledger 94 preserva o histórico", ledger.output);
+
+  const rolled = psql("logistics_identity_local", readFileSync(new URL("../../supabase/rollbacks/094_after_commit.sql", import.meta.url), "utf8"));
+  assert(rolled.ok, "rollback pós-commit da 094", rolled.output);
+  const after = psql("logistics_identity_local", `
+    select count(*) as rows,
+           has_column_privilege('authenticated', 'public.profiles', 'pscs_one_user_id', 'UPDATE') as reopened,
+           (select applied_at from public._dev_schema_migrations where filename = 'm001.sql') as first_at
+    from public._dev_schema_migrations;
+  `);
+  assert(after.ok && after.output.includes("93") && after.output.includes("t") && after.output.includes("2026-11-01 00:01:00"), "rollback volta a 93", after.output);
+  console.log("identity local: admin, financeiro, operacional e anon negados; nome editável; SSO gravou e inseriu; rollback 94→93");
 }
 
 function rollback093() {
