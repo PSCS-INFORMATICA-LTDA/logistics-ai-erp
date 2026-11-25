@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { IdentityDecision } from "../src/lib/pscs-one/identityGate.ts";
 import { buildCoreSupabaseAuthCookieHeader, parseCoreSessionCookie } from "../src/lib/pscs-one/core/authCookie.ts";
 import { PscsOneCoreArClient } from "../src/lib/pscs-one/core/arClient.ts";
 import { CoreArError, mapCoreHttpError } from "../src/lib/pscs-one/core/errors.ts";
@@ -7,6 +8,8 @@ import {
   assertLogisticsCompanyMatchesMapping,
   readCoreCompanyIdFromCookieHeader,
 } from "../src/lib/pscs-one/core/tenantMapping.ts";
+
+const recognized: IdentityDecision = { code: "recognized_admin", arWrite: true, coreRead: true };
 
 const fixtureReceivable = {
   receivable_id: "c1b8e615-d725-4e66-acb3-5efe44aa1dd9",
@@ -36,7 +39,9 @@ describe("Core AR auth cookie", () => {
       access_token: "a",
       refresh_token: "r",
       expires_at: 9999999999,
+      user_id: "11111111-1111-4111-8111-111111111111",
     });
+    assert.equal(parseCoreSessionCookie(JSON.stringify({ access_token: "a", refresh_token: "r", expires_at: "agora" })), null);
     const header = buildCoreSupabaseAuthCookieHeader(session, {
       PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof",
     });
@@ -111,6 +116,7 @@ describe("Core AR client", () => {
       },
       {
         baseUrl: "https://core.test",
+        identity: recognized,
         env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
         fetchImpl: fetchImpl as typeof fetch,
       },
@@ -148,6 +154,7 @@ describe("Core AR client", () => {
       { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
       {
         baseUrl: "https://core.test",
+        identity: recognized,
         env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
         fetchImpl: fetchImpl as typeof fetch,
       },
@@ -184,6 +191,7 @@ describe("Core AR client", () => {
       { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
       {
         baseUrl: "https://core.test",
+        identity: recognized,
         env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
         fetchImpl: fetchImpl as typeof fetch,
       },
@@ -215,6 +223,7 @@ describe("Core AR client", () => {
       { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
       {
         baseUrl: "https://core.test",
+        identity: recognized,
         env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
         fetchImpl: fetchImpl as typeof fetch,
       },
@@ -244,6 +253,7 @@ describe("Core AR payment posting", () => {
       { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
       {
         baseUrl: "https://core.test",
+        identity: recognized,
         env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
         fetchImpl,
       },
@@ -336,6 +346,7 @@ describe("Core AR payment reversal", () => {
       { access_token: "token", refresh_token: "refresh", expires_at: Math.floor(Date.now() / 1000) + 3600 },
       {
         baseUrl: "https://core.test",
+        identity: recognized,
         env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
         fetchImpl,
       },

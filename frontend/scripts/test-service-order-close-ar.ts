@@ -20,6 +20,7 @@ import type { CoreIntegrationDirectory } from "../src/lib/pscs-one/core/coreDire
 import { CoreArError } from "../src/lib/pscs-one/core/errors.ts";
 import { resolveServiceOrderReceivableAmount } from "../src/lib/pscs-one/core/receivableAmount.ts";
 import { resolveServiceOrderReceivableDueAt } from "../src/lib/pscs-one/core/receivableSchedule.ts";
+import { actorFromRecords } from "../src/lib/pscs-one/identityGate.ts";
 import { requireCoreArSession } from "../src/lib/pscs-one/core/requestAuth.ts";
 
 const LOGISTICS = "bcd3c6c9-0e4a-4356-addd-4af925725576";
@@ -136,6 +137,7 @@ function coreClient(handler: (url: string, init?: RequestInit) => Response | Pro
     },
     {
       baseUrl: "https://core.test",
+      identity: { code: "recognized_admin", arWrite: true, coreRead: true },
       env: { PSCS_ONE_CORE_SUPABASE_PROJECT_REF: "uvyaqklvqcakwfvfopof" },
       fetchImpl: fetchImpl as typeof fetch,
     },
@@ -150,6 +152,22 @@ const session = {
   user_id: USER,
 };
 
+function recognizedActor() {
+  const actor = actorFromRecords({
+    logisticsUserId: USER,
+    logisticsRole: "admin",
+    logisticsCompanyId: LOGISTICS,
+    pscsOneUserId: USER,
+    coreUserId: USER,
+    coreCompanyId: CORE,
+    mappedLogisticsCompanyId: LOGISTICS,
+    coreMembershipRole: "company_admin",
+    coreMembershipActive: true,
+  });
+  if (!actor) throw new Error("recognized actor");
+  return actor;
+}
+
 const dueAtExplicit = () => ({ ok: true as const, dueAt: "2026-11-08" });
 const dueAtInvalid = () => ({ ok: true as const, dueAt: "not-a-date" });
 
@@ -162,6 +180,7 @@ async function run(
     complete?: () => Promise<{ status: string; service_completed_at: string | null }> | { status: string; service_completed_at: string | null };
     resolveDueAt?: typeof dueAtExplicit;
     member?: boolean;
+    loadIdentity?: (context: { logisticsCompanyId: string; coreCompanyId: string; mappedLogisticsCompanyId: string | null }) => Promise<ReturnType<typeof recognizedActor>>;
   },
 ) {
   const built = storeFor(order, options?.complete);
@@ -197,6 +216,7 @@ async function run(
     directory: directory.directory,
     coreClient: http.client,
     resolveDueAt: options?.resolveDueAt,
+    loadIdentity: options?.loadIdentity ?? (async () => recognizedActor()),
   });
   return { result, completeCalls: built.calls.complete, http: http.calls, directory };
 }
@@ -561,6 +581,37 @@ describe("official fixture and regressions", () => {
     assert.equal((fixtureReceivable as { due_on: string | null }).due_on, null);
   });
 
+  it("keeps the OS open when the flag is on and the role cannot write the receivable", async () => {
+    const operational = actorFromRecords({
+      logisticsUserId: USER,
+      logisticsRole: "operacional",
+      logisticsCompanyId: LOGISTICS,
+      pscsOneUserId: USER,
+      coreUserId: USER,
+      coreCompanyId: CORE,
+      mappedLogisticsCompanyId: LOGISTICS,
+      coreMembershipRole: "member",
+      coreMembershipActive: true,
+    });
+    let posts = 0;
+    await assert.rejects(
+      () =>
+        run(openOrder(), {
+          loadIdentity: async () => {
+            if (!operational) throw new Error("actor");
+            return operational;
+          },
+          fetch: async (_url, init) => {
+            if ((init?.method ?? "GET") === "POST") posts += 1;
+            return new Response("{}", { status: 500 });
+          },
+        }),
+      (error: unknown) => error instanceof CoreArError && error.code === "core_unauthorized",
+    );
+    assert.equal(posts, 0);
+    assert.equal(resolveServiceOrderCloseMode({ PSCS_ONE_CLOSE_WITH_AR: "1" }), "core_receivable");
+  });
+
   it("reports reconciliation when a completed OS has no receivable", async () => {
     await assert.rejects(
       () =>
@@ -589,6 +640,8 @@ describe("official fixture and regressions", () => {
     for (const src of [closeSrc, routeSrc, amountSrc]) {
       assert.doesNotMatch(src, /service_role|SERVICE_ROLE|createServiceClient|accounts_receivable/i);
     }
+    assert.match(routeSrc, /decideSharedIdentity/);
+    assert.match(routeSrc, /createSupabaseArIdentityLoader/);
     assert.match(routeSrc, /closeServiceOrderOperationally/);
     assert.match(routeSrc, /resolveServiceOrderCloseMode/);
     assert.match(closeSrc, /PSCS_ONE_CLOSE_WITH_AR/);

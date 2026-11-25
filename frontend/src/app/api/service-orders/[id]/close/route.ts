@@ -10,7 +10,9 @@ import {
   createSupabaseLogisticsCloseStore,
   resolveServiceOrderCloseMode,
 } from "@/lib/pscs-one/core/closeServiceOrder";
+import { createSupabaseArIdentityLoader } from "@/lib/pscs-one/core/arIdentity";
 import { CoreArError } from "@/lib/pscs-one/core/errors";
+import { decideSharedIdentity } from "@/lib/pscs-one/identityGate";
 import { requireCoreArSession } from "@/lib/pscs-one/core/requestAuth";
 
 export const dynamic = "force-dynamic";
@@ -63,12 +65,22 @@ export async function POST(
     }
 
     const cookieHeader = request.headers.get("cookie");
+    const coreSession = requireCoreArSession(cookieHeader);
+    const loadIdentity = createSupabaseArIdentityLoader(supabase, coreSession, user.id);
     const result = await closeServiceOrderWithCoreReceivable({
       authUserId: user.id,
       serviceOrderId,
       cookieHeader,
-      coreSession: requireCoreArSession(cookieHeader),
+      coreSession,
       store: createSupabaseLogisticsCloseStore(supabase),
+      loadIdentity: async (context) => {
+        const actor = await loadIdentity(context);
+        const decision = decideSharedIdentity(actor);
+        if (!decision.arWrite) {
+          throw new CoreArError("core_unauthorized", "A sessão não autoriza o recebível. A OS não foi concluída.", 403);
+        }
+        return actor;
+      },
     });
     return NextResponse.json({
       ok: true,

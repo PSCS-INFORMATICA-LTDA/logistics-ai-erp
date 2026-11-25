@@ -35,7 +35,7 @@ export function requireCoreArSession(
       401,
     );
   }
-  if (session.expires_at * 1000 <= Date.now()) {
+  if (!Number.isFinite(session.expires_at) || session.expires_at * 1000 <= Date.now() || !session.user_id) {
     throw new CoreArError(
       "core_session_invalid",
       "Core session expired. Sign in via PSCS One SSO again.",

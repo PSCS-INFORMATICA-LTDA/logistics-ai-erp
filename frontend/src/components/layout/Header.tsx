@@ -18,6 +18,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const handleLogout = async () => {
     clearMasterSession();
+    await fetch("/api/auth/logout", { method: "POST" });
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

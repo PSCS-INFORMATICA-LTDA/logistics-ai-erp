@@ -67,6 +67,27 @@ export class CoreUserDirectory implements CoreIntegrationDirectory {
     return { coreCompanyId: ids[0] };
   }
 
+  async readOwnMembership(
+    companyId: string,
+  ): Promise<{ role: string; active: boolean } | null> {
+    if (!isCoreUuid(companyId) || !this.session.user_id || !isCoreUuid(this.session.user_id)) {
+      throw new CoreArError("core_session_invalid", "Core session has no user.", 401);
+    }
+    const rows = await this.restGet<
+      Array<{ role?: string; active?: boolean; status?: string; deleted_at?: string | null }>
+    >("memberships", {
+      select: "role,active,status,deleted_at",
+      company_id: `eq.${companyId}`,
+      app_user_id: `eq.${this.session.user_id}`,
+      deleted_at: "is.null",
+    });
+    const active = rows.filter((row) => row.active === true && row.status === "active" && row.deleted_at == null);
+    const privileged = active.find((row) => row.role === "company_admin" || row.role === "platform_admin");
+    const chosen = privileged ?? active[0];
+    if (!chosen?.role) return null;
+    return { role: chosen.role, active: true };
+  }
+
   async resolveClientParty(input: {
     coreCompanyId: string;
     clientId: string;
