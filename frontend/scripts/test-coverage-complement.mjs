@@ -67,6 +67,8 @@ describe("cobertura complementar sem nova escrita no DEV", () => {
     assert.match(rollback093, /rollback_093_requires_postgres/);
     assert.match(rollback093, /count\(distinct filename\)/);
     assert.match(rollback093, /rollback_093_timestamp_changed/);
+    assert.match(rollback093, /rollback_093_historical_row_changed/);
+    assert.match(rollback093, /rollback_093_history/);
     assert.match(rollback093, /rollback_093_privilege_mismatch/);
     for (const helper of HELPERS) {
       assert.match(rollback093, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${helper}`));

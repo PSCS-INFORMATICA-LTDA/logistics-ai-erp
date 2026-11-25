@@ -35,4 +35,4 @@ O endereço da prova é `philippe.dev@pscsinformatica.com.br`. O envio continua 
 
 A autorização operacional de concluir a OS e a autorização financeira de baixar ou estornar o recebível usam hoje o mesmo gate `arWrite`. A separação fica para uma mudança futura: o operacional poderá concluir a OS, e só o financeiro ou o admin poderá baixar e estornar. Esta homologação não separa os dois.
 
-`profiles.pscs_one_user_id` ainda pode ser alterado pelo próprio usuário. A policy `profiles_update_own` não restringe a coluna e a migration 078 não cria trava. A correção futura é um gatilho ou privilégio de coluna, numa migration autorizada. Nenhuma migration foi criada nesta etapa.
+A policy `profiles_update_own` e a migration 078 continuam sem trava de coluna. A correção preparada e não aplicada está em `supabase/pending/094_protect_pscs_one_user_id.sql`: tira o UPDATE da tabela de anon, authenticated e PUBLIC, devolve UPDATE só de `full_name` e `email`, e o gatilho `trg_profiles_pscs_one_user_id_guard` aceita mudança de `pscs_one_user_id` apenas para service_role, postgres e supabase_admin.

@@ -171,7 +171,7 @@ describe("isolamento e sessão", () => {
     assert.equal(actor && decideSharedIdentity(actor).arWrite, false);
   });
 
-  it("mostra que o próprio usuário ainda pode gravar pscs_one_user_id", () => {
+  it("prepara a trava de pscs_one_user_id sem alterar a policy já aplicada", () => {
     const policy = fs.readFileSync(
       path.join(path.dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/057_company_members_admin_access.sql"),
       "utf8",
@@ -180,9 +180,17 @@ describe("isolamento e sessão", () => {
       path.join(path.dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/078_pscs_one_user_id.sql"),
       "utf8",
     );
+    const guard = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../../supabase/pending/094_protect_pscs_one_user_id.sql"),
+      "utf8",
+    );
     assert.match(policy, /profiles_update_own/);
     assert.doesNotMatch(policy, /pscs_one_user_id/);
     assert.doesNotMatch(column, /revoke|trigger/i);
+    assert.match(guard, /NÃO EXECUTAR/);
+    assert.match(guard, /pscs_one_user_id_immutable/);
+    assert.match(guard, /grant update \(full_name, email\)/i);
+    assert.match(guard, /service_role/);
   });
 
   it("revoga os cookies da sessão do Core no logout", () => {

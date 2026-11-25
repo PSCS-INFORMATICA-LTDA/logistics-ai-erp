@@ -68,6 +68,11 @@ begin
   from public._dev_schema_migrations
   where filename <> '093_residual_search_path_and_helpers.sql';
 
+  create temp table rollback_093_history on commit drop as
+  select filename, applied_at
+  from public._dev_schema_migrations
+  where filename <> '093_residual_search_path_and_helpers.sql';
+
   select count(*)
     into v_helpers_open
   from (
@@ -139,6 +144,17 @@ begin
      or v_stamp_max_after is distinct from v_stamp_max
      or v_stamp_count_after is distinct from v_stamp_count then
     raise exception 'rollback_093_timestamp_changed';
+  end if;
+  if exists (
+    select 1
+    from rollback_093_history h
+    full outer join public._dev_schema_migrations m
+      on m.filename = h.filename
+    where h.filename is null
+       or m.filename is null
+       or m.applied_at is distinct from h.applied_at
+  ) then
+    raise exception 'rollback_093_historical_row_changed';
   end if;
 
   select count(*) filter (where has_function_privilege('anon', helper.proc, 'EXECUTE')),
