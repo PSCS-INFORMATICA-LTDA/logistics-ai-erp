@@ -56,6 +56,13 @@ export function publicPscsOneSsoReason(error: unknown): string {
   if (/create_user_failed|user not allowed/i.test(text)) {
     return "create_user_failed";
   }
+  if (
+    text === "duplicate_auth_email" ||
+    text === "auth_email_unverified" ||
+    text === "auth_directory_unbounded"
+  ) {
+    return text;
+  }
   if (/session_link_failed|hashed_token|verifyotp|otp/i.test(text)) {
     return "session_link_failed";
   }
