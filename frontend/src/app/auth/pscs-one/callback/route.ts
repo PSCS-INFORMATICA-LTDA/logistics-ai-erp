@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
       ensureLocalUser: (identity) => PscsOneSessionAdapter.ensureLocalUser(identity),
       ensureMembership: (authUserId, companyId) =>
         PscsOneCompanyService.ensureMembership(authUserId, companyId),
-      verifySession: async (tokenHash) =>
-        PscsOneSessionAdapter.attachSessionCookie(request, response, tokenHash),
+      verifySession: async (tokenHash, authUserId) =>
+        PscsOneSessionAdapter.attachSessionCookie(request, response, tokenHash, authUserId),
       writeCookies: (cookies) => {
         for (const cookie of cookies) {
           response.cookies.set(cookie.name, cookie.value, {
