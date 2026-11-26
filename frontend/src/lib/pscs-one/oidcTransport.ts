@@ -3,13 +3,39 @@ import { sanitizeEnvString } from "./config";
 export const PSCS_ONE_OIDC_HEADER = "x-vercel-trusted-oidc-idp-token";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const TOKEN_PATH = "/api/integrations/sso/token";
 
 export function authorizedOidcHostname(
   source: Record<string, string | undefined>,
 ): string | null {
   const raw = sanitizeEnvString(source.PSCS_ONE_OIDC_HOST).toLowerCase();
-  if (!raw || /[/\\@:?#\s]/.test(raw)) return null;
+  if (!raw || raw.includes(".") === false || /[/\\@:?#\s]/.test(raw)) return null;
   return raw;
+}
+
+function oidcDestination(tokenUrl: string, source: Record<string, string | undefined>): URL | null {
+  const configured = sanitizeEnvString(source.PSCS_ONE_OIDC_HOST);
+  if (!configured) return null;
+  const allowed = authorizedOidcHostname(source);
+  let url: URL;
+  try {
+    url = new URL(tokenUrl);
+  } catch {
+    throw new Error("oidc_destination_denied");
+  }
+  const portAllowed = url.port === "" || url.port === "443";
+  const matches =
+    allowed !== null &&
+    url.protocol === "https:" &&
+    url.hostname.toLowerCase() === allowed &&
+    portAllowed &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname === TOKEN_PATH &&
+    url.search === "" &&
+    url.hash === "";
+  if (!matches) throw new Error("oidc_destination_denied");
+  return url;
 }
 
 export function oidcTokenIsUsable(token: string, nowMs = Date.now()): boolean {
@@ -39,12 +65,11 @@ export async function exchangeCoreToken(input: {
   loadOidcToken?: () => Promise<string | undefined>;
 }): Promise<{ response: Response; oidcToken: string | null }> {
   const env = input.env ?? process.env;
-  const url = new URL(input.tokenUrl);
-  const allowed = authorizedOidcHostname(env);
-  const requiresOidc = allowed !== null && url.hostname.toLowerCase() === allowed;
+  const pinned = oidcDestination(input.tokenUrl, env);
+  const url = pinned ?? new URL(input.tokenUrl);
   let oidcToken: string | null = null;
 
-  if (requiresOidc) {
+  if (pinned) {
     try {
       const loaded = await (input.loadOidcToken ?? defaultOidcToken)();
       oidcToken = loaded && oidcTokenIsUsable(loaded) ? loaded : null;

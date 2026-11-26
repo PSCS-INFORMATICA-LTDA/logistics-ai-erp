@@ -39,6 +39,8 @@ describe("OIDC transport", () => {
         assert.equal(String(input), TOKEN_URL);
         assert.equal(headers.get(PSCS_ONE_OIDC_HEADER), token);
         assert.equal(init?.redirect, "manual");
+        assert.equal(new URL(String(input)).port, "");
+        assert.equal(new URL(String(input)).pathname, "/api/integrations/sso/token");
         const body = JSON.parse(String(init?.body));
         assert.equal(body.client_secret, SECRET);
         assert.equal(JSON.stringify(body).includes(token), false);
@@ -47,6 +49,19 @@ describe("OIDC transport", () => {
     });
     assert.equal(calls, 1);
     assert.equal(response.status, 200);
+    await exchangeCoreToken({
+      tokenUrl: `https://${HOST}:443/api/integrations/sso/token`,
+      body: { client_secret: SECRET },
+      env: { PSCS_ONE_OIDC_HOST: HOST },
+      loadOidcToken: async () => token,
+      fetchImpl: async (input) => {
+        const target = new URL(String(input));
+        assert.equal(target.protocol, "https:");
+        assert.equal(target.hostname, HOST);
+        assert.equal(target.port, "");
+        return jsonResponse(200, { ok: true });
+      },
+    });
   });
 
   it("refuses a missing or expired token without calling the host", async () => {
@@ -77,26 +92,57 @@ describe("OIDC transport", () => {
     }
   });
 
-  it("does not attach the token to an unauthorized hostname", async () => {
+  it("fails before POST when the configured destination diverges", async () => {
     const token = jwt(Math.floor(Date.now() / 1000) + 600);
-    let loaded = false;
-    await exchangeCoreToken({
-      tokenUrl: "https://other.example/api/integrations/sso/token",
-      body: { client_secret: SECRET },
-      env: { PSCS_ONE_OIDC_HOST: HOST },
-      loadOidcToken: async () => {
-        loaded = true;
-        return token;
-      },
-      fetchImpl: async (_input, init) => {
-        const headers = new Headers(init?.headers);
-        assert.equal(headers.get(PSCS_ONE_OIDC_HEADER), null);
-        assert.equal(init?.redirect, undefined);
-        assert.equal(JSON.parse(String(init?.body)).client_secret, SECRET);
-        return jsonResponse(200, { ok: true });
-      },
-    });
-    assert.equal(loaded, false);
+    const denied = [
+      "https://other.example/api/integrations/sso/token",
+      "http://core-candidate.vercel.app/api/integrations/sso/token",
+      "https://core-candidate.vercel.app:8443/api/integrations/sso/token",
+      "https://core-candidate.vercel.app/api/integrations/sso/other",
+      "https://user:pass@core-candidate.vercel.app/api/integrations/sso/token",
+      "https://core-candidate.vercel.app/api/integrations/sso/token?next=1",
+      "not a url",
+    ];
+    for (const tokenUrl of denied) {
+      let calls = 0;
+      let loaded = false;
+      await assert.rejects(
+        () =>
+          exchangeCoreToken({
+            tokenUrl,
+            body: { client_secret: SECRET },
+            env: { PSCS_ONE_OIDC_HOST: HOST },
+            loadOidcToken: async () => {
+              loaded = true;
+              return token;
+            },
+            fetchImpl: async () => {
+              calls += 1;
+              return jsonResponse(200, {});
+            },
+          }),
+        (error: unknown) => {
+          const message = error instanceof Error ? error.message : "";
+          assert.equal(message, "oidc_destination_denied");
+          assert.equal(message.includes(SECRET), false);
+          assert.equal(message.includes(token), false);
+          return true;
+        },
+      );
+      assert.equal(calls, 0);
+      assert.equal(loaded, false);
+    }
+    await assert.rejects(
+      () =>
+        exchangeCoreToken({
+          tokenUrl: TOKEN_URL,
+          body: { client_secret: SECRET },
+          env: { PSCS_ONE_OIDC_HOST: "https://core-candidate.vercel.app" },
+          loadOidcToken: async () => token,
+          fetchImpl: async () => jsonResponse(200, {}),
+        }),
+      /oidc_destination_denied/,
+    );
   });
 
   it("does not follow a redirect to another hostname", async () => {
