@@ -68,9 +68,87 @@ async function readProfile(admin: SsoAdmin, column: "id" | "pscs_one_user_id", v
   return (data as ProfileLink | null) ?? null;
 }
 
-async function writeProfileEmail(admin: SsoAdmin, profileId: string, email: string): Promise<void> {
-  const { error } = await admin.from("profiles").update({ email }).eq("id", profileId);
+function isDuplicateWrite(error: { message?: string } | null | undefined): boolean {
+  const text = error?.message?.toLowerCase() ?? "";
+  return /already been registered|already registered|already exists|duplicate key|duplicate/.test(text);
+}
+
+async function updateOwnedEmail(
+  admin: SsoAdmin,
+  profileId: string,
+  identityUserId: string,
+  email: string,
+): Promise<void> {
+  const { error } = await admin
+    .from("profiles")
+    .update({ email })
+    .eq("id", profileId)
+    .eq("pscs_one_user_id", identityUserId);
   if (error) throw new Error(error.message);
+}
+
+async function claimProfileLink(
+  admin: SsoAdmin,
+  authUserId: string,
+  identityUserId: string,
+  trustedEmail: string,
+): Promise<void> {
+  const profile = await readProfile(admin, "id", authUserId);
+  if (profile?.pscs_one_user_id && profile.pscs_one_user_id !== identityUserId) {
+    throw new Error("identity_conflict");
+  }
+  if (profile?.pscs_one_user_id === identityUserId) {
+    if (normalizeEmail(profile.email) !== trustedEmail) {
+      await updateOwnedEmail(admin, authUserId, identityUserId, trustedEmail);
+    }
+    return;
+  }
+
+  if (profile) {
+    const claimed = await admin
+      .from("profiles")
+      .update({ pscs_one_user_id: identityUserId, email: trustedEmail })
+      .eq("id", authUserId)
+      .is("pscs_one_user_id", null)
+      .select("id, pscs_one_user_id");
+    if (claimed.error) throw new Error(claimed.error.message);
+    if (claimed.data?.[0]?.pscs_one_user_id === identityUserId) return;
+    const current = await readProfile(admin, "id", authUserId);
+    if (current?.pscs_one_user_id === identityUserId) return;
+    throw new Error("identity_conflict");
+  }
+
+  const inserted = await admin.from("profiles").insert({
+    id: authUserId,
+    email: trustedEmail,
+    full_name: trustedEmail.split("@")[0] || "User",
+    pscs_one_user_id: identityUserId,
+  });
+  if (!inserted.error) return;
+  if (!isDuplicateWrite(inserted.error)) throw new Error(inserted.error.message);
+
+  const owner = await readProfile(admin, "pscs_one_user_id", identityUserId);
+  if (owner && owner.id !== authUserId) throw new Error("identity_conflict");
+  const current = await readProfile(admin, "id", authUserId);
+  if (current?.pscs_one_user_id === identityUserId) return;
+  if (current?.pscs_one_user_id) throw new Error("identity_conflict");
+  if (!current) throw new Error("identity_conflict");
+
+  const retried = await admin
+    .from("profiles")
+    .update({ pscs_one_user_id: identityUserId, email: trustedEmail })
+    .eq("id", authUserId)
+    .is("pscs_one_user_id", null)
+    .select("id, pscs_one_user_id");
+  if (retried.error) throw new Error(retried.error.message);
+  if (retried.data?.[0]?.pscs_one_user_id === identityUserId) return;
+  const after = await readProfile(admin, "id", authUserId);
+  if (after?.pscs_one_user_id === identityUserId) return;
+  throw new Error("identity_conflict");
+}
+
+export function assertAuthenticatedUser(actual: string | null | undefined, expected: string): void {
+  if (!actual || actual !== expected) throw new Error("session_user_mismatch");
 }
 
 export class PscsOneSessionAdapter {
@@ -104,7 +182,7 @@ export class PscsOneSessionAdapter {
       authUserId = linked.id;
       trustedEmail = confirmed;
       if (normalizeEmail(linked.email) !== trustedEmail) {
-        await writeProfileEmail(admin, linked.id, trustedEmail);
+        await updateOwnedEmail(admin, linked.id, identity.user_id, trustedEmail);
       }
     } else {
       let authUser = await findConfirmedAuthUserByEmail(admin, email);
@@ -114,41 +192,25 @@ export class PscsOneSessionAdapter {
           email_confirm: true,
         });
         if (created.error || !created.data.user?.id) {
-          throw new Error(created.error?.message || "create_user_failed");
+          if (!isDuplicateWrite(created.error)) {
+            throw new Error(created.error?.message || "create_user_failed");
+          }
+          authUser = await findConfirmedAuthUserByEmail(admin, email);
+          if (!authUser) throw new Error("create_user_failed");
+        } else {
+          const reread = await admin.auth.admin.getUserById(created.data.user.id);
+          if (reread.error || !reread.data.user) throw new Error("auth_user_missing");
+          const confirmed = confirmedAuthEmail(reread.data.user as AuthUserRecord);
+          if (confirmed !== email) throw new Error("auth_email_unverified");
+          authUser = reread.data.user as AuthUserRecord;
         }
-        const reread = await admin.auth.admin.getUserById(created.data.user.id);
-        if (reread.error || !reread.data.user) throw new Error("auth_user_missing");
-        const confirmed = confirmedAuthEmail(reread.data.user as AuthUserRecord);
-        if (confirmed !== email) throw new Error("auth_email_unverified");
-        authUser = reread.data.user as AuthUserRecord;
       }
 
       const confirmed = confirmedAuthEmail(authUser);
       if (!confirmed) throw new Error("auth_email_unverified");
       authUserId = authUser.id;
       trustedEmail = confirmed;
-
-      const profile = await readProfile(admin, "id", authUserId);
-      if (profile?.pscs_one_user_id && profile.pscs_one_user_id !== identity.user_id) {
-        throw new Error("identity_conflict");
-      }
-      if (profile) {
-        const patch: { pscs_one_user_id?: string; email?: string } = {};
-        if (!profile.pscs_one_user_id) patch.pscs_one_user_id = identity.user_id;
-        if (normalizeEmail(profile.email) !== trustedEmail) patch.email = trustedEmail;
-        if (Object.keys(patch).length > 0) {
-          const { error } = await admin.from("profiles").update(patch).eq("id", authUserId);
-          if (error) throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("profiles").insert({
-          id: authUserId,
-          email: trustedEmail,
-          full_name: trustedEmail.split("@")[0] || "User",
-          pscs_one_user_id: identity.user_id,
-        });
-        if (error) throw new Error(error.message);
-      }
+      await claimProfileLink(admin, authUserId, identity.user_id, trustedEmail);
     }
 
     const redirectTo = `${new URL(pscsOneCallbackUri()).origin}/dashboard`;
@@ -169,6 +231,7 @@ export class PscsOneSessionAdapter {
     request: NextRequest,
     response: NextResponse,
     tokenHash: string,
+    expectedAuthUserId: string,
   ): Promise<{ accessTokenPresent: boolean; refreshTokenPresent: boolean }> {
     const supabase = createRouteHandlerClient(request, response);
     const verified = await supabase.auth.verifyOtp({
@@ -178,6 +241,8 @@ export class PscsOneSessionAdapter {
     if (verified.error) {
       throw new Error(verified.error.message);
     }
+    const sessionUserId = verified.data.user?.id ?? verified.data.session?.user?.id;
+    assertAuthenticatedUser(sessionUserId, expectedAuthUserId);
     return {
       accessTokenPresent: Boolean(verified.data.session?.access_token),
       refreshTokenPresent: Boolean(verified.data.session?.refresh_token),

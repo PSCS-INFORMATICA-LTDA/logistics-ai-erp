@@ -32,7 +32,7 @@ export type PscsOneCallbackDeps = {
     tokenHash: string;
   }>;
   ensureMembership: (authUserId: string, companyId: string) => Promise<void>;
-  verifySession: (tokenHash: string) => Promise<{
+  verifySession: (tokenHash: string, authUserId: string) => Promise<{
     accessTokenPresent: boolean;
     refreshTokenPresent: boolean;
   }>;
@@ -98,7 +98,7 @@ export async function executePscsOneCallback(
 
   let session: { accessTokenPresent: boolean; refreshTokenPresent: boolean };
   try {
-    session = await deps.verifySession(local.tokenHash);
+    session = await deps.verifySession(local.tokenHash, local.authUserId);
   } catch (error) {
     return { ok: false, stage: "session", reason: publicPscsOneSsoReason(error) };
   }

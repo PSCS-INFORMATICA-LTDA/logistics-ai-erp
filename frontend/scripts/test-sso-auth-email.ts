@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { executePscsOneCallback } from "../src/lib/pscs-one/callbackFlow.ts";
 import { publicPscsOneSsoReason } from "../src/lib/pscs-one/errors.ts";
-import { PscsOneSessionAdapter } from "../src/lib/pscs-one/sessionAdapter.ts";
+import { assertAuthenticatedUser, PscsOneSessionAdapter } from "../src/lib/pscs-one/sessionAdapter.ts";
 import type { PscsOneIdentityV1 } from "../src/lib/pscs-one/types.ts";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
@@ -74,17 +74,46 @@ function directory(initial?: { profiles?: ProfileRow[]; users?: AuthRow[] }) {
           };
         },
         update(values: Record<string, unknown>) {
-          return {
-            eq(column: string, value: string) {
-              if (column !== "id") throw new Error("unexpected_update_column");
-              writes.push({ op: "update", values, id: value });
-              const row = profiles.find((profile) => profile.id === value);
-              if (row) Object.assign(row, values);
-              return Promise.resolve({ error: null });
+          const filters: Array<{ op: "eq" | "is"; column: string; value: unknown }> = [];
+          const run = async () => {
+            const hits = profiles.filter((row) =>
+              filters.every((filter) => {
+                const current = row[filter.column as keyof ProfileRow];
+                if (filter.op === "is") return filter.value === null ? current == null : current === filter.value;
+                return current === filter.value;
+              }),
+            );
+            const idFilter = filters.find((filter) => filter.op === "eq" && filter.column === "id");
+            if (hits.length === 0) return { data: [], error: null };
+            writes.push({ op: "update", values, id: typeof idFilter?.value === "string" ? idFilter.value : undefined });
+            for (const row of hits) Object.assign(row, values);
+            return { data: hits.map((row) => ({ ...row })), error: null };
+          };
+          const builder = {
+            eq(column: string, value: unknown) {
+              filters.push({ op: "eq", column, value });
+              return builder;
+            },
+            is(column: string, value: unknown) {
+              filters.push({ op: "is", column, value });
+              return builder;
+            },
+            select() {
+              return builder;
+            },
+            then(onFulfilled: (value: Awaited<ReturnType<typeof run>>) => unknown, onRejected?: (reason: unknown) => unknown) {
+              return run().then(onFulfilled, onRejected);
             },
           };
+          return builder;
         },
         insert(values: ProfileRow) {
+          const duplicate = profiles.some(
+            (row) => row.id === values.id || (values.pscs_one_user_id != null && row.pscs_one_user_id === values.pscs_one_user_id),
+          );
+          if (duplicate) {
+            return Promise.resolve({ error: { message: "duplicate key value violates unique constraint" } });
+          }
           writes.push({ op: "insert", values });
           profiles.push(values);
           return Promise.resolve({ error: null });
@@ -103,6 +132,13 @@ function directory(initial?: { profiles?: ProfileRow[]; users?: AuthRow[] }) {
         },
         async createUser(input: { email: string; email_confirm?: boolean }) {
           if (input.email_confirm !== true) throw new Error("email_confirm_required");
+          const normalized = input.email.trim().toLowerCase();
+          if (users.some((row) => row.email.trim().toLowerCase() === normalized)) {
+            return {
+              data: { user: null },
+              error: { message: "A user with this email address has already been registered" },
+            };
+          }
           const user = {
             id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             email: input.email,
@@ -271,6 +307,92 @@ describe("associação SSO pelo e-mail confirmado do Auth", () => {
     assert.equal(state.profiles.find((row) => row.id === AUTH_B)?.pscs_one_user_id, USER_B);
     assert.equal(publicPscsOneSsoReason(new Error("duplicate_auth_email")), "duplicate_auth_email");
     assert.equal(publicPscsOneSsoReason(new Error("auth_email_unverified")), "auth_email_unverified");
+  });
+
+  it("recupera dois callbacks simultâneos do mesmo e-mail sem segundo usuário", async () => {
+    const state = directory();
+    const [first, second] = await Promise.all([
+      PscsOneSessionAdapter.ensureLocalUser(identity(), state.admin as never),
+      PscsOneSessionAdapter.ensureLocalUser(identity(), state.admin as never),
+    ]);
+    assert.equal(first.authUserId, second.authUserId);
+    assert.equal(state.users.length, 1);
+    assert.equal(state.profiles.length, 1);
+    assert.equal(state.profiles[0].pscs_one_user_id, USER_A);
+  });
+
+  it("não deixa o callback perdedor sobrescrever o vínculo de outra identidade", async () => {
+    const state = directory();
+    const results = await Promise.allSettled([
+      PscsOneSessionAdapter.ensureLocalUser(identity(), state.admin as never),
+      PscsOneSessionAdapter.ensureLocalUser(identity({ user_id: USER_B, company_id: CORE_B, external_company_id: COMPANY_B }), state.admin as never),
+    ]);
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.match(String((rejected[0] as PromiseRejectedResult).reason), /identity_conflict/);
+    assert.equal(state.users.length, 1);
+    assert.equal(state.profiles.length, 1);
+    const winner = (fulfilled[0] as PromiseFulfilledResult<{ authUserId: string }>).value;
+    assert.equal(winner.authUserId, state.users[0].id);
+    assert.equal(state.profiles[0].pscs_one_user_id, results[0].status === "fulfilled" ? USER_A : USER_B);
+    assert.equal(state.profiles[0].id, state.users[0].id);
+  });
+
+  it("rejeita identidade ambígua na releitura após createUser duplicado", async () => {
+    let reads = 0;
+    const ambiguous = [
+      { id: AUTH_A, email: "ana@empresa-a.test", email_confirmed_at: "2026-11-25T16:00:00Z" },
+      { id: AUTH_B, email: "ana@empresa-a.test", email_confirmed_at: "2026-11-25T16:00:00Z" },
+    ];
+    const admin = {
+      from() {
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          maybeSingle: async () => ({ data: null, error: null }),
+          update() {
+            throw new Error("profile_write");
+          },
+          insert() {
+            throw new Error("profile_write");
+          },
+        };
+      },
+      auth: {
+        admin: {
+          async listUsers() {
+            reads += 1;
+            return { data: { users: reads === 1 ? [] : ambiguous }, error: null };
+          },
+          async createUser() {
+            return {
+              data: { user: null },
+              error: { message: "A user with this email address has already been registered" },
+            };
+          },
+          async getUserById() {
+            throw new Error("unexpected_get_user");
+          },
+        },
+      },
+    };
+    await assert.rejects(
+      () => PscsOneSessionAdapter.ensureLocalUser(identity(), admin as never),
+      /duplicate_auth_email/,
+    );
+    assert.equal(reads, 2);
+  });
+
+  it("rejeita a sessão quando o usuário autenticado não é o vínculo local", () => {
+    assert.throws(() => assertAuthenticatedUser(AUTH_B, AUTH_A), /session_user_mismatch/);
+    assert.throws(() => assertAuthenticatedUser(null, AUTH_A), /session_user_mismatch/);
+    assert.doesNotThrow(() => assertAuthenticatedUser(AUTH_A, AUTH_A));
   });
 
   it("preserva o hash da migration 094", () => {
