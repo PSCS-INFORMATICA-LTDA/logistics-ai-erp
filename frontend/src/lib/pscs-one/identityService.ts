@@ -1,5 +1,6 @@
 import { identityFromTokenPayload } from "./callbackFlow";
 import { pscsOneCallbackUri, pscsOneClientId, pscsOneTokenUrl, sanitizeEnvString } from "./config";
+import { exchangeCoreToken, exchangeErrorReason } from "./oidcTransport";
 import type {
   PscsOneCoreAuthSessionV1,
   PscsOneIdentityV1,
@@ -19,17 +20,15 @@ export class PscsOneIdentityService {
       throw new Error("sso_client_unconfigured");
     }
 
-    const response = await fetch(pscsOneTokenUrl(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
+    const { response, oidcToken } = await exchangeCoreToken({
+      tokenUrl: pscsOneTokenUrl(),
+      body: {
         grant_type: "authorization_code",
         code,
         redirect_uri: pscsOneCallbackUri(),
         client_id: pscsOneClientId(),
         client_secret: clientSecret,
-      }),
-      cache: "no-store",
+      },
     });
 
     const payload = (await response.json().catch(() => ({}))) as {
@@ -40,7 +39,7 @@ export class PscsOneIdentityService {
     };
 
     if (!response.ok) {
-      throw new Error(payload.reason || "token_exchange_denied");
+      throw new Error(exchangeErrorReason(payload.reason, oidcToken));
     }
 
     const identity = identityFromTokenPayload(payload);
